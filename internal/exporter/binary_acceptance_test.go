@@ -206,6 +206,37 @@ func TestPackagedRebuildCLI(t *testing.T) {
 	t.Log("actual binary offline rebuild, EOF cancellation, PDF/privacy, original provenance and person narrowing passed with fixture OS already closed")
 }
 
+func TestPackagedLegacyRebuildCLI(t *testing.T) {
+	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
+	if binary == "" {
+		t.Skip("set PIECES_EXPORT_TEST_BINARY to the native release executable")
+	}
+	binary, err := filepath.Abs(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := createLegacyProjectedArchive(t)
+	out := filepath.Join(t.TempDir(), "legacy profiles")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	b, err := exec.CommandContext(ctx, binary, "rebuild", "--source", source, "--output", out, "--people", "profiles", "--yes").CombinedOutput()
+	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 {
+		t.Fatalf("legacy rebuild must stay partial: %v %s", err, b)
+	}
+	m, err := InspectArchive(out)
+	if err != nil || !m.Rebuild.LegacyPersonEvidence || m.People.Selected != 2 || m.People.Unknown != 1 || m.People.Omitted != 2 {
+		t.Fatalf("packaged legacy selection lost conservative evidence: %v", err)
+	}
+	r := &run{ctx: ctx, stage: out, opts: Options{Scanner: scanner(t, DefaultPolicy())}}
+	if err := r.validateMarkdownLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.auditOutput(); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("legacy aggregate/issue reconciliation supports profile selection; unknown person retained and partial exit preserved")
+}
+
 func TestPackagedCacheCLI(t *testing.T) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {

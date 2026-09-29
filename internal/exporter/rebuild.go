@@ -23,19 +23,22 @@ import (
 )
 
 type RebuildInfo struct {
-	SourceManifestSHA256 string           `json:"source_manifest_sha256"`
-	SourceToolVersion    string           `json:"source_tool_version"`
-	SourceStarted        time.Time        `json:"source_started"`
-	SourceFinished       time.Time        `json:"source_finished"`
-	OriginalReadStarted  time.Time        `json:"original_read_started"`
-	OriginalReadFinished time.Time        `json:"original_read_finished"`
-	SourceStatus         string           `json:"source_status"`
-	SourceCoverage       []*Coverage      `json:"source_coverage"`
-	SourcePeople         PeopleStats      `json:"source_people"`
-	SourcePerformance    PerformanceStats `json:"source_performance"`
-	LegacyEvidence       bool             `json:"legacy_evidence"`
-	UnavailableTargets   int              `json:"unavailable_dependency_targets"`
-	BlockedCacheBodies   int              `json:"bodies_with_unavailable_cached_summary"`
+	LegacyPersonEvidence    bool             `json:"legacy_person_evidence_reconciled"`
+	LegacyPersonsReconciled int              `json:"legacy_persons_reconciled"`
+	LegacyPersonsUnknown    int              `json:"legacy_persons_with_unknown_annotations"`
+	SourceManifestSHA256    string           `json:"source_manifest_sha256"`
+	SourceToolVersion       string           `json:"source_tool_version"`
+	SourceStarted           time.Time        `json:"source_started"`
+	SourceFinished          time.Time        `json:"source_finished"`
+	OriginalReadStarted     time.Time        `json:"original_read_started"`
+	OriginalReadFinished    time.Time        `json:"original_read_finished"`
+	SourceStatus            string           `json:"source_status"`
+	SourceCoverage          []*Coverage      `json:"source_coverage"`
+	SourcePeople            PeopleStats      `json:"source_people"`
+	SourcePerformance       PerformanceStats `json:"source_performance"`
+	LegacyEvidence          bool             `json:"legacy_evidence"`
+	UnavailableTargets      int              `json:"unavailable_dependency_targets"`
+	BlockedCacheBodies      int              `json:"bodies_with_unavailable_cached_summary"`
 }
 
 type RebuildOptions struct {
@@ -342,6 +345,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := r.restoreArchiveGraph(root, original.ArchiveState, byPath); err != nil {
 		return r.manifest, err
 	}
+	r.restoreLegacyPersonEvidence(original, manifestBytes, byRef)
 	if o.Mode == "filtered" {
 		if err := r.rescanKnownCredentials(); err != nil {
 			return r.manifest, err

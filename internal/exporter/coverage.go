@@ -146,6 +146,9 @@ func (r *run) renderCoverage() error {
 		if info.LegacyEvidence {
 			b.WriteString("The source uses the legacy archive format without reconstruction evidence. Unknown original projections remain unknown, redacted counts can be unavailable (-1), and verified-user labels are replayed from existing user-profile navigation. This archive remains partial.\n\n")
 		}
+		if info.LegacyPersonEvidence {
+			fmt.Fprintf(&b, "Legacy person annotation-selection evidence reconciled for %d retained people, with %d still unknown, using the explicit all-people report and matching history issues. Event-connection counts and missing person-to-summary projections remain unknown. This supports conservative profile selection; it does not certify complete history.\n\n", info.LegacyPersonsReconciled, info.LegacyPersonsUnknown)
+		}
 		fmt.Fprintf(&b, "Unavailable selected dependencies encountered during cache recovery: %d. Included annotation bodies withheld because a historical cached summary was unavailable: %d. Missing records are never recreated from cached text. Conservative withholding can remove additional content.\n\n", info.UnavailableTargets, info.BlockedCacheBodies)
 	}
 	fmt.Fprintf(&b, "Scope: **%s**.\n\n", md(scope.Name))
