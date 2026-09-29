@@ -209,3 +209,25 @@ Do not sign off migration completeness until retained annotation-to-summary link
 The native Dart SDK persists JSON in `pieces_client_sqlite.db`. Read-only local investigation found cached active annotation links for 10,316 of 11,732 summaries in the current OS staging export (87.9%), referring to 21,277 distinct annotation IDs; the caches contain no inline annotation bodies. The remaining 1,416 summaries have no cached annotation links, and no pipeline links were recovered. These counts describe candidate links, not a completed migration. Current summary IDs and creation times matched, while many update times differed.
 
 The implemented repeatable `--sdk-cache` option requires explicit local file selection and reads without SDK initialization or cache cleanup. It retains origin/update timestamps for recovered edges, honors current fields and newer cache empties/tombstones, skips equal-time conflicts, validates exact current record identities and creation times, and applies ordinary privacy propagation before naming/rendering. Cached text and embedded records never replace current OS content. These exports remain partial. [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md) defines the UX, field/version rules, resource bounds, provenance, tests, and remaining live reconciliation. Cache coverage depends on which clients were used; it cannot be promised on other users' machines.
+
+## Optional event history and summaries scope
+
+Implemented 2026-09-29: `--scope all|summaries`. The default remains `all`; choosing a preset is explicit, and a custom `--materials` selection cannot be combined with a preset. Scan, dry run, calibration, and export use the same scope, so a summaries preview must never sample or enumerate event/hint collections accidentally.
+
+| Data | `all` | `summaries` |
+| --- | --- | --- |
+| Workstream summaries and explicit hierarchy | Full inventory and hierarchy reads | Full inventory and hierarchy reads |
+| Annotations, persons, pipeline definitions | Full inventory; persona-history queries | Full inventory; persona-history queries |
+| Tags, websites, source applications, applications, ranges, anchors | Full selected inventories | Referenced IDs only, batched, without whole-collection counts or reconciliation |
+| Events, hints, source windows, signals, conversations, other collections | Selected full inventories | Not read |
+| Person-to-event connectivity | Full records plus available evidence | Bounded association total query only; no event bodies |
+
+Summary bodies come from annotation records. Events represent underlying activity and supply event-derived graph dimensions and privacy dependencies. They are not necessary to render a summary with a known annotation attachment. Fetching events cannot substitute for omitted summary/annotation attachment fields. The annotation inventory intentionally includes unattached annotations because current OS projections do not reliably expose those attachments. Cache recovery remains optional, historical, and partial; it only links targets already read in the selected scope.
+
+Reference traversal batches only selected material types, deduplicates each frontier, obeys the existing adaptive ceiling and one-request gate, and retains the eight-pass bound. It does not follow summary event references into an omitted event collection. Referenced-only coverage rows use `inventory_mode: references`, unavailable initial/final counts (-1), and actual fetched/included counts; no full-collection completeness is claimed. Preflight counts and estimates cover the four full inventories, with supporting records and persona-history work disclosed as additional cost.
+
+The manifest records `scope.name`, `inventoried_materials`, `referenced_materials`, `omitted_materials`, and aggregate `omitted_reference_occurrences` (edge occurrences, not distinct records). `coverage.md`, the root index, and PDF companions disclose the selected scope. An intentionally omitted target is left unlinked and does not by itself create a failed-read issue. A missing target in a selected collection, unresolved core projection, or unavailable persona history remains a partial-export issue. People selection remains independent of scope and does not merge identities.
+
+Privacy filters still process JSON, text, names, metadata, and PDFs. Excluding event bodies reduces provenance: if a denied website is only exposed by an omitted event/source window, ordinary domain filtering cannot infer that origin from the summary prose. Known included dependencies still propagate exclusions. Strict derived filtering continues to withhold generated records when source filtering is enabled. Tests must demonstrate both the ordinary reduced-provenance behavior and strict withholding, without claiming event-free domain-origin completeness.
+
+The already-running live all-data export was explicitly left running at the user's request. No second live scan/export should compete with its request pacing. Local synthetic acceptance can run independently. The summaries preset does not change that running executable or its selected scope.

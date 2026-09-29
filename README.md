@@ -31,6 +31,25 @@ The default `filtered` mode removes detected secrets and basic financial identif
 
 `--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. There is no resume yet; choose a new path after a failed run. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
 
+## Export summaries without event history
+
+Use `--scope summaries` for summaries and persona/profile documents:
+
+```sh
+./pieces-export export --scope summaries --people profiles --output ./exports/summaries
+./pieces-export export --scope summaries --dry-run --launch-os=false
+# The existing all-data behavior remains available and is the default.
+./pieces-export export --scope all --output ./exports/all-data
+```
+
+Summary narrative text is stored in **annotations**, not in event bodies. The summaries scope inventories summaries, annotations, persons, and pipelines. It queries persona histories and the explicit summary hierarchy, then fetches only referenced tags, websites, source applications, ranges, and anchors in bounded batches. All annotations are included because some OS versions omit the links identifying which annotations supply summary bodies. A missing attachment still needs an authoritative relationship or an explicitly selected historical SDK cache; reading events does not repair it.
+
+Events are useful for raw activity history, event-derived source/website/person graph connections, connectivity evidence, and privacy propagation from excluded activity to dependent summaries. They are optional for a document-focused export. This scope skips event bodies, source-window history, hints, signals, conversations, and other unselected collections. It can use a bounded person/event-association count query; it does not download the underlying events. Preflight and benchmark also respect the selected scope.
+
+Secret detection and domain rules still scan the exported content. If a website origin exists only in skipped activity, its domain cannot be used to exclude that summary. `withhold_unproven_generated_content: true` remains the conservative policy option when domain filtering is configured. Related-summary suggestions include only available evidence; missing destinations stay unlinked. `coverage.md` and the manifest distinguish intentional scope omissions from read failures. A successful summaries export is not an all-data migration.
+
+Advanced `--materials TYPE,TYPE` still selects full inventories of those types; it cannot be combined with `--scope`. `--materials WORKSTREAM_SUMMARIES` alone does **not** select annotation bodies or profile context.
+
 ## Measure performance and choose people
 
 ```sh

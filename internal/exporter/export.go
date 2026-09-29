@@ -16,6 +16,8 @@ import (
 )
 
 type Options struct {
+	Scope                                   string
+	ReferenceOnly                           map[string]bool
 	SDKCaches                               []string
 	Output, Mode, Timezone, Version         string
 	Format, Naming, Relationships, Metadata string
@@ -31,16 +33,17 @@ type Options struct {
 	Progress                                io.Writer
 }
 type Coverage struct {
-	Omitted      int    `json:"intentionally_omitted"`
-	Material     string `json:"material"`
-	InitialCount int    `json:"initial_count"`
-	Inventoried  int    `json:"inventoried"`
-	Fetched      int    `json:"fetched"`
-	Included     int    `json:"included"`
-	Redacted     int    `json:"redacted"`
-	Excluded     int    `json:"excluded"`
-	Withheld     int    `json:"withheld"`
-	FinalCount   int    `json:"final_count"`
+	InventoryMode string `json:"inventory_mode"`
+	Omitted       int    `json:"intentionally_omitted"`
+	Material      string `json:"material"`
+	InitialCount  int    `json:"initial_count"`
+	Inventoried   int    `json:"inventoried"`
+	Fetched       int    `json:"fetched"`
+	Included      int    `json:"included"`
+	Redacted      int    `json:"redacted"`
+	Excluded      int    `json:"excluded"`
+	Withheld      int    `json:"withheld"`
+	FinalCount    int    `json:"final_count"`
 }
 type Issue struct {
 	Material string `json:"material"`
@@ -48,6 +51,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	Scope                   Scope                    `json:"scope"`
 	SDKCache                CacheCoverage            `json:"sdk_cache"`
 	RelationshipCoverage    []RelationshipCoverage   `json:"relationship_coverage"`
 	People                  PeopleStats              `json:"people"`
@@ -181,6 +185,9 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	if err := validateScope(o); err != nil {
+		return Manifest{}, err
+	}
 	if err := ValidateSDKCaches(ctx, o.SDKCaches); err != nil {
 		return Manifest{}, err
 	}
@@ -274,11 +281,12 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		r.opts.Progress = r.progress.out
 	}
 
-	r.manifest = Manifest{RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 4, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
+	r.manifest = Manifest{Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 4, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
 		"Retained local HTTP data only; not an atomic database backup or deleted history.",
 		"Association record metadata, supplementary analysis/settings views, and fingerprint audio downloads are not implemented in this version.",
 		"Server projections can omit vectors and internal data. Binary attachments are not extracted; preserve mode retains exposed byte/encoded fields in JSON.",
 		"The dedicated summary-hierarchy endpoints recover direct parent/child edges when available. Summary annotation bodies and person/pipeline memberships still require relationship projections or an enumerable association API. A person association can mean authorship or involvement, not exclusive subject matter.",
+		"Selected scope controls which collections are read. Unselected relationships have no local links; event-derived source/person/website connections cannot be recovered when events are omitted. Domain filtering checks exposed URLs and known dependencies, not unseen origins.",
 		"IDs and graph metadata are held in memory; record bodies are staged on disk. Large deployments need sizing validation.",
 		"Final ID reconciliation detects set changes, not all in-place edits; pause capture/editing for a quieter export interval.",
 	}}
@@ -304,9 +312,13 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			return r.manifest, ctx.Err()
 		}
 		r.progress.Stage("Inventory "+m.Type, 0)
-		cov := &Coverage{Material: m.Type, InitialCount: -1, FinalCount: -1}
+		cov := &Coverage{Material: m.Type, InventoryMode: "full", InitialCount: -1, FinalCount: -1}
 		r.coverage[m.Type] = cov
 		r.manifest.Coverage = append(r.manifest.Coverage, cov)
+		if o.ReferenceOnly[m.Type] {
+			cov.InventoryMode = "references"
+			continue
+		}
 		ids, err := r.inventoryMaterial(m, cov)
 		if err != nil {
 			if errors.Is(err, ErrOSBusy) || ctx.Err() != nil {
@@ -346,42 +358,13 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		return r.manifest, err
 	}
 	r.progress.Stage("Resolve references", 0)
-	// Fetch references absent from inventories, including supported embedded Pieces links.
-	for pass := 0; pass < 8; pass++ {
-		added := false
-		for _, meta := range r.sortedMeta() {
-			for _, e := range meta.Edges {
-				if _, ok := r.meta[e.Target]; ok {
-					continue
-				}
-				t, id, ok := splitRef(e.Target)
-				if !ok {
-					continue
-				}
-				m, ok := materialByType(t)
-				if !ok || m.Collection == "" {
-					continue
-				}
-				if _, selected := r.coverage[t]; !selected {
-					continue
-				}
-				if err := r.fetch(m, []string{id}); err != nil {
-					return r.manifest, err
-				}
-				added = true
-			}
-		}
-		if !added {
-			break
-		}
-		if pass == 7 {
-			r.issue("GRAPH", "", "reference_traversal_limit")
-		}
+	if err := r.resolveReferences(); err != nil {
+		return r.manifest, err
 	}
 	r.progress.Stage("Reconcile inventories", 0)
 	// A second identity pass makes concurrent additions/deletions explicit; no snapshot claim.
 	for _, m := range o.Materials {
-		if m.SnapshotOnly {
+		if m.SnapshotOnly || o.ReferenceOnly[m.Type] {
 			continue
 		}
 		cov := r.coverage[m.Type]
@@ -441,6 +424,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		}
 	}
 	r.progress.Stage("Assign paths and build graph", 0)
+	r.collectScopeOmissions()
 	r.collectRelationshipCoverage()
 	if err = r.render(); err != nil {
 		return r.manifest, err

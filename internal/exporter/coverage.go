@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -137,7 +138,26 @@ func (r *run) collectRelationshipCoverage() {
 
 func (r *run) renderCoverage() error {
 	var b strings.Builder
-	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\nCounts describe the HTTP data returned during this run. This is not an atomic database backup. Exclusions and selection omissions are intentional; unknown relationship projections remain a coverage gap.\n\n## Material records\n\n| Material | Initial | Inventoried | Fetched | Included | Excluded | Withheld | Omitted | Final |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n")
+	scope := r.manifest.Scope
+	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\n## Selected export scope\n\n")
+	fmt.Fprintf(&b, "Scope: **%s**.\n\n", md(scope.Name))
+	fmt.Fprintf(&b, "Fully inventoried collections: %s.\n\nReferenced supporting collections only: %s.\n\nIntentionally skipped collections: %s.\n\n", strings.Join(scope.Inventoried, ", "), strings.Join(scope.ReferenceOnly, ", "), strings.Join(scope.Omitted, ", "))
+	if len(scope.ReferenceOnly) > 0 {
+		b.WriteString("Supporting collections are not enumerated or reconciled as complete inventories. Initial/final counts are unavailable; fetched/included counts cover only reached records.\n\n")
+	}
+	if len(scope.Omitted) > 0 {
+		b.WriteString("Skipped relationships are intentionally unlinked. Without event history, some source, website, and person connections are unavailable. Secret scanning and URL rules still apply to exported content; they cannot identify a website origin present only in skipped activity. Strict derived-content filtering remains available in the privacy policy.\n\n")
+	}
+	keys := []string{}
+	for typ := range scope.OmittedReferences {
+		keys = append(keys, typ)
+	}
+	sort.Strings(keys)
+	for _, typ := range keys {
+		fmt.Fprintf(&b, "- %s: %d intentionally skipped reference occurrences (not a count of distinct records).\n", typ, scope.OmittedReferences[typ])
+	}
+	b.WriteByte('\n')
+	b.WriteString("Counts describe the HTTP data returned during this run. This is not an atomic database backup. Exclusions and selection omissions are intentional; unknown relationship projections remain a coverage gap.\n\n## Material records\n\n| Material | Initial | Inventoried | Fetched | Included | Excluded | Withheld | Omitted | Final |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n")
 	for _, c := range r.manifest.Coverage {
 		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %d | %d | %d | %d |\n", c.Material, c.InitialCount, c.Inventoried, c.Fetched, c.Included, c.Excluded, c.Withheld, c.Omitted, c.FinalCount)
 	}

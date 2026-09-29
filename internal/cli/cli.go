@@ -99,7 +99,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		out := fs.String("output", "pieces-export-"+time.Now().Format("20060102-150405"), "new output directory (must not exist)")
 		mode := fs.String("mode", "filtered", "filtered or preserve; preserve includes original sensitive content")
 		policyPath := fs.String("policy", "", "JSON privacy policy; defaults to embedded secret and basic financial detection")
-		materials := fs.String("materials", "all", "comma-separated material types or all")
+		scope := fs.String("scope", "", "all (default) or summaries; summaries skips events and reads supporting labels only when referenced")
+		materials := fs.String("materials", "", "custom comma-separated material types or all; cannot combine with --scope")
 		batch := fs.Int("batch-size", 50, "maximum IDs per batch (1–50); pacing starts smaller")
 		window := fs.Int("window-ids", 5000, "target ID count per adaptive time window")
 		zone := fs.String("timezone", "UTC", "IANA timezone for chronological daily indexes")
@@ -218,10 +219,12 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if err != nil {
 			return fail(err)
 		}
-		selected, err := exporter.SelectMaterials(*materials)
+		selection, err := exporter.SelectScope(*scope, *materials)
 		if err != nil {
 			return fail(err)
 		}
+		selected := selection.Materials
+		inventoried := selection.InventoryMaterials()
 		if len(sdkCaches) > 0 {
 			hasSummaries := false
 			for _, m := range selected {
@@ -252,18 +255,19 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			fmt.Fprintln(stdout, "Pieces OS is ready. Collection access is checked by scan/export.")
 			return 0
 		}
+		selection.Print(stdout)
 		if args[0] == "benchmark" || *dryRun {
 			if *dryRun {
 				fmt.Fprintln(stdout, "Dry run: inventory and bounded reads only; no export directory or Desktop closure.")
-				preflight, e := exporter.Scan(ctx, client, selected, stdout)
+				preflight, e := exporter.Scan(ctx, client, inventoried, stdout)
 				if e != nil {
 					return fail(e)
 				}
 				preflight.Print(stdout, "markdown")
 			}
 			// Default calibration covers large bodies and graph/identity families.
-			calibration := selected
-			if *materials == "all" {
+			calibration := inventoried
+			if selection.Name == "all" {
 				calibration, _ = exporter.SelectMaterials("WORKSTREAM_SUMMARIES,WORKSTREAM_EVENTS,PERSONS,ANNOTATIONS,TAGS")
 			}
 			if _, e := exporter.Benchmark(ctx, client, calibration, *benchmarkDuration, *benchmarkReads, stdout); e != nil {
@@ -281,7 +285,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			return 0
 		}
 		fmt.Fprintln(stdout, "Scanning retained local collections...")
-		preflight, err := exporter.Scan(ctx, client, selected, stdout)
+		preflight, err := exporter.Scan(ctx, client, inventoried, stdout)
 		if err != nil {
 			return fail(err)
 		}
@@ -348,7 +352,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)
@@ -380,7 +384,8 @@ Usage:
   pieces-export scan [--environment production|staging] [--launch-os=false]
   pieces-export benchmark [--benchmark-duration 30s] [--people-report]
   pieces-export export --dry-run [--people connected --people-report]
-  pieces-export export --output ./my-export [--format markdown|pdf|both] [--yes]
+  pieces-export export --scope summaries --output ./my-summaries [--yes]
+  pieces-export export --scope all --output ./my-export [--format markdown|pdf|both] [--yes]
   pieces-export export --output ./private-originals --mode preserve
   pieces-export policy init --output policy.json
   pieces-export lists fetch --output lists --categories adult,bank

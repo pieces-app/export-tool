@@ -20,6 +20,16 @@ The CLI scans inventory, shows a rough duration estimate, offers Markdown/PDF ou
 
 `--output` resolves from the terminal working directory; the CLI prints the absolute destination. With no option, it creates `pieces-export-<timestamp>` there. Open `my-pieces-export/index.md` after completion, or `index.pdf` when PDF was requested. Read `manifest.json` for included, excluded, withheld, and missing records and current coverage limits. Existing output directories are never overwritten. Exit code 2 means a partial export that needs review; exit code 1 means failure. Interrupted/failed runs can leave a `.partial` directory; it is not a completed export. This version does not resume partial directories: choose a new output path for a retry.
 
+For a smaller export centered on summary documents and personas, use:
+
+```sh
+./pieces-export export --scope summaries --people profiles --output ./my-summaries
+```
+
+On Windows, use `.\pieces-export.exe` with the same flags. Summary text comes from annotations; fetching all events is not required. This scope inventories summaries, annotations, persons, and pipelines, then reads referenced tags/websites/sources/applications/ranges/anchors only. It skips event bodies, hints, source-window history, signals, conversations, and other unselected collections. Person connectivity may use an association-count query without reading event bodies. Missing body attachments remain reported as coverage gaps.
+
+`--scope all` preserves the default all-data export. Events add activity history and some source/person/website graph evidence. Omitting them reduces website-origin filtering coverage: rules still inspect exported URLs, but cannot discover a domain present only in skipped activity. Review the intentional omissions in `coverage.md`. The folder structure and validated local links are the same for both scopes. `scan`, `benchmark`, and `export --dry-run` accept `--scope summaries` too. Advanced `--materials` cannot be combined with `--scope`.
+
 To preview without creating an archive or closing Desktop:
 
 ```sh

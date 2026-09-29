@@ -102,6 +102,66 @@ func TestPackagedCLI(t *testing.T) {
 	t.Log("native binary doctor/scan/export, counts, user profile, body, PDF/privacy checks, and moved local links passed")
 }
 
+func TestPackagedSummaryCLI(t *testing.T) {
+	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
+	if binary == "" {
+		t.Skip("set PIECES_EXPORT_TEST_BINARY to the native release executable")
+	}
+	binary, err := filepath.Abs(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := summaryScopeFixture()
+	srv := f.server(t)
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	common := []string{"--scope", "summaries", "--base-url", srv.URL, "--launch-os=false"}
+	for _, command := range []string{"scan", "benchmark"} {
+		args := append([]string{command}, common...)
+		if command == "benchmark" {
+			args = append(args, "--benchmark-reads", "1", "--benchmark-duration", "5s")
+		}
+		b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput()
+		if err != nil || !strings.Contains(string(b), "Export scope: summaries") {
+			t.Fatalf("packaged scoped %s failed: %v\n%s", command, err, b)
+		}
+	}
+	out := filepath.Join(t.TempDir(), "summaries only")
+	args := append([]string{"export"}, common...)
+	args = append(args, "--output", out, "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
+	if b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil {
+		t.Fatalf("packaged summaries export failed: %v\n%s", err, b)
+	}
+	assertSummaryScopeRequests(t, f)
+	var manifest Manifest
+	b, err := os.ReadFile(filepath.Join(out, "manifest.json"))
+	if err != nil || json.Unmarshal(b, &manifest) != nil || manifest.Scope.Name != "summaries" || manifest.Status != "complete_for_implemented_scope" {
+		t.Fatal("packaged summary scope manifest missing or incomplete")
+	}
+	var paths map[string]string
+	b, _ = os.ReadFile(filepath.Join(out, "link-map.json"))
+	if err := json.Unmarshal(b, &paths); err != nil {
+		t.Fatal(err)
+	}
+	b, err = os.ReadFile(filepath.Join(out, paths[opaque("WORKSTREAM_SUMMARIES", "summary")]))
+	if err != nil || !strings.Contains(string(b), "Actual summary narrative") {
+		t.Fatal("packaged summaries export lost its annotation body")
+	}
+	moved := out + "-moved"
+	if err := os.Rename(out, moved); err != nil {
+		t.Fatal(err)
+	}
+	r := &run{ctx: ctx, stage: moved, opts: Options{Scanner: scanner(t, DefaultPolicy())}}
+	if err := r.validateMarkdownLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.auditOutput(); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("scoped scan/benchmark/export read no event bodies or supporting inventories; body, PDF/privacy, and moved links passed")
+}
+
 func TestPackagedCacheCLI(t *testing.T) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {

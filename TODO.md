@@ -20,6 +20,17 @@ Updated 2026-09-29. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/name
 - [x] Update this checklist with the evidence from the new implementation and keep README/download instructions synchronized.
 - [ ] Define a release coverage contract for “all retained exposed data”; close the existing association/binary/supplemental-view gaps or explicitly list them in every manifest and download guide.
 
+## 0a. Optional events and summaries-focused export
+
+- [x] Add explicit `--scope summaries|all`; preserve the all-data default and reject ambiguous `--scope` plus `--materials` combinations before OS discovery.
+- [x] Inventory summaries, annotations, persons, and pipelines; fetch only referenced supporting tags/websites/sources/applications/ranges/anchors in adaptive batches. Do not enumerate supporting collections or read event bodies, hints, signals, or source-window history.
+- [x] Make scan, dry run, and calibration respect the scope. Explain that persona connectivity can use a bounded association-count query without reading events.
+- [x] Preserve annotation bodies, persona histories, explicit user mappings, summary hierarchy, and valid local Markdown/PDF links; distinguish intentional omissions from failed selected-record reads.
+- [x] Record scope, referenced-only coverage, and omitted reference occurrences in the manifest and rendered coverage report. Explain reduced graph and website-origin filtering evidence.
+- [x] Test ordinary and strict domain filtering without event bodies, missing selected targets, unrelated-tag omission, batched references, and moved Markdown/PDF navigation on a synthetic OS.
+- [ ] Execute the new preset against the live OS after the active all-data export finishes; compare elapsed time, records, body/graph coverage, and person reduction without concurrent readers competing with pacing.
+- [ ] Add offline rebuilding of a finalized archive with preserved privacy decisions, verified user mappings, relationship provenance, and original coverage gaps. Reject active partial folders; do not silently reintroduce excluded content from SDK caches. This remains unimplemented.
+
 ## 1. Discovery and OS lifecycle
 
 Implementation: isolate lifecycle helpers from CLI prompts; inject process launch/probe functions so tests do not launch or quit real applications. Use the source links in the lifecycle section of EXPORT_SPEC.
@@ -278,3 +289,12 @@ Live exports stay under ignored `exports/`. Record counts/timings/statuses in th
 - After adding SQLite, the pinned vulnerability scan reported zero reachable vulnerabilities on macOS, with three imported-package and eighteen required-module advisories not found called. Re-run native acceptance and package/license checks for the new release; cross-compilation alone does not prove platform runtime behavior.
 - `0.6.0-dev`: all six targets built with CGO disabled. Verified every ZIP checksum and the exact four-file allowlist, including SQLite/libc and bundled third-party license texts. Compressed packages are approximately 6.8–7.5 MiB and contain no source or private cache/export files. Native macOS ARM64 and the isolated Linux ARM64 VM both passed packaged ordinary and cache-recovery exports, partial exit-code checks, body/provenance, privacy/PDF auditing and relocated local links. Linux also passed the cache/WAL, reference-budget and UUID regressions. `go test -race ./...` and `go vet ./...` passed after the fixes. The running full export still uses the earlier binary; it was not restarted or modified.
 - The `0.6.0-dev` macOS AMD64 binary passed both packaged acceptance cases under Rosetta (ordinary export 1.77 s; cache recovery 0.62 s). This exercises the new SQLite path but is not an Intel-hardware test. The updated native workflow passed actionlint locally; it was not retried on GitHub.
+
+### 2026-09-29 optional event history and summaries scope
+
+- Implemented `--scope summaries` with four full inventories and six referenced-only supporting types. The default remains all data. Advanced material selection and presets are mutually exclusive. Batched graph traversal never fetches an unselected type; intentional scope omissions no longer masquerade as missing selected targets.
+- Local tests prove that annotation narrative, verified user persona history, direct source/tag labels, PDF/privacy checks, and moved links work without event-body reads. A 53-tag fixture fetches only referenced tags in batches and leaves its unrelated tag behind. Selected missing bodies still make the archive partial; strict domain-origin filtering still withholds generated content. Scan and benchmark respect the preset.
+- `go test -race ./...`, `go vet ./...`, and actionlint passed. Pinned `govulncheck@v1.8.0` found zero reachable vulnerabilities (3 imported-package and 18 required-module advisories remain outside called code).
+- Built six `0.7.0-dev` binary-only archives locally; verified SHA-256 checksums, exactly four package members, SQLite notices, and bundled scope instructions. Actual packaged ordinary/cache/summaries acceptance passed on macOS ARM64, Linux ARM64 in the network-isolated local VM, and macOS AMD64 under Rosetta. Rosetta is not Intel hardware acceptance; Windows runtime and GUI acceptance remain pending.
+- The user explicitly chose to let the active all-data run finish. At the latest observation it had fetched 516,336/689,546 events (74.9%, approximately 107 records/s), with zero retries and adaptive pauses. This is an in-progress event-phase measurement, not a finished migration or whole-export ETA. No second live summaries scan/export was started, and GitHub Actions was not retried.
+- Offline rebuilding remains planned and unimplemented; work shifted to optional event history after the user's request. The running process uses its original binary and selection, so these new changes apply only to subsequent runs.

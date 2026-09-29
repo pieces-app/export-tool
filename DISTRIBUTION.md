@@ -94,3 +94,5 @@ Local evidence so far:
 Record full live migration and published-URL install evidence in [TODO.md](TODO.md) before marking the release production ready.
 
 The `0.6.0-dev` packages add optional [SDK-cache recovery](SDK_CACHE_RECOVERY.md) and a UUID/payment-card false-positive fix. All six packages compile with CGO disabled and include SQLite/libc notices. Packaged ordinary and cache-recovery acceptance passed on macOS ARM64, Linux ARM64 in the isolated local VM, and macOS AMD64 under Rosetta. These remain development builds: the full live migration, remote native matrix, GUI behavior, and GCP download path are still unverified.
+
+The local `0.7.0-dev` packages add the explicit summaries scope and batched supporting-reference reads. All six checksums/package members were verified. Packaged ordinary/cache/summaries acceptance passed on macOS ARM64, local Linux ARM64, and macOS AMD64 under Rosetta. No binaries were uploaded; Windows/Intel-hardware/runtime acceptance and the configured GCP download path remain pending. The prepared workflow includes the new scoped acceptance case, but Actions remains on the billing hold.

@@ -174,7 +174,7 @@ func (r *run) render() error {
 		for _, e := range m.Edges {
 			target := r.meta[e.Target]
 			if target == nil || target.State != "included" {
-				if target == nil || target.State == "missing" {
+				if typ, _, ok := splitRef(e.Target); ok && r.coverage[typ] != nil && (target == nil || target.State == "missing") {
 					r.issue(m.Type, m.ID, "unresolved_reference")
 				}
 				continue
@@ -354,6 +354,7 @@ func (r *run) render() error {
 	chronology.WriteString("# Chronological record index\n\nThis index covers every included dated material record, ordered by its record creation timestamp. It is separate from the workstream-summary timeline, which organizes summary documents.\n\n[Chronological JSONL](records.jsonl) · [Export index](../index.md)\n\n## Days\n\n")
 	var index strings.Builder
 	index.WriteString("# Pieces export\n\nChronology uses record creation time, not necessarily activity time. Summary ranges and calendar context remain in record JSON.\n\n[Manifest](manifest.json) · [Chronological JSONL](timeline/records.jsonl) · [Undated records](markdown/undated.md)\n\n## Days\n\n")
+	fmt.Fprintf(&index, "Selected scope: **%s**. Read [coverage and intentional omissions](coverage.md) before treating this as a full migration.\n\n", md(r.manifest.Scope.Name))
 	for _, day := range dayNames {
 		path := "markdown/days/" + day + ".md"
 		var b strings.Builder

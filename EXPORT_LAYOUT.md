@@ -18,6 +18,12 @@ In PowerShell:
 
 Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder; resume is not implemented. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
 
+## Optional event history
+
+`--scope summaries` keeps this summary/persona/pipeline folder structure while omitting event bodies and other activity collections. Summary bodies are annotation records. Summaries, annotations, persons, and pipeline definitions are inventoried; supporting tags, websites, source applications, applications, ranges, and anchors are fetched only when referenced. `--scope all` retains the full export behavior and remains the default. `--people profiles` is an independent person-selection option.
+
+`manifest.json` and `coverage.md` record scope and intentional omissions. Local links point only to included files. Suggestions can be less connected without event-derived source/person/website evidence. Domain rules still inspect exported URLs, but cannot recognize origins available only in skipped activity. See [the scope contract](EXPORT_SPEC.md#optional-event-history-and-summaries-scope).
+
 ## Folder map
 
 Names and IDs below are illustrative. Only included, successfully read records appear. In filtered mode, records and folder labels must pass privacy processing first. Empty categories can contain an index without record files.

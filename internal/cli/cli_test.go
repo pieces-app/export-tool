@@ -48,6 +48,16 @@ func TestHelpVersionAndValidation(t *testing.T) {
 	}
 }
 
+func TestScopeValidationBeforeConnection(t *testing.T) {
+	for _, flags := range [][]string{{"--scope", "bad"}, {"--scope", "summaries", "--materials", "all"}, {"--scope", "all", "--materials", "TAGS"}} {
+		var out, errs bytes.Buffer
+		args := append([]string{"scan", "--launch-os=false", "--base-url", "http://127.0.0.1:1"}, flags...)
+		if code := Run(context.Background(), args, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "scope") {
+			t.Fatalf("scope validation did not precede OS discovery: %d %s", code, errs.String())
+		}
+	}
+}
+
 func TestPolicyInitDoesNotOverwrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "policy.json")
 	var out, errs bytes.Buffer

@@ -42,13 +42,14 @@ func refs(ids ...string) map[string]any {
 }
 
 type fakeOS struct {
-	beforeBatch     func()
-	data            map[string][]map[string]any
-	batchMissing    string
-	calls           []string
-	summaryChildren map[string][]string
-	currentUserID   string
-	userPersons     map[string]string
+	requestedMaterials []string
+	beforeBatch        func()
+	data               map[string][]map[string]any
+	batchMissing       string
+	calls              []string
+	summaryChildren    map[string][]string
+	currentUserID      string
+	userPersons        map[string]string
 }
 
 func (f *fakeOS) server(t *testing.T) *httptest.Server {
@@ -207,6 +208,7 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 			var input map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&input)
 			typ, _ := input["material_type"].(string)
+			f.requestedMaterials = append(f.requestedMaterials, typ)
 			records, ok := f.data[typ]
 			if !ok {
 				http.Error(w, "unsupported", 404)

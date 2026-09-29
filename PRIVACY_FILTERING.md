@@ -307,3 +307,7 @@ The research initially executed the synthetic Gitleaks experiment described abov
 [ut1-license]: https://creativecommons.org/licenses/by-sa/4.0/
 [public-suffix]: https://publicsuffix.org/list/
 [tldextract]: https://github.com/john-kurkowski/tldextract/blob/master/README.md
+
+## Summaries without event history
+
+`--scope summaries` skips event bodies and source-window history. Text/credential/financial detection and domain rules still run on every included representation. A domain exposed only in omitted activity is unavailable to ordinary domain-origin filtering, and event-derived graph connections are reduced. Do not describe this mode as excluding every summary influenced by an adult or banking website. With source filtering configured, `withhold_unproven_generated_content: true` still withholds generated summaries/annotations rather than treating unobserved origins as approved. Scope omissions are reported separately from missing selected records.
