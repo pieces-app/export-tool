@@ -47,6 +47,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	RelationshipCoverage    []RelationshipCoverage   `json:"relationship_coverage"`
 	People                  PeopleStats              `json:"people"`
 	Performance             PerformanceStats         `json:"performance"`
 	SummaryHierarchy        SummaryHierarchyCoverage `json:"summary_hierarchy"`
@@ -75,6 +76,7 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	ProjectionStates                                               map[string]string
 	RelationshipProjectionUnknown                                  bool
 	PersonProjection                                               bool
 	PersonEvidence                                                 *PersonFacts
@@ -420,6 +422,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		}
 	}
 	r.progress.Stage("Assign paths and build graph", 0)
+	r.collectRelationshipCoverage()
 	if err = r.render(); err != nil {
 		return r.manifest, err
 	}
@@ -548,7 +551,9 @@ func (r *run) fetch(m Material, ids []string) error {
 				if v, ok := item.(map[string]any); ok {
 					id := fieldString(v, "id")
 					if pending[id] {
-						r.store(m, v, false)
+						if err := r.store(m, v, false); err != nil {
+							return err
+						}
 						delete(pending, id)
 					} else {
 						r.issue(m.Type, "", "unexpected_batch_id")
@@ -577,11 +582,16 @@ func (r *run) fetch(m Material, ids []string) error {
 			r.issue(m.Type, id, "record_fetch_failed")
 			continue
 		}
-		r.store(m, v, false)
+		if err := r.store(m, v, false); err != nil {
+			return err
+		}
 	}
 	return nil
 }
-func (r *run) store(m Material, v map[string]any, replace bool) {
+func (r *run) store(m Material, v map[string]any, replace bool) error {
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
 	id := fieldString(v, "id")
 	key := m.Type + "\x00" + id
 	name := opaque(m.Type, id)
@@ -590,6 +600,7 @@ func (r *run) store(m Material, v map[string]any, replace bool) {
 		meta.DataPath = "raw/" + m.Folder + "/" + name + ".json"
 	}
 	meta.Edges = extractEdges(m.Type, id, v)
+	meta.ProjectionStates = projectionStates(m.Type, v)
 	if m.Type == "WORKSTREAM_SUMMARIES" {
 		for _, field := range []string{"annotations", "persons", "pipelines"} {
 			if object(v, field) == nil {
@@ -636,12 +647,20 @@ func (r *run) store(m Material, v map[string]any, replace bool) {
 		if err := writeJSON(filepath.Join(r.stage, meta.DataPath), v); err != nil {
 			meta.State = "withheld"
 			r.issue(m.Type, id, "record_write_failed")
+			r.meta[key] = meta
+			if !replace {
+				r.coverage[m.Type].Fetched++
+			}
+			// A destination failure is unlikely to be record-specific. Stop before
+			// fetching more source data into an unwritable/full filesystem.
+			return errConfig("could not write an export record; check destination space and permissions; partial directory was not finalized")
 		}
 	}
 	r.meta[key] = meta
 	if !replace {
 		r.coverage[m.Type].Fetched++
 	}
+	return nil
 }
 func (r *run) sortedMeta() []*Meta {
 	result := make([]*Meta, 0, len(r.meta))

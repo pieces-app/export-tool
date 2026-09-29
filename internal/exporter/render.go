@@ -354,6 +354,10 @@ func (r *run) render() error {
 	if err := r.renderOrganization(); err != nil {
 		return err
 	}
+	if err := r.renderCoverage(); err != nil {
+		return err
+	}
+	index.WriteString("\n[Export coverage and relationship gaps](coverage.md)\n")
 	index.WriteString("\n[Chronological record index](timeline/index.md) · [All workstream summaries](workstream_summaries/index.md) · [Single-click summaries](workstream_summaries/single_click_summaries/index.md)\n")
 	index.WriteString("\n[Personas, profiles, and people](workstream_summaries/personas/index.md) · [Known pipeline associations](workstream_summaries/pipeline_associations/index.md)\n")
 	index.WriteString("\n## All included records\n\n")

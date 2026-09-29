@@ -9,12 +9,13 @@ import (
 )
 
 type ScanMaterial struct {
-	Type          string  `json:"type"`
-	Count         int     `json:"count"`
-	Status        string  `json:"status"`
-	Sampled       int     `json:"sampled"`
-	SampleSeconds float64 `json:"sample_seconds"`
-	SampleBytes   int     `json:"sample_bytes"`
+	UnknownProjections int     `json:"sampled_unknown_projections"`
+	Type               string  `json:"type"`
+	Count              int     `json:"count"`
+	Status             string  `json:"status"`
+	Sampled            int     `json:"sampled"`
+	SampleSeconds      float64 `json:"sample_seconds"`
+	SampleBytes        int     `json:"sample_bytes"`
 }
 type Preflight struct {
 	Materials               []ScanMaterial `json:"materials"`
@@ -80,6 +81,17 @@ func Scan(ctx context.Context, c *Client, materials []Material, progress io.Writ
 				}
 				item.SampleSeconds = time.Since(sampleStart).Seconds()
 				item.Sampled = len(records)
+				for _, raw := range records {
+					v, ok := raw.(map[string]any)
+					if !ok {
+						continue
+					}
+					for _, state := range projectionStates(m.Type, v) {
+						if state == "absent" || state == "invalid" {
+							item.UnknownProjections++
+						}
+					}
+				}
 				data, _ := json.Marshal(records)
 				item.SampleBytes = len(data)
 				if item.Sampled > 0 {
@@ -124,6 +136,9 @@ func (p Preflight) Print(w io.Writer, format string) {
 		}
 		if item.Status == "inventory_only" {
 			fmt.Fprintf(w, "Coverage limitation: %s has %d records but no implemented read endpoint.\n", item.Type, item.Count)
+		}
+		if item.UnknownProjections > 0 {
+			fmt.Fprintf(w, "Coverage limitation: %s sample has %d absent/invalid core relationship fields across %d records; a complete graph is unverified.\n", item.Type, item.UnknownProjections, item.Sampled)
 		}
 	}
 	fmt.Fprintf(w, "%d nonempty collections have no read sample; their cost is assumed or unavailable.\n", unsampled)

@@ -48,8 +48,13 @@ func TestOrganizedCanonicalPathsSharedMembershipAndPrivacy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Status != "complete_for_implemented_scope" {
+	if manifest.Status != "partial" {
 		t.Fatalf("unexpected coverage issues: %+v", manifest.Issues)
+	}
+	for _, issue := range manifest.Issues {
+		if !strings.HasPrefix(issue.Code, "unverified_") {
+			t.Fatalf("unexpected non-projection issue: %+v", issue)
+		}
 	}
 	var paths map[string]string
 	data, _ := os.ReadFile(filepath.Join(out, "link-map.json"))

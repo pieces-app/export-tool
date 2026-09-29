@@ -88,6 +88,7 @@ Local evidence so far:
 - Bash installer: HTTPS download against a temporary trusted test server, real SHA/ZIP validation, native fixture execution, exit statuses, literal arguments, and cleanup/retention passed.
 - PowerShell 7 on macOS: same package/execution/cleanup tests passed with transport mocked; the actual HTTPS download helper separately retrieved a pinned public README with certificate validation enabled. This is not Windows runtime evidence.
 - Both scripts reject corrupted hashes, duplicate checksum entries, and ZIP path traversal before executing any binary.
-- Native macOS ARM64 packaged CLI: synthetic end-to-end acceptance passed. Workflow passed actionlint. Other native jobs are prepared, not yet executed.
+- Native macOS ARM64 and a local Linux ARM64 Docker VM: packaged synthetic end-to-end acceptance passed. The Linux container had no Go, no network, and no private export/source mounts; exporter, CLI, and fake-lifecycle tests also passed. macOS AMD64 passed under Rosetta, which is not Intel hardware acceptance. GUI metadata and installed-OS lifecycle remain separate tests.
+- Workflow passed actionlint. GitHub Actions attempts returned startup failures with no jobs; the user confirmed outstanding billing prevents Actions until next week. Do not retry CI until billing is resolved. Windows and remote native runners remain unverified.
 
 Record full live migration and published-URL install evidence in [TODO.md](TODO.md) before marking the release production ready.

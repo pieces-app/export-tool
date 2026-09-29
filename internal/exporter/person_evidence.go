@@ -147,7 +147,9 @@ func (r *run) loadPersonEvidence() error {
 			id := fieldString(v, "id")
 			key := "ANNOTATIONS\x00" + id
 			if existing := r.meta[key]; existing == nil {
-				r.store(annotationMaterial, v, false)
+				if err := r.store(annotationMaterial, v, false); err != nil {
+					return err
+				}
 			}
 			m.Edges = append(m.Edges, Edge{m.Key, key, "annotations"})
 			if annotation := r.meta[key]; annotation != nil {

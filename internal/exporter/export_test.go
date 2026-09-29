@@ -42,6 +42,7 @@ func refs(ids ...string) map[string]any {
 }
 
 type fakeOS struct {
+	beforeBatch     func()
 	data            map[string][]map[string]any
 	batchMissing    string
 	calls           []string
@@ -243,6 +244,9 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 		}
 		for _, m := range Materials {
 			if r.URL.Path == m.Batch && m.Batch != "" {
+				if f.beforeBatch != nil {
+					f.beforeBatch()
+				}
 				var input map[string]any
 				_ = json.NewDecoder(r.Body).Decode(&input)
 				want := references(input[m.Field])
@@ -298,6 +302,7 @@ func TestFilteredExportChronologyGraphAndLeaks(t *testing.T) {
 	summary["name"] = "Retained summary"
 	summary["annotations"] = refs("annotation-1")
 	summary["events"] = refs("event-secret")
+	summary["persons"], summary["pipelines"] = refs(), refs()
 	privateBody := record("annotation-private", "2026-09-21T14:00:00Z")
 	privateBody["type"] = "SUMMARY"
 	privateBody["text"] = "private balance description derived without URL"
@@ -307,6 +312,7 @@ func TestFilteredExportChronologyGraphAndLeaks(t *testing.T) {
 	person := record("person-1", "2026-01-01T00:00:00Z")
 	person["type"] = map[string]any{"platform": map[string]any{"name": "Alex", "apiKeys": []any{"very-short-credential"}}}
 	person["annotations"] = refs("annotation-1")
+	person["summaries"] = refs()
 	undated := record("tag-undated", "")
 	undated["text"] = "No date"
 	f := &fakeOS{data: map[string][]map[string]any{"WORKSTREAM_EVENTS": {evt, denied}, "ANNOTATIONS": {annotation, privateBody}, "WORKSTREAM_SUMMARIES": {summary, privateSummary}, "PERSONS": {person}, "TAGS": {undated}}, batchMissing: "person-1"}

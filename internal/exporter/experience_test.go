@@ -30,10 +30,12 @@ func TestReadableSummaryGraphPDFAndMetadata(t *testing.T) {
 	description["type"] = "WORKSTREAM_SUMMARY_DESCRIPTION"
 	description["text"] = "Reviewed the export graph and document layout."
 	b["annotations"] = refs("body", "description")
+	a["annotations"], a["pipelines"], b["pipelines"] = refs(), refs(), refs()
 	tag := record("tag", "")
 	tag["text"] = "Export planning"
 	person := record("person", "")
 	person["name"] = "Alex"
+	person["summaries"] = refs()
 	persona := record("persona", "2026-09-29T14:00:00Z")
 	persona["type"] = "HIERARCHICAL_PROFILE_SUMMARY"
 	persona["person"] = map[string]any{"id": "person"}

@@ -95,10 +95,10 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.5.0-dev --output dist/0.5.0-dev
+go run ./cmd/release --version 0.5.1-dev --output dist/0.5.1-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.5.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.5.1-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 
@@ -111,7 +111,7 @@ Live hierarchy verification recovered **1,708 direct edges**, using two global i
 An evenly spaced sample of 250 summary snapshots still omitted annotation/person/pipeline relationship fields. Sampled persona annotations also omitted summary links. Enums/descriptors classify the files, and the exporter follows both forward and reverse attachment fields wherever present, but **full summary-body attachment and person/pipeline membership remain release blockers**. The current OS omits those inspected response fields even though the source model defines them; missing data is not an empty relationship. Full-history export has not been verified.
 
 
-- Person-to-summary and pipeline membership indexes depend on available typed associations; projected snapshots can omit them. The exporter queries persona/profile histories directly but cannot promise every summary describing a person. The consolidated signals digest is planned, not implemented.
+- Person-to-summary and pipeline membership indexes depend on available typed associations; projected snapshots can omit them. New exports disclose absent/malformed core projections in `coverage.md` and the manifest, and return partial status (exit 2) even if material counts reconcile. The exporter queries persona/profile histories directly but cannot promise every summary describing a person. The consolidated signals digest is planned, not implemented.
 - Association-object metadata, supplementary settings/analysis views, fingerprint audio downloads, and separate binary attachment extraction are not implemented. Preservation JSON retains encoded representations returned by the server; filtered mode withholds unsupported binary forms. Inaccessible internal records are reported.
 - The current timeline uses **record creation time**, not summary activity ranges or scheduled calendar occurrence times. Those source fields remain in record JSON for a later activity timeline. The CLI exports full history; it does not yet offer a user-selected date range.
 - There is no atomic server snapshot. The final inventory catches ID changes, not in-place updates to existing records. Deleted history and unavailable/cloud-only data cannot be recovered. Failed reads result in a partial manifest and nonzero exit status.

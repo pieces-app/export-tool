@@ -27,6 +27,7 @@ Pieces-Export/
   index.md                                  # start here
   index.pdf                                 # when PDF requested
   manifest.json                             # counts, issues, hierarchy checks, performance
+  coverage.md                               # aggregate record/projection gaps; partial status
   link-map.json                             # canonical paths keyed by material/ID hash
   relationships.jsonl                       # typed edges; derived inverses marked
 
@@ -209,6 +210,10 @@ Every renderer uses final canonical paths, relative URI-escaped links, and forwa
 Related-summary sections use Tags, Source, Person, and Website. Default relevance scores one point per distinct shared dimension, then sorts by recency and ID. `--related-order recent`, `--related-limit`, and `--related-since` change suggestions only. Complete group/person/pipeline indexes preserve all known included memberships beyond suggestion limits. Markdown and PDF local targets are checked before finalization and tested after moving the archive.
 
 Descriptions, tags, normalized source/website tags, and approved person labels appear in documents and portable metadata sidecars. Optional native attributes use the platform-specific mechanisms documented in [EXPORT_SPEC.md](EXPORT_SPEC.md#native-metadata-and-portability); filesystem copying can remove those attributes, so sidecars remain authoritative.
+
+## Coverage report
+
+The root `coverage.md` links to the manifest and reports per-material counts alongside the core summary/person/pipeline projection counts. Absent or malformed relationship fields make an export partial, even if all returned IDs reconcile. Explicitly empty fields are counted separately. Inverse body recovery and hierarchy traversal preserve supported links without certifying the omitted projections. Counts concern included records; private record labels and identifiers do not appear in this report. The root index links to it, and PDF mode adds `pdf/coverage.pdf` with Markdown companion links.
 
 ## Signals digest: planned next
 
