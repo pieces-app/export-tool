@@ -20,6 +20,7 @@ import (
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/text/encoding/charmap"
 )
 
 func pdfPath(path string) string {
@@ -216,12 +217,21 @@ func (r *run) renderPDFs() error {
 			r.documentMetadata[target] = meta
 		}
 	}
+	// Some destinations are rendered later in the loop. Check their existence
+	// after all PDFs have been written, including in unfiltered mode.
+	for _, path := range paths {
+		if err := r.auditPDFFile(filepath.Join(r.stage, pdfPath(path)), true, false); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadata) (int, error) {
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.SetMargins(44, 44, 44, 44)
+	slots := pdfActionSlots{}
+	unsupportedLinks := map[string]bool{}
 	missing := map[rune]bool{}
 	option := gopdf.TtfOption{OnGlyphNotFound: func(c rune) { missing[c] = true }, OnGlyphNotFoundSubstitute: func(rune) rune { return '?' }}
 	font := goregular.TTF
@@ -317,7 +327,11 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 				if err != nil {
 					return err
 				}
-				pdf.AddExternalLink(destination, 44, y, width, size*1.5)
+				annotation := destination
+				if strings.HasPrefix(destination, "/A <<") {
+					annotation = slots.reserve(destination)
+				}
+				pdf.AddExternalLink(annotation, 44, y, width, size*1.5)
 			}
 			y += size * 1.5
 		}
@@ -335,18 +349,35 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 				continue
 			}
 			destination := link.Destination
-			if !u.IsAbs() && u.Host == "" && u.Path != "" {
+			if !u.IsAbs() && u.Host == "" && u.Path != "" && !strings.Contains(u.Path, "\\") && !strings.HasPrefix(u.Path, "/") {
 				resolved := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(source), filepath.FromSlash(u.Path))))
-				destination = relative(target, resolved)
-				if u.Fragment != "" {
-					destination += "#" + url.PathEscape(u.Fragment)
+				if resolved == ".." || strings.HasPrefix(resolved, "../") {
+					return 0, errConfig("PDF link leaves export directory")
 				}
-			} else if u.IsAbs() && u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "mailto" {
+				// JSON and other non-document links remain visible labels. Local
+				// PDF navigation opens the mirrored PDF, at its first page.
+				if filepath.Ext(resolved) != ".md" {
+					continue
+				}
+				if st, err := os.Stat(filepath.Join(r.stage, resolved)); err != nil || !st.Mode().IsRegular() {
+					return 0, errConfig("PDF Markdown companion is missing")
+				}
+				rel, err := filepath.Rel(filepath.Dir(filepath.FromSlash(target)), filepath.FromSlash(pdfPath(resolved)))
+				if err != nil {
+					return 0, errConfig("PDF link could not be resolved")
+				}
+				var supported bool
+				destination, supported = pdfFileAction(filepath.ToSlash(rel))
+				if !supported {
+					unsupportedLinks[resolved] = true
+					continue
+				}
+			} else if !u.IsAbs() || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "mailto") {
 				continue
 			}
 			links = append(links, pdfLink{link.Label, destination})
 		}
-		if len(links) == 1 {
+		if len(links) == 1 && len(block.Links) == 1 {
 			// A single-link paragraph/list item is one clickable block, avoiding
 			// duplicated labels and detached link lines at page boundaries.
 			if err := write(block.Text, block.Size, links[0].Destination, block.Heading); err != nil {
@@ -367,22 +398,34 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 	if err := pdf.Write(&output); err != nil {
 		return 0, err
 	}
-	pdfBytes, err := pdfInformation(output.Bytes(), meta)
+	pdfBytes, err := slots.apply(output.Bytes())
+	if err != nil {
+		return 0, err
+	}
+	pdfBytes, err = pdfInformation(pdfBytes, meta)
 	if err != nil {
 		return 0, err
 	}
 	if err := writeFile(filepath.Join(r.stage, target), pdfBytes); err != nil {
 		return 0, err
 	}
-	if err := r.auditPDF(filepath.Join(r.stage, target)); err != nil {
+	if err := r.auditPDFFile(filepath.Join(r.stage, target), false, true); err != nil {
 		return 0, err
+	}
+	if len(unsupportedLinks) > 0 {
+		r.manifest.Warnings = append(r.manifest.Warnings, fmt.Sprintf("A PDF left %d local destinations as plain text because their filenames cannot be represented in Preview's legacy file encoding; full links remain in Markdown.", len(unsupportedLinks)))
+		r.issue("PDF", "", "unsupported_pdf_link_filename")
 	}
 	return len(missing), nil
 }
 
 // Scan decoded page text, document metadata, and links; compressed binary bytes
 // and font programs are not meaningful inputs for a text secret detector.
-func (r *run) auditPDF(path string) (err error) {
+func (r *run) auditPDF(path string) error {
+	return r.auditPDFFile(path, true, true)
+}
+
+func (r *run) auditPDFFile(path string, targetsExist, content bool) (err error) {
 	defer func() {
 		if recover() != nil {
 			err = errConfig("generated PDF could not be validated")
@@ -402,7 +445,7 @@ func (r *run) auditPDF(path string) (err error) {
 		return errConfig("generated PDF could not be parsed")
 	}
 	check := func(s string) error {
-		if r.opts.Mode == "filtered" {
+		if content && r.opts.Mode == "filtered" {
 			return r.auditText(s)
 		}
 		return nil
@@ -417,16 +460,54 @@ func (r *run) auditPDF(path string) (err error) {
 			return r.ctx.Err()
 		}
 		p := pdf.Page(page)
-		text, err := p.GetPlainText(nil)
-		if err != nil {
-			return errConfig("generated PDF text extraction failed")
-		}
-		if err := check(text); err != nil {
-			return err
+		if content {
+			text, err := p.GetPlainText(nil)
+			if err != nil {
+				return errConfig("generated PDF text extraction failed")
+			}
+			if err := check(text); err != nil {
+				return err
+			}
 		}
 		annotations := p.V.Key("Annots")
 		for i := 0; i < annotations.Len(); i++ {
-			destination := annotations.Index(i).Key("A").Key("URI").Text()
+			action := annotations.Index(i).Key("A")
+			if !action.Key("Next").IsNull() {
+				return errConfig("PDF contains chained actions")
+			}
+			if action.Key("S").Name() == "GoToR" {
+				file := action.Key("F")
+				page := action.Key("D")
+				if len(action.Keys()) != 3 || len(file.Keys()) != 3 || page.Len() != 5 || page.Index(0).Kind() != pdfread.Integer || page.Index(0).Int64() != 0 || page.Index(1).Name() != "XYZ" || page.Index(2).Kind() != pdfread.Integer || page.Index(2).Int64() != 0 || page.Index(3).Int64() != 842 || !page.Index(4).IsNull() {
+					return errConfig("PDF file action has unsupported options")
+				}
+				destination := file.Key("UF").Text()
+				legacy, decodeErr := charmap.Macintosh.NewDecoder().String(file.Key("F").RawString())
+				if file.Key("Type").Name() != "Filespec" || decodeErr != nil || legacy != destination || destination == "" {
+					return errConfig("PDF filename encodings disagree")
+				}
+				if err := check(destination); err != nil {
+					return err
+				}
+				if strings.ContainsAny(destination, "\\:\x00\r\n") || strings.HasPrefix(destination, "/") || filepath.Ext(destination) != ".pdf" {
+					return errConfig("PDF file action has an invalid destination")
+				}
+				resolved := filepath.Clean(filepath.Join(filepath.Dir(path), filepath.FromSlash(destination)))
+				rel, err := filepath.Rel(r.stage, resolved)
+				if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+					return errConfig("PDF link leaves export directory")
+				}
+				if targetsExist {
+					if st, err := os.Stat(resolved); err != nil || !st.Mode().IsRegular() {
+						return errConfig("PDF link target is missing")
+					}
+				}
+				continue
+			}
+			if action.Key("S").Name() != "URI" {
+				return errConfig("PDF contains an unsupported action")
+			}
+			destination := action.Key("URI").Text()
 			if err := check(destination); err != nil {
 				return err
 			}
@@ -434,17 +515,8 @@ func (r *run) auditPDF(path string) (err error) {
 			if err != nil {
 				return errConfig("PDF link is invalid")
 			}
-			if !u.IsAbs() && u.Host == "" && u.Path != "" {
-				target := filepath.Clean(filepath.Join(filepath.Dir(path), filepath.FromSlash(u.Path)))
-				rel, err := filepath.Rel(r.stage, target)
-				if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-					return errConfig("PDF link leaves export directory")
-				}
-				if rel != "manifest.json" {
-					if _, err := os.Stat(target); err != nil {
-						return errConfig("PDF link target is missing")
-					}
-				}
+			if (u.Scheme != "https" && u.Scheme != "http" && u.Scheme != "mailto") || !u.IsAbs() {
+				return errConfig("PDF URI action is not an approved external link")
 			}
 		}
 	}

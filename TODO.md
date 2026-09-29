@@ -98,7 +98,8 @@ Implementation: platform-specific files behind a common metadata writer; portabl
 
 - [x] Define sidecar schema: summary ID, document path, title, description, original tag labels, normalized source/website tags, persons, date basis, and native-attribute outcome.
 - [x] macOS: write/read back plist-encoded Finder tags and description comment metadata; eight synthetic Markdown/PDF files reported `applied`.
-- [ ] Verify Finder tags, Get Info comments, and Spotlight behavior separately; xattr readback alone is not UI proof.
+- [x] Verify Finder tags, ascending filename order, and Spotlight tag/comment readback on synthetic macOS 15.7.3 documents.
+- [ ] Resolve or explicitly support the Finder Get Info Comments limitation: the editable box was empty despite the comment xattr and Spotlight value. See [native evidence](NATIVE_GUI_ACCEPTANCE.md).
 - [x] Implement Linux write/readback of `user.xdg.tags` and `user.xdg.comment`.
 - [ ] Execute Linux metadata tests on ext4 and a filesystem that does not support xattrs; verify Dolphin with indexing enabled and document GNOME/file-manager differences.
 - [x] Windows: implement writable Shell property-store probing, `System.Keywords`/`System.Comment`/`System.Title` set/commit/readback. Report unsupported for missing/read-only Markdown or PDF property handlers.
@@ -112,14 +113,15 @@ Implementation: platform-specific files behind a common metadata writer; portabl
 Implementation: render from canonical approved Markdown; retain it in PDF exports. Ship a local renderer and fonts with appropriate notices. Keep network/image fetching and HTML/script execution disabled.
 
 - [x] Add `--format markdown|pdf|both`; wire the interactive choice to the same code path.
-- [x] Render PDFs with headings, paragraphs, lists, code, long words/URLs, readable tables, page boundaries, and clickable Markdown-companion links.
+- [x] Render PDFs with headings, paragraphs, lists, code, long words/URLs, readable tables, page boundaries, and local PDF document links; retain the full Markdown navigation.
 - [x] Mirror relationship siblings and summary basenames for PDF; offer both indexes where requested. `pdf` and `both` currently retain the same Markdown companions.
 - [x] Embed fonts and sanitized PDF metadata; test accented/non-Latin/emoji text. Detect unsupported glyphs and report them rather than silently deleting text. Document any custom font support.
 - [x] Validate extracted PDF text, annotations/link targets, metadata, and A4 page geometry. Inspect the two-page synthetic summary and relationship sections visually with Poppler; no clipping or detached link lines remain.
 - [ ] Expand PDF visual coverage to large tables, long code blocks, all requested scripts/fonts, and extreme relationship pages; complex-script shaping and multiple-font fallback are not implemented.
 - [x] Audit generated PDF page text, metadata, and annotations semantically; run the filtered privacy fixture in PDF mode and reject a deliberately unfiltered secret PDF. Only approved text/metadata enters PDFs; no imported attachments, hidden layers, images, or remote assets are added.
 - [ ] Expand adversarial tests across all generated surfaces/native properties; the implemented checks are not a universal secret-detection guarantee.
-- [ ] Exercise Preview, Acrobat/Edge, and a Linux viewer; document their handling of relative local-file links. Move the folder and retest.
+- [x] Exercise Preview on a moved synthetic archive; fix relative-URI failure using PDF file actions and verify a summary/index round trip with an accented filename after both targets are opened directly.
+- [ ] Resolve/document first-use Preview file-access restrictions and test Acrobat/Edge plus a Linux viewer. Do not count parser/path checks as unrestricted viewer navigation.
 - [ ] Test PDF render failure/disk full/cancel and guarantee no falsely successful final archive.
 
 ## 7. Completeness and privacy hardening
@@ -336,3 +338,13 @@ Live exports stay under ignored `exports/`. Record counts/timings/statuses in th
 - Full `go test -race ./...` passed (exporter package 140.138 seconds); focused ranking/rendering race tests passed after the final allocation adjustment. `go vet ./...` passed. Final packaged acceptance is recorded separately below.
 - Six `0.8.4-dev` packages built; every SHA-256 and exact four-member binary/docs/license layout passed. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild acceptance passed on macOS ARM64, isolated Linux ARM64, and macOS AMD64 under Rosetta. Linux also passed the mixed-group complete-sort equivalence and older-stronger-match fixtures. No GitHub Actions run or publication occurred.
 - Full-history graph/rendering time, peak memory, and complete-index/PDF sizes remain to be measured after the active export fetches its remaining collections.
+
+### Native macOS navigation and metadata (2026-09-29)
+
+- Finder ascending filename order and visible tag/source/website tags passed on synthetic files. Spotlight returned tag/comment values. Finder More Info showed embedded PDF description/keywords, but its editable Comments field remained empty. `applied` still means native byte readback, not UI visibility. Full observations and reproduction steps are in [NATIVE_GUI_ACCEPTANCE.md](NATIVE_GUI_ACCEPTANCE.md).
+- Found a real viewer failure in the prior relative-URI-to-Markdown PDF links despite valid on-disk targets. Replaced local document links with relative PDF file actions, matching Unicode/MacRoman filename encodings, first-page destinations, and post-render target validation in both privacy modes. JSON/non-PDF destinations remain labels; unrepresentable legacy filenames remain labels with an explicit partial-status issue. Markdown retains complete navigation.
+- The Go-generated moved fixture navigated summary → index → accented summary in Preview after opening both documents directly. Preview first-use permissions remain a separate limitation, and no security or filesystem permission settings were relaxed. Windows/Linux GUI behavior is still unverified.
+- Full `go test -race ./...` passed (exporter package 140.217 seconds); focused PDF/rendering race tests passed after the final mixed-label/action-validation changes. `go vet ./...` and `git diff --check` passed. Regression cases include relocation, Unicode/space/hash/percent filenames, unlinked labels, missing destinations, escape/absolute/Windows paths, unsupported actions, mismatched encodings, and missing/duplicate/corrupt action slots.
+- Six `0.8.5-dev` packages built with verified SHA-256 and exact four-member binary/docs/license layouts. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild cases passed on macOS ARM64, macOS AMD64 under Rosetta, and isolated Linux ARM64. Linux also passed the new PDF link regressions. This is not Windows/native Intel/GUI acceptance. No publication or Actions retry occurred.
+- The actual packaged rebuild of the nine-record legacy synthetic archive produced 28 PDFs with 149 existing local PDF links; independent pypdf 6.19.0 strict parsing accepted all files. Poppler rendered the final two-page summary, both pages were visually reviewed, and pdfinfo confirmed A4, approved title/description/keywords, and no JavaScript. Legacy coverage correctly retained exit 2/partial status.
+- The full live all-data export continued unchanged throughout these checks. Fetches for events, tags, annotations, and websites have finished; hints and later processing remain. No additional live HTTP reader was started. Current binary and the old running binary differ; new PDF behavior does not alter that Markdown-only process.

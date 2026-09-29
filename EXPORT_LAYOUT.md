@@ -119,7 +119,7 @@ Pieces-Export/
     <other-material>/...
 ```
 
-`pdf` and `both` both retain canonical Markdown companions. PDF links target those Markdown files. Keep the whole export together; PDF viewers may require a Markdown handler or permission to open local files. Portable metadata sidecars accompany summary Markdown and PDF files in their own trees. A run uses only one of `data/` and `raw/`.
+`pdf` and `both` both retain canonical Markdown companions. PDF document links target their mirrored PDFs, at the first page. Markdown retains JSON and other non-PDF navigation. Keep the whole export together; PDF viewers may require permission to open each local destination. See [native viewer findings and filename limits](NATIVE_GUI_ACCEPTANCE.md). Portable metadata sidecars accompany summary Markdown and PDF files in their own trees. A run uses only one of `data/` and `raw/`.
 
 ## How summary placement is determined
 
@@ -212,7 +212,7 @@ Summary basename: `<zero-padded-global-rank>.<safe-title>.<creation-date>.<sourc
 
 ## Valid links and related summaries
 
-Every renderer uses final canonical paths, relative URI-escaped links, and forward slashes. The whole folder can be moved. PDF links target retained Markdown companions. Supported embedded Pieces links become local links only when the target exists and is included; missing/private/unsupported/original-filesystem/empty destinations become plain visible labels. No empty `[]()` or placeholder `#` links are generated. Permitted external web/mail links stay external and are not contacted to check availability.
+Every renderer uses final canonical paths and relative paths with forward slashes. Markdown uses URI escaping; PDF local-file actions use file specifications with a Unicode filename and a legacy MacRoman filename. The whole folder can be moved. PDF document links target mirrored PDFs at their first page; heading fragments do not become PDF page anchors. Non-PDF destinations remain plain labels in PDF. Destinations outside the legacy filename encoding also remain plain labels, with a warning and partial status; Markdown preserves those links. Supported embedded Pieces links become local links only when the target exists and is included; missing/private/unsupported/original-filesystem/empty destinations become plain visible labels. No empty `[]()` or placeholder `#` links are generated. Permitted external web/mail links stay external and are not contacted to check availability.
 
 Related-summary sections use Tags, Source, Person, and Website. Default relevance scores one point per distinct shared dimension, then sorts by recency and ID. `--related-order recent`, `--related-limit`, and `--related-since` change suggestions only. Complete group/person/pipeline indexes preserve all known included memberships beyond suggestion limits. Markdown and PDF local targets are checked before finalization and tested after moving the archive.
 
@@ -220,7 +220,7 @@ Descriptions, tags, normalized source/website tags, and approved person labels a
 
 ## Coverage report
 
-The root `coverage.md` links to the manifest and reports per-material counts alongside the core summary/person/pipeline projection counts. Absent or malformed relationship fields make an export partial, even if all returned IDs reconcile. Explicitly empty fields are counted separately. Inverse body recovery and hierarchy traversal preserve supported links without certifying the omitted projections. Counts concern included records; private record labels and identifiers do not appear in this report. The root index links to it, and PDF mode adds `pdf/coverage.pdf` with Markdown companion links.
+The root `coverage.md` links to the manifest and reports per-material counts alongside the core summary/person/pipeline projection counts. Absent or malformed relationship fields make an export partial, even if all returned IDs reconcile. Explicitly empty fields are counted separately. Inverse body recovery and hierarchy traversal preserve supported links without certifying the omitted projections. Counts concern included records; private record labels and identifiers do not appear in this report. The root index links to it, and PDF mode adds `pdf/coverage.pdf` with links to companion PDFs.
 
 With explicit `--sdk-cache` inputs, this report also reconciles historical candidate/recovered edges. Body attachments and graph JSONL identify cache provenance while retaining the same canonical folder tree and filenames. No duplicate cached record tree is emitted. See [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md).
 
