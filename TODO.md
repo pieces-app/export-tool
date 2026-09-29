@@ -89,7 +89,8 @@ Implementation: create inverted indexes of included summaries by tag ID, source 
 - [x] Test older four-dimension matches against 75+ newer one-dimension matches, repeated tags without score inflation, recent ordering, exact cutoff boundaries, and undated candidates.
 - [x] Add complete shared-group index destinations for omitted/overflow related results; verify a 150-member group still exposes every member with only 50 suggestions inline.
 - [x] Test missing/private/unsupported/empty inline and reference links, nested labels, HTML/images, and unchanged code samples.
-- [ ] Benchmark 1k/10k/100k-member groups and full large histories. Exact candidate evaluation still costs CPU for very high-degree groups; bounded output does not imply bounded total ranking work.
+- [x] Benchmark 1k/10k/100k-member groups; retain complete scoring with bounded per-dimension selection, cached recency ranks, membership-based evidence lookup, and a single inline/sibling rendering. Compare every selected result, dimension score, count, and cutoff against the independent complete-sort reference.
+- [ ] Profile the complete live graph/rendering stages. Exact candidate evaluation still costs CPU for very high-degree groups; bounded output does not imply bounded total ranking work or disk-backed storage.
 
 ## 5. Native metadata and portability
 
@@ -318,3 +319,20 @@ Live exports stay under ignored `exports/`. Record counts/timings/statuses in th
 - [x] Verify compatibility using the actual older `./pieces-export` 0.4.x executable against a synthetic server. It produced a format 4 archive that rebuilt offline from 4 people to 2 while retaining the profile and unknown person. No live OS endpoint was queried by this test.
 - [x] Run focused legacy/rebuild race tests and `go vet ./...`; both passed. Build six `0.8.3-dev` packages; all SHA-256 checks and exact four-member binary/docs/license layouts passed. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild tests passed on macOS ARM64, local Linux ARM64 with networking disabled, and macOS AMD64 under Rosetta. Actionlint passed. No Actions run or publication occurred.
 - [ ] Apply this reconciliation to the actual completed legacy archive and report the measured person reduction, or explain any unreconciled evidence that prevents it.
+
+### Related-summary ranking performance (2026-09-29)
+
+- Replaced repeated complete sorting with exact bounded selection after evaluating all shared dimensions. Timestamp parsing/recency ranking happens once per graph. Evidence labels use membership lookups, and inline/sibling sections reuse one rendering. No OS request rate or live process setting changed.
+- Reproduction: `go test ./internal/exporter -run '^$' -bench '^BenchmarkRelated(Top50LargeGroup|CandidatesLargeGroup|RankingPreparation)$' -benchtime=3x -count=3 -benchmem`. Apple M4 Max, macOS ARM64; the live exporter was also running. The fixture has one shared group in each of the four dimensions. Medians below describe one ranking query, excluding graph preparation and file output; they are not whole-export speedups.
+
+| Group members | Previous full sort | Exact top 50 per dimension | Per-query speedup | Allocated bytes, previous → new |
+| --- | --- | --- | --- | --- |
+| 1,000 | 0.747 ms | 0.141 ms | 5.3× | 226,072 → 112,824 |
+| 10,000 | 11.018 ms | 1.370 ms | 8.0× | 1,828,824 → 879,109 |
+| 100,000 | 178.138 ms | 16.198 ms | 11.0× | 14,782,168 → 6,993,560 |
+
+- One-time graph preparation medians: 0.128/1.382/18.839 ms for 1k/10k/100k members. Preparation itself allocates memory (approximately 0.25/3.15/32.70 MB cumulatively); the rank/date index stays resident. Per-query allocation reductions do not establish lower peak memory for an entire export.
+- A seeded mixed-group fixture checks exact results against the independent complete-sort reference for both orders, limits 1/7/50/500, equal timestamps with differing UTC offsets, invalid/undated dates, inclusive cutoffs, repeated memberships, and empty groups. Explicit older-four-dimension-versus-75-newer-one-dimension coverage, cancellation, complete overflow indexes, and inline/sibling equivalence pass.
+- Full `go test -race ./...` passed (exporter package 140.138 seconds); focused ranking/rendering race tests passed after the final allocation adjustment. `go vet ./...` passed. Final packaged acceptance is recorded separately below.
+- Six `0.8.4-dev` packages built; every SHA-256 and exact four-member binary/docs/license layout passed. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild acceptance passed on macOS ARM64, isolated Linux ARM64, and macOS AMD64 under Rosetta. Linux also passed the mixed-group complete-sort equivalence and older-stronger-match fixtures. No GitHub Actions run or publication occurred.
+- Full-history graph/rendering time, peak memory, and complete-index/PDF sizes remain to be measured after the active export fetches its remaining collections.

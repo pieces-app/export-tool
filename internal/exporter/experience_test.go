@@ -79,6 +79,14 @@ func TestReadableSummaryGraphPDFAndMetadata(t *testing.T) {
 			t.Fatal("missing relationship dimension")
 		}
 	}
+	sibling, err := os.ReadFile(relationshipPath(main))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, related, found := strings.Cut(string(sibling), "\n## Related summaries\n")
+	if !found || !strings.Contains(string(data), "\n## Related summaries\n"+related) {
+		t.Fatal("inline and sibling navigation differ")
+	}
 	var metadata DocumentMetadata
 	encoded, err := os.ReadFile(strings.TrimSuffix(main, ".md") + ".metadata.json")
 	if err != nil {
@@ -118,6 +126,7 @@ func TestLargeSharedGroupUsesCompleteIndex(t *testing.T) {
 	for i := 0; i < 150; i++ {
 		m := &Meta{Key: fmt.Sprint(i), ID: fmt.Sprint(i), State: "included", Title: fmt.Sprintf("Summary %d", i), Path: fmt.Sprintf("markdown/summaries/%06d.md", i)}
 		r.meta[m.Key] = m
+		g.Keys[m.Key] = map[string]map[string]string{"Tags": {"common": "Shared topic"}}
 		g.Index["Tags"]["common"] = append(g.Index["Tags"]["common"], m)
 	}
 	m := r.meta["0"]

@@ -1,6 +1,7 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
 	"math/bits"
 	"net/url"
@@ -24,10 +25,12 @@ type DocumentMetadata struct {
 	DateBasis    string   `json:"date_basis"`
 }
 type summaryGraph struct {
-	Written  map[string]bool
-	Metadata map[string]*DocumentMetadata
-	Keys     map[string]map[string]map[string]string // summary -> dimension -> key -> label
-	Index    map[string]map[string][]*Meta
+	Written    map[string]bool
+	Metadata   map[string]*DocumentMetadata
+	Keys       map[string]map[string]map[string]string // summary -> dimension -> key -> label
+	Index      map[string]map[string][]*Meta
+	chronology []summaryChronology
+	ranks      map[string]int
 }
 
 var dimensions = []string{"Tags", "Source", "Person", "Website"}
@@ -152,52 +155,15 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 		g.Metadata[m.Key] = meta
 		g.Keys[m.Key] = keys
 	}
+	if err := g.prepareRanking(r.ctx); err != nil {
+		return nil, err
+	}
 	for _, groups := range g.Index {
 		for _, items := range groups {
-			sort.Slice(items, func(i, j int) bool { return newer(items[i], items[j]) })
+			sort.Slice(items, func(i, j int) bool { return g.ranks[items[i].Key] < g.ranks[items[j].Key] })
 		}
 	}
 	return g, nil
-}
-
-// Score counts distinct shared dimensions, never the number of matching tags.
-// Evaluate the complete candidate union before limiting the visible list.
-func (g *summaryGraph) candidates(m *Meta, since time.Time, order string) ([]*Meta, map[string]uint8, map[string]bool) {
-	masks := map[string]uint8{}
-	candidates := map[string]*Meta{}
-	omitted := map[string]bool{}
-	for dimension, d := range dimensions {
-		for key := range g.Keys[m.Key][d] {
-			for _, other := range g.Index[d][key] {
-				if other.Key == m.Key {
-					continue
-				}
-				if !since.IsZero() {
-					created, err := time.Parse(time.RFC3339Nano, other.Created)
-					if err != nil || created.Before(since) {
-						omitted[d] = true
-						continue
-					}
-				}
-				masks[other.Key] |= 1 << dimension
-				candidates[other.Key] = other
-			}
-		}
-	}
-	ordered := make([]*Meta, 0, len(candidates))
-	for _, candidate := range candidates {
-		ordered = append(ordered, candidate)
-	}
-	sort.Slice(ordered, func(i, j int) bool {
-		if order != "recent" {
-			a, b := bits.OnesCount8(masks[ordered[i].Key]), bits.OnesCount8(masks[ordered[j].Key])
-			if a != b {
-				return a > b
-			}
-		}
-		return newer(ordered[i], ordered[j])
-	})
-	return ordered, masks, omitted
 }
 
 func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
@@ -220,28 +186,22 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 		fmt.Fprintf(&b, "Related-list cutoff: %s (record creation). Undated matches are omitted from these lists. ", r.opts.RelatedSince.UTC().Format(time.RFC3339Nano))
 	}
 	b.WriteString("Complete shared-group indexes retain older and overflow matches.\n\n")
-	ordered, masks, omitted := g.candidates(m, r.opts.RelatedSince, order)
+	ctx := r.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	selection, err := g.selectRelated(ctx, m, r.opts.RelatedSince, order, limit)
+	if err != nil {
+		return "", err
+	}
 	for dimension, d := range dimensions {
 		fmt.Fprintf(&b, "#### Related Summaries by %s\n\n", d)
-		shown, total := 0, 0
-		for _, other := range ordered {
-			mask := masks[other.Key]
-			if mask&(1<<dimension) == 0 {
-				continue
-			}
-			total++
-			if shown >= limit {
-				continue
-			}
-			shown++
+		for _, match := range selection.lists[dimension] {
+			other, mask := g.chronology[match.rank].meta, match.mask
 			evidence := []string{}
 			for key, label := range g.Keys[m.Key][d] {
-				// Membership via the inverted index also supports legacy fixtures.
-				for _, member := range g.Index[d][key] {
-					if member.Key == other.Key {
-						evidence = append(evidence, label)
-						break
-					}
+				if _, shared := g.Keys[other.Key][d][key]; shared {
+					evidence = append(evidence, label)
 				}
 			}
 			shared := []string{}
@@ -256,10 +216,10 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 			}
 			fmt.Fprintf(&b, "- [%s](%s) — shared: %s; %d/4 dimensions (%s); %s\n", md(other.Title), relative(from, other.Path), md(strings.Join(unique(evidence), ", ")), bits.OnesCount8(mask), strings.Join(shared, ", "), md(date))
 		}
-		if shown == 0 {
+		if len(selection.lists[dimension]) == 0 {
 			b.WriteString("No included related summaries match these list settings.\n")
 		}
-		if total > limit || omitted[d] {
+		if selection.totals[dimension] > limit || selection.omitted[dimension] {
 			b.WriteString("\nBrowse complete shared-group indexes (all exported dates; includes this summary):\n\n")
 			groupKeys := []string{}
 			for key := range g.Keys[m.Key][d] {

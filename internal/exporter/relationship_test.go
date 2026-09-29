@@ -1,7 +1,10 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
+	"math/bits"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -29,17 +32,20 @@ func TestRelatedRankingUsesAllDimensionsBeforeLimit(t *testing.T) {
 	}
 	g.Keys["self"]["Tags"]["second"] = "second tag"
 	g.Index["Tags"]["second"] = []*Meta{self, recent}
-	got, masks, _ := g.candidates(self, time.Time{}, "relevance")
-	if got[0] != old || masks[old.Key] != 15 || masks[recent.Key] != 1 {
+	got, err := g.selectRelated(context.Background(), self, time.Time{}, "relevance", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.lists[0]) != 50 || g.chronology[got.lists[0][0].rank].meta != old || got.lists[0][0].mask != 15 || got.lists[0][1].mask != 1 {
 		t.Fatal("relevance must count distinct dimensions across full candidate set")
 	}
-	got, _, _ = g.candidates(self, time.Time{}, "recent")
-	if got[0] != recent {
+	got, err = g.selectRelated(context.Background(), self, time.Time{}, "recent", 50)
+	if err != nil || g.chronology[got.lists[0][0].rank].meta != recent {
 		t.Fatal("recent order did not prioritize timestamp")
 	}
 	cutoff, _ := time.Parse("2006-01-02", "2026-09-29")
-	got, _, omitted := g.candidates(self, cutoff, "relevance")
-	if len(got) != 76 || got[0] != recent || !omitted["Tags"] || !omitted["Person"] {
+	got, err = g.selectRelated(context.Background(), self, cutoff, "relevance", 50)
+	if err != nil || got.totals[0] != 76 || g.chronology[got.lists[0][0].rank].meta != recent || !got.omitted[0] || !got.omitted[2] {
 		t.Fatal("cutoff must be inclusive and exclude undated records")
 	}
 }
@@ -97,8 +103,21 @@ func TestPDFUsesDisplayedMarkdownText(t *testing.T) {
 }
 
 func BenchmarkRelatedCandidatesLargeGroup(b *testing.B) {
+	for _, n := range []int{1000, 10000, 100000} {
+		b.Run(fmt.Sprint(n), func(b *testing.B) {
+			g := benchmarkRelatedGraph(n)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				g.fullSortRelatedReference(&Meta{Key: "self"}, time.Time{}, "relevance")
+			}
+		})
+	}
+}
+
+func benchmarkRelatedGraph(n int) *summaryGraph {
 	g := &summaryGraph{Keys: map[string]map[string]map[string]string{"self": {}}, Index: map[string]map[string][]*Meta{}}
-	members := make([]*Meta, 10000)
+	members := make([]*Meta, n)
 	for i := range members {
 		members[i] = &Meta{Key: fmt.Sprint(i), ID: fmt.Sprint(i), Created: time.Date(2026, 1, 1, 0, i, 0, 0, time.UTC).Format(time.RFC3339)}
 	}
@@ -106,8 +125,46 @@ func BenchmarkRelatedCandidatesLargeGroup(b *testing.B) {
 		g.Keys["self"][d] = map[string]string{"common": d}
 		g.Index[d] = map[string][]*Meta{"common": members}
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		g.candidates(&Meta{Key: "self"}, time.Time{}, "relevance")
+	return g
+}
+
+// Independent, unbounded reference retained for ranking regression checks.
+// Score counts distinct shared dimensions, never the number of matching tags.
+// Evaluate the complete candidate union before limiting the visible list.
+func (g *summaryGraph) fullSortRelatedReference(m *Meta, since time.Time, order string) ([]*Meta, map[string]uint8, map[string]bool) {
+	masks := map[string]uint8{}
+	candidates := map[string]*Meta{}
+	omitted := map[string]bool{}
+	for dimension, d := range dimensions {
+		for key := range g.Keys[m.Key][d] {
+			for _, other := range g.Index[d][key] {
+				if other.Key == m.Key {
+					continue
+				}
+				if !since.IsZero() {
+					created, err := time.Parse(time.RFC3339Nano, other.Created)
+					if err != nil || created.Before(since) {
+						omitted[d] = true
+						continue
+					}
+				}
+				masks[other.Key] |= 1 << dimension
+				candidates[other.Key] = other
+			}
+		}
 	}
+	ordered := make([]*Meta, 0, len(candidates))
+	for _, candidate := range candidates {
+		ordered = append(ordered, candidate)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if order != "recent" {
+			a, b := bits.OnesCount8(masks[ordered[i].Key]), bits.OnesCount8(masks[ordered[j].Key])
+			if a != b {
+				return a > b
+			}
+		}
+		return newer(ordered[i], ordered[j])
+	})
+	return ordered, masks, omitted
 }

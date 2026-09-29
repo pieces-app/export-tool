@@ -302,19 +302,17 @@ func (r *run) render() error {
 			fmt.Fprintf(&b, "- [%s](%s) — %s (derived backlink)\n", md(source.Title), relative(m.Path, source.Path), md(label))
 		}
 		if meta := graph.Metadata[m.Key]; meta != nil {
+			// Both documents share a directory, so all relative destinations are
+			// identical. Rank and render the related sections only once.
+			related, err := graph.render(r, m, m.Path)
+			if err != nil {
+				return err
+			}
 			if r.opts.Relationships == "inline" || r.opts.Relationships == "both" {
-				related, err := graph.render(r, m, m.Path)
-				if err != nil {
-					return err
-				}
 				b.WriteString(related)
 			}
 			if r.opts.Relationships == "sidecar" || r.opts.Relationships == "both" {
 				sibling := relationshipPath(m.Path)
-				related, err := graph.render(r, m, sibling)
-				if err != nil {
-					return err
-				}
 				body := fmt.Sprintf("# Relationships: %s\n\n[Summary](%s)\n\n", md(m.Title), relative(sibling, m.Path)) + related
 				if len(r.opts.SDKCaches) > 0 {
 					body += "\nHistorical client-cache relationships may contribute to these suggestions. See the summary and export coverage for provenance.\n"

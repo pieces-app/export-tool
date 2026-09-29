@@ -119,7 +119,7 @@ The ranking contract is:
 
 When a limit or cutoff omits candidates, link to complete shared-group indexes under `markdown/relationships/<dimension>/<opaque-group>.md`. These contain all included members, newest first, including the current summary and dates outside the suggestion cutoff; explain that scope beside the links. The indexes preserve complete graph navigation without duplicating every high-degree edge on every summary. They are also converted when PDF is requested. Privacy filtering applies before indexing; excluded nodes never appear in complete indexes.
 
-Use inverted indexes, one candidate mask per summary ID, and one bit per dimension to count distinct overlap. Limit output per summary, not traversal completeness. Very common groups still cost significant CPU to rank; benchmark 1k/10k/100k groups and migrate to a disk-backed or indexed candidate strategy before claiming large-history scalability. Record `related_order`, `related_limit`, and any `related_since` in the manifest for reproducibility.
+Use inverted indexes, one candidate mask per summary ID, and one bit per dimension to count distinct overlap. Parse timestamps and assign stable recency ranks once per graph. After scoring every eligible candidate, keep the best requested matches in a bounded heap per dimension; sorting those retained matches must produce the same order as a complete sort. Shared-label evidence uses the two summaries' group memberships. Inline and sibling relationship sections reuse one rendering because their relative destinations share a directory. Limit output per summary, not traversal completeness. Very common groups still require complete candidate traversal and an in-memory mask union; these optimizations do not make total graph cost constant or remove the need for full-history profiling. Record `related_order`, `related_limit`, and any `related_since` in the manifest for reproducibility.
 
 ## Native metadata and portability
 
@@ -151,7 +151,7 @@ Apply the same policy to content, filenames, headings, PDF metadata, xattrs, sid
 
 Never overwrite an existing export. Publish only after validation; interrupted work remains explicitly partial. Cancellation must propagate through discovery, scans, reading prompts, fetching, rendering, and child processes. Record unreadable types, denied reads, drift, unsupported metadata, and PDF failures distinctly. Operational privacy failures cannot become successful filtered exports. No broad process kills, OS shutdown API, source mutations, or hidden source uploads.
 
-Acceptance requires unit/fixture tests, live read-only preflight, a real filtered export with reconciled counts, moved-folder link checks, PDF text/visual checks, metadata readback plus file-manager UI checks, six cross-builds, native tests on each supported OS/architecture, and signed distribution. See TODO for reproducible procedures and evidence.
+Acceptance requires unit/fixture tests, live read-only preflight, a real filtered export with reconciled counts, moved-folder link checks, PDF text/visual checks, metadata readback plus file-manager UI checks, six cross-builds, native tests on each supported OS/architecture, and checksum-verified binary distribution. Binaries are intentionally unsigned and unnotarized per the release decision above. See TODO for reproducible procedures and evidence.
 
 ## Output destination, adaptive reads, and terminal progress
 
