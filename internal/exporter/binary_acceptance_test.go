@@ -162,6 +162,50 @@ func TestPackagedSummaryCLI(t *testing.T) {
 	t.Log("scoped scan/benchmark/export read no event bodies or supporting inventories; body, PDF/privacy, and moved links passed")
 }
 
+func TestPackagedRebuildCLI(t *testing.T) {
+	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
+	if binary == "" {
+		t.Skip("set PIECES_EXPORT_TEST_BINARY to the native release executable")
+	}
+	binary, err := filepath.Abs(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, policy, original := createRebuildFixture(t)
+	policyPath := filepath.Join(t.TempDir(), "policy.json")
+	if err := writeJSON(policyPath, policy); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	out := filepath.Join(t.TempDir(), "offline archive")
+	args := []string{"rebuild", "--source", source, "--output", out, "--policy", policyPath, "--format", "both", "--metadata", "off", "--people", "profiles"}
+	// EOF declines without writing or connecting to any server.
+	if b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil || !strings.Contains(string(b), "Canceled") {
+		t.Fatalf("packaged rebuild EOF did not decline: %v %s", err, b)
+	}
+	if _, err := os.Stat(out + ".partial"); !os.IsNotExist(err) {
+		t.Fatal("declined rebuild created staging directory")
+	}
+	args = append(args, "--yes")
+	if b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil {
+		t.Fatalf("packaged offline rebuild failed: %v\n%s", err, b)
+	}
+	var m Manifest
+	b, _ := os.ReadFile(filepath.Join(out, "manifest.json"))
+	if json.Unmarshal(b, &m) != nil || m.Performance.Requests != 0 || m.People.Selected != 1 || !m.Rebuild.SourceStarted.Equal(original.Started) {
+		t.Fatal("packaged rebuild evidence/selection incorrect")
+	}
+	r := &run{ctx: ctx, stage: out, opts: Options{Scanner: scanner(t, policy)}}
+	if err := r.validateMarkdownLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.auditOutput(); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("actual binary offline rebuild, EOF cancellation, PDF/privacy, original provenance and person narrowing passed with fixture OS already closed")
+}
+
 func TestPackagedCacheCLI(t *testing.T) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {

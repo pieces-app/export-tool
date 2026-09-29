@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // These are core navigation/body projections, not all optional model fields.
@@ -140,6 +141,13 @@ func (r *run) renderCoverage() error {
 	var b strings.Builder
 	scope := r.manifest.Scope
 	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\n## Selected export scope\n\n")
+	if info := r.manifest.Rebuild; info != nil {
+		fmt.Fprintf(&b, "This archive was rebuilt offline. No OS connection or new source reconciliation occurred. The original read interval was %s through %s. Initial, inventoried, fetched, and final counts describe that source read; included/excluded/withheld/omitted counts include subsequent rebuild decisions. Original coverage and people statistics remain in the manifest's rebuild section.\n\n", info.OriginalReadStarted.UTC().Format(time.RFC3339), info.OriginalReadFinished.UTC().Format(time.RFC3339))
+		if info.LegacyEvidence {
+			b.WriteString("The source uses the legacy archive format without reconstruction evidence. Unknown original projections remain unknown, redacted counts can be unavailable (-1), and verified-user labels are replayed from existing user-profile navigation. This archive remains partial.\n\n")
+		}
+		fmt.Fprintf(&b, "Unavailable selected dependencies encountered during cache recovery: %d. Included annotation bodies withheld because a historical cached summary was unavailable: %d. Missing records are never recreated from cached text. Conservative withholding can remove additional content.\n\n", info.UnavailableTargets, info.BlockedCacheBodies)
+	}
 	fmt.Fprintf(&b, "Scope: **%s**.\n\n", md(scope.Name))
 	fmt.Fprintf(&b, "Fully inventoried collections: %s.\n\nReferenced supporting collections only: %s.\n\nIntentionally skipped collections: %s.\n\n", strings.Join(scope.Inventoried, ", "), strings.Join(scope.ReferenceOnly, ", "), strings.Join(scope.Omitted, ", "))
 	if len(scope.ReferenceOnly) > 0 {
@@ -157,7 +165,7 @@ func (r *run) renderCoverage() error {
 		fmt.Fprintf(&b, "- %s: %d intentionally skipped reference occurrences (not a count of distinct records).\n", typ, scope.OmittedReferences[typ])
 	}
 	b.WriteByte('\n')
-	b.WriteString("Counts describe the HTTP data returned during this run. This is not an atomic database backup. Exclusions and selection omissions are intentional; unknown relationship projections remain a coverage gap.\n\n## Material records\n\n| Material | Initial | Inventoried | Fetched | Included | Excluded | Withheld | Omitted | Final |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n")
+	b.WriteString("Counts describe the original HTTP source read and the retained output. This is not an atomic database backup. Exclusions and selection omissions are intentional; unknown relationship projections remain a coverage gap.\n\n## Material records\n\n| Material | Initial | Inventoried | Fetched | Included | Excluded | Withheld | Omitted | Final |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n")
 	for _, c := range r.manifest.Coverage {
 		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %d | %d | %d | %d |\n", c.Material, c.InitialCount, c.Inventoried, c.Fetched, c.Included, c.Excluded, c.Withheld, c.Omitted, c.FinalCount)
 	}

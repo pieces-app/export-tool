@@ -181,7 +181,7 @@ func (r *run) recoverSDKCacheRelationships() error {
 		r.manifest.SDKCache.Fields++
 		for _, id := range candidate.ids {
 			target := referenceTypes[key.relation] + "\x00" + id
-			meta := r.meta[target]
+			meta := r.archiveDependency(target)
 			if meta == nil || meta.State == "missing" {
 				r.manifest.SDKCache.MissingTargets++
 				continue
@@ -270,7 +270,10 @@ func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*
 		}
 		key := "WORKSTREAM_SUMMARIES\x00" + fieldString(v, "id")
 		m := r.meta[key]
-		if m == nil || m.State == "missing" {
+		if m == nil || m.State == "missing" || m.ArchivePlaceholder {
+			if err := r.blockUnavailableCachedSummary(v, budget); err != nil {
+				return err
+			}
 			continue
 		}
 		r.manifest.SDKCache.Matching++

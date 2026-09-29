@@ -27,6 +27,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 	}
 	fail := func(err error) int { fmt.Fprintln(stderr, "Error:", err); return 1 }
 	switch args[0] {
+	case "rebuild":
+		return rebuild(ctx, args[1:], stdin, stdout, stderr, version)
 	case "version", "--version":
 		fmt.Fprintln(stdout, "pieces-export", version)
 		return 0
@@ -387,6 +389,7 @@ Usage:
   pieces-export export --scope summaries --output ./my-summaries [--yes]
   pieces-export export --scope all --output ./my-export [--format markdown|pdf|both] [--yes]
   pieces-export export --output ./private-originals --mode preserve
+  pieces-export rebuild --source ./finished-export --output ./rebuilt --format both
   pieces-export policy init --output policy.json
   pieces-export lists fetch --output lists --categories adult,bank
   pieces-export materials

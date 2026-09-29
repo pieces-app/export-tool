@@ -129,6 +129,9 @@ func validateScope(o Options) error {
 }
 
 func (r *run) collectScopeOmissions() {
+	if r.rebuilding {
+		return // Original scope omissions describe the source read interval.
+	}
 	r.manifest.Scope.OmittedReferences = map[string]int{}
 	for _, m := range r.meta {
 		if m.State != "included" {

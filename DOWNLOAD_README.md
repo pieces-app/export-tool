@@ -30,6 +30,14 @@ On Windows, use `.\pieces-export.exe` with the same flags. Summary text comes fr
 
 `--scope all` preserves the default all-data export. Events add activity history and some source/person/website graph evidence. Omitting them reduces website-origin filtering coverage: rules still inspect exported URLs, but cannot discover a domain present only in skipped activity. Review the intentional omissions in `coverage.md`. The folder structure and validated local links are the same for both scopes. `scan`, `benchmark`, and `export --dry-run` accept `--scope summaries` too. Advanced `--materials` cannot be combined with `--scope`.
 
+To regenerate documents/PDFs from an already completed export without reading OS again:
+
+```sh
+./pieces-export rebuild --source ./my-pieces-export --output ./rebuilt-export --format both
+```
+
+Use the original `--policy` if configured. The input stays unchanged, exclusions remain excluded, and incomplete coverage remains partial. `--people profiles` can narrow an all-people archive; missing records cannot be restored offline. Optional historical `--sdk-cache` links may attach already-exported annotation bodies, subject to conservative privacy checks. Active `.partial` folders are rejected. Format 5 archives include reconstruction checksums and evidence; older format 4 archives are accepted with explicitly incomplete evidence and partial status.
+
 To preview without creating an archive or closing Desktop:
 
 ```sh

@@ -1,6 +1,6 @@
 # Export folders, naming, and navigation
 
-Updated 2026-09-29. This is the implemented **archive format 4** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest below remains planned.
+Updated 2026-09-29. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest below remains planned.
 
 ## Where the export goes
 
@@ -33,6 +33,7 @@ Pieces-Export/
   index.md                                  # start here
   index.pdf                                 # when PDF requested
   manifest.json                             # counts, issues, hierarchy checks, performance
+  rebuild-state.jsonl                       # hashed included evidence; opaque omission decisions
   coverage.md                               # aggregate record/projection gaps; partial status
   link-map.json                             # canonical paths keyed by material/ID hash
   relationships.jsonl                       # typed edges; derived inverses marked
@@ -230,3 +231,7 @@ Individual `SIGNALS` records already export; the earlier live inventory counted 
 Generate from sanitized staged data and the final path map. Include signal identity, origin/category, timestamps/ranges, approved annotation text, and links to canonical signal/person/pipeline/summary/evidence records. Sort newest-created first, display occurrence ranges separately, and reconcile every included signal to a digest entry. Do not refetch or regenerate signals.
 
 Initial splitting design: 1,000 signals or 8 MiB approved text per part; report oversized single signals explicitly. A single-document choice needs a size estimate. PDF needs its own page/memory/cancellation budget. Test empty, large, tied, undated, missing-link, filtered, Unicode, moved-folder, and interrupted cases before claiming full digest coverage. Track the work in [TODO.md](TODO.md).
+
+## Regenerating an archive
+
+`rebuild --source <finalized-folder> --output <new-folder>` regenerates this layout offline and can add PDFs or narrow an all-people archive. Source files remain unchanged; original coverage gaps and privacy omissions persist. New format 5 state/graph/link-map checksums allow original user/projection evidence to survive rendering. Legacy format 4 imports remain partial. See [OFFLINE_REBUILD.md](OFFLINE_REBUILD.md).

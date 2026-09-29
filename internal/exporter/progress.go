@@ -34,7 +34,7 @@ func startProgress(w io.Writer, c *Client) *Progress {
 	}
 	safe := &lockedOutput{out: w}
 	p := &Progress{out: safe, client: c, stop: make(chan struct{}), exited: make(chan struct{})}
-	if c.pacer != nil {
+	if c != nil && c.pacer != nil {
 		c.pacer.output = safe
 	}
 	go func() {
@@ -83,7 +83,6 @@ func (p *Progress) print() {
 		return
 	}
 	elapsed := time.Since(p.started)
-	stats := p.client.Performance()
 	fmt.Fprintf(p.out, "Progress: %s | elapsed %s", p.stage, elapsed.Round(time.Second))
 	if p.total > 0 {
 		fmt.Fprintf(p.out, " | %d/%d (%.1f%%)", p.done, p.total, float64(p.done)*100/float64(p.total))
@@ -93,6 +92,11 @@ func (p *Progress) print() {
 			fmt.Fprintf(p.out, " | %.1f records/s | phase ETA %s", rate, remaining.Round(time.Second))
 		}
 	}
+	if p.client == nil {
+		fmt.Fprintln(p.out)
+		return
+	}
+	stats := p.client.Performance()
 	fmt.Fprintf(p.out, " | OS p95 %.0fms | requests %d | retries %d | backoffs %d\n", stats.P95MS, stats.Requests, stats.Retries, stats.Backoffs)
 }
 func (p *Progress) Close() {

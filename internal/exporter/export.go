@@ -51,6 +51,11 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	Naming                  string                   `json:"naming"`
+	Relationships           string                   `json:"relationships"`
+	Metadata                string                   `json:"metadata"`
+	ArchiveState            *ArchiveState            `json:"archive_state,omitempty"`
+	Rebuild                 *RebuildInfo             `json:"rebuild,omitempty"`
 	Scope                   Scope                    `json:"scope"`
 	SDKCache                CacheCoverage            `json:"sdk_cache"`
 	RelationshipCoverage    []RelationshipCoverage   `json:"relationship_coverage"`
@@ -82,6 +87,8 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	ArchivePlaceholder                                             bool
+	ArchiveDataSHA256                                              string
 	SupplementableFields                                           map[string]bool
 	ProjectionStates                                               map[string]string
 	RelationshipProjectionUnknown                                  bool
@@ -96,6 +103,8 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
+	priorDecisions   []archiveRecord
+	rebuilding       bool
 	ctx              context.Context
 	client           *Client
 	opts             Options
@@ -281,7 +290,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		r.opts.Progress = r.progress.out
 	}
 
-	r.manifest = Manifest{Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 4, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
+	r.manifest = Manifest{Naming: o.Naming, Relationships: o.Relationships, Metadata: o.Metadata, Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 5, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
 		"Retained local HTTP data only; not an atomic database backup or deleted history.",
 		"Association record metadata, supplementary analysis/settings views, and fingerprint audio downloads are not implemented in this version.",
 		"Server projections can omit vectors and internal data. Binary attachments are not extracted; preserve mode retains exposed byte/encoded fields in JSON.",
@@ -423,6 +432,13 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			cov.Withheld++
 		}
 	}
+	return r.finish(abs)
+}
+
+func (r *run) finish(destination string) (Manifest, error) {
+	var err error
+	o := r.opts
+	stage := r.stage
 	r.progress.Stage("Assign paths and build graph", 0)
 	r.collectScopeOmissions()
 	r.collectRelationshipCoverage()
@@ -451,7 +467,12 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if len(r.manifest.Issues) > 0 {
 		r.manifest.Status = "partial"
 	}
-	r.manifest.Performance = client.Performance()
+	if r.client != nil {
+		r.manifest.Performance = r.client.Performance()
+	}
+	if err = r.writeArchiveState(); err != nil {
+		return r.manifest, err
+	}
 	r.manifest.Finished = time.Now().UTC()
 	if err = writeJSON(filepath.Join(stage, "manifest.json"), r.manifest); err != nil {
 		return r.manifest, err
@@ -461,7 +482,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			return r.manifest, err
 		}
 	}
-	if err = os.Rename(stage, abs); err != nil {
+	if err = os.Rename(stage, destination); err != nil {
 		return r.manifest, err
 	}
 	return r.manifest, nil

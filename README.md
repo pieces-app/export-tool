@@ -50,6 +50,15 @@ Secret detection and domain rules still scan the exported content. If a website 
 
 Advanced `--materials TYPE,TYPE` still selects full inventories of those types; it cannot be combined with `--scope`. `--materials WORKSTREAM_SUMMARIES` alone does **not** select annotation bodies or profile context.
 
+## Rebuild without fetching from OS again
+
+```sh
+./pieces-export rebuild --source ./exports/finished --output ./exports/rebuilt --format both
+./pieces-export rebuild --source ./exports/finished --output ./exports/profiles --people profiles
+```
+
+This reads only a finalized archive and writes a new folder. It preserves the source policy, exclusions, graph provenance, and coverage gaps, and can optionally use historical `--sdk-cache` links to records already exported. It never connects to or launches OS. Legacy archives remain partial where reconstruction evidence is unavailable. Use the original `--policy` when one was configured. See [offline rebuilding](OFFLINE_REBUILD.md) for integrity checks, conservative cache handling, and limitations.
+
 ## Measure performance and choose people
 
 ```sh

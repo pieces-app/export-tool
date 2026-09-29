@@ -78,7 +78,7 @@ jobs:
         shell: bash
         env:
           PIECES_EXPORT_TEST_BINARY: ${{ github.workspace }}/dist/pieces-export_${{ env.RELEASE_VERSION }}_${{ matrix.label }}/${{ matrix.executable }}
-        run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI)$' -count=1 -v
+        run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI|RebuildCLI)$' -count=1 -v
       - name: Retain binary-only acceptance artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
