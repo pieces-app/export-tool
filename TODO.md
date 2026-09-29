@@ -1,0 +1,250 @@
+# Export tool execution checklist
+
+Updated 2026-09-29. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+
+## Current remaining work, in execution order
+
+1. **Body/person/pipeline coverage:** obtain active relationship projections or a read-only association enumerator for the installed OS. The enum/descriptor identifies summary category; it cannot replace a missing attachment. The implemented hierarchy traversal now recovers direct parent/child edges separately. See [endpoint findings](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage).
+2. **Complete live migration:** run selected-person/history acceptance and then a full filtered export. Reconcile per-material counts and links, record privacy omissions and source changes, measure client disk/memory/CPU and OS responsiveness. A preview or hierarchy probe is not this test.
+3. **Scale and recovery:** calibrate estimates, test large graph groups and output cancellation/disk-full behavior, then add resumable manifests and disk-backed IDs/graph where measurements require them.
+4. **Remaining content:** consolidated signals presentation, supported attachments/audio, and explicitly scoped association metadata/supplemental reads.
+5. **Native acceptance:** Finder/Explorer/Dolphin metadata and local links, production/staging lifecycle, and macOS/Linux/Windows ARM64/AMD64 runtime matrix. Cross-builds alone do not close these boxes.
+6. **Distribution:** GCP-hosted, checksum-verified closed-source binaries; Gist Bash/PowerShell bootstrap with end-of-run cleanup; clean-machine download tests and publication. Signing/notarization are explicitly excluded by the user's release decision. Builds remain local until hosting/publication is verified.
+
+## 0. Baseline and scope
+
+- [x] Go CLI, loopback HTTP client, generic material inventory, batched hydration, filtered/preserve modes, Markdown graph, and source research exist.
+- [x] Baseline fixture/race tests and six-platform binary packager exist; first macOS packaged fixture export passed on 2026-09-28.
+- [x] Document the requested lifecycle, UX, naming, two-pass links, related-summary graph, PDF strategy, and native metadata differences in EXPORT_SPEC.
+- [x] Update this checklist with the evidence from the new implementation and keep README/download instructions synchronized.
+- [ ] Define a release coverage contract for “all retained exposed data”; close the existing association/binary/supplemental-view gaps or explicitly list them in every manifest and download guide.
+
+## 1. Discovery and OS lifecycle
+
+Implementation: isolate lifecycle helpers from CLI prompts; inject process launch/probe functions so tests do not launch or quit real applications. Use the source links in the lifecycle section of EXPORT_SPEC.
+
+- [x] Probe all loopback ports 39300–39333 inclusive with bounded timeouts, validate health/version, and reject unrelated HTTP services.
+- [x] Recognize migrating/not-ready health separately from absence; wait with a deadline without launching a duplicate instance.
+- [x] Add `--environment auto|production|staging`; classify staging from the version suffix, never the port. Refuse ambiguous auto discovery and named-environment mismatches.
+- [x] Support explicit loopback `--base-url`, including an explicitly selected debug server, while retaining redirect/proxy restrictions.
+- [x] Add launch-if-missing with `--launch-os` and `--os-path`; use registered production scheme or an explicit staging executable/bundle. Verify the environment after launch. No invented staging scheme.
+- [ ] Cover unregistered handlers and both environments running in integration tests. Unit tests already cover missing installation, wrong environment after launch, launch failure, migration readiness/deadline, no duplicate launch, cancellation, and an inclusive range boundary.
+- [x] Add precise desktop process checks and `pieces-for-developers://quit`, only after export approval and only if Desktop is running. Add `--close-desktop=false`.
+- [x] Poll for confirmed desktop exit, never force-kill, and confirm OS stays healthy. A closure failure must be actionable and must not be reported as success.
+- [ ] Verify live production discovery and staging discovery separately; test launch from stopped state on macOS, Linux, and Windows without changing the active database.
+- [ ] Test desktop closure on all platforms and record exact executable/bundle matching. Verify unsaved desktop work gets its normal cooperative shutdown behavior.
+
+## 2. Preflight scan, duration estimate, and confirmation UX
+
+Implementation: add a read-only `scan` command and a reusable preflight result with per-type status, counts, sample size, measured request duration/bytes, estimated range, and limitations. Print aggregate information only. Keep raw record bodies out of logs and preflight artifacts.
+
+- [x] Count every selected material, including summaries/persons/annotations/events/tags/conversations. Keep unknown/error separate from zero.
+- [x] Explain persona annotations accurately; do not display all annotations as a persona count.
+- [x] Sample bounded batches and estimate a duration range with explicit assumptions for privacy, graph, and PDF work. Display unavailable when sampling fails.
+- [x] Add format choice, output destination/privacy summary, metadata/relationship options, and `Export now? [Y/n]`.
+- [x] Support `--yes`/`-y`; noninteractive input without an explicit answer must cancel. Test empty-line yes, y/Y/yes, n/N/no, invalid input, EOF, and cancellation.
+- [x] Validate destination/flags/policy before lifecycle mutations. Declining creates no export directory and does not close Desktop.
+- [x] Add per-stage counts, elapsed time, rate, phase ETA, recent OS p95, retry/backoff counts, and two-second terminal updates. Whole-run ETA remains an assumed range pending large-history calibration.
+- [x] Run live scan against the user's running OS; save aggregate evidence only. Investigate schema/auth/version incompatibilities before claiming export coverage.
+- [ ] Benchmark estimates on small, medium, and large histories; include large events, huge tags, and PDF mode. Document uncertainty rather than presenting exact promises.
+
+## 3. Final path assignment and newest-first files
+
+Implementation: preserve JSON storage identities, then assign document paths only after the final included graph is known. Store paths in one map used by every renderer and index.
+
+- [x] Add readable summary filenames: `000000.safe_title.YYYY-MM-DD.uuid.md`, newest creation time first, rank starting at zero.
+- [x] Deterministic UUID tie-break; undated summaries last; six-digit minimum padding that grows as required.
+- [x] Preserve canonical UUIDs; use opaque deterministic fallback for non-UUID IDs. Add opaque naming option.
+- [x] Sanitize title/metadata before naming; normalize Unicode, remove reserved characters, bound full UTF-8 basename length including sibling suffixes, handle reserved Windows names and case-insensitive collisions.
+- [x] Use the selected timezone consistently; explicitly distinguish creation dates from covered activity dates.
+- [ ] Expand filename fixtures to 0/1/10 records, equal timestamps, case variants, and more non-Latin names. Current coverage includes 125 records, long Unicode titles, forbidden punctuation, non-UUID fallback, two dated UUID summaries, and filtered secret handling.
+- [ ] Verify Finder/Explorer ascending name order yields newest first and all same-basename siblings stay adjacent.
+
+## 4. Graph, relationship siblings, and link validation
+
+Implementation: create inverted indexes of included summaries by tag ID, source ID, person ID, and normalized website hostname. Derive only documented provenance edges through events/source windows, with visited sets and bounded traversal. Label co-occurrence as derived.
+
+- [x] Complete path assignment before rewriting supported Pieces URI links.
+- [x] Generate relative URI-safe local links; preserve code examples and permitted web/mail links. Flatten unresolved/private/unknown Pieces links, original relative/file links, and empty destinations to their labels; drop unverified Pieces fragments. Keep source HTML inert and image labels without fetching images. Never expose absolute home/staging paths.
+- [x] Add `Related Summaries by Tags`, `... by Source`, `... by Person`, and `... by Website` with shared evidence labels, distinct-dimension scores, and timestamps.
+- [x] Deduplicate per section and exclude self-links/private/missing targets. Distinguish source applications from website hosts.
+- [x] Add `<same-basename>.relationships_graph.md` and `--relationships inline|sidecar|both`; main and sibling link to each other.
+- [x] Put tags, sources, website hosts, persons, and description in the summary itself and portable metadata sidecar.
+- [x] Validate every generated local link and graph target after rendering. Check links again after moving/copying the whole export folder.
+- [ ] Expand graph fixtures for cyclic provenance and excluded shared nodes across all four dimensions. Shared tag/source/person/website groups, missing references, empty lists, and ordinary backlinks already have fixture coverage.
+- [x] Add `--related-order relevance|recent`, `--related-limit` (1–500, default 50), and inclusive `--related-since` for suggestions only. Count distinct dimensions, then recency/ID; record settings in the manifest.
+- [x] Test older four-dimension matches against 75+ newer one-dimension matches, repeated tags without score inflation, recent ordering, exact cutoff boundaries, and undated candidates.
+- [x] Add complete shared-group index destinations for omitted/overflow related results; verify a 150-member group still exposes every member with only 50 suggestions inline.
+- [x] Test missing/private/unsupported/empty inline and reference links, nested labels, HTML/images, and unchanged code samples.
+- [ ] Benchmark 1k/10k/100k-member groups and full large histories. Exact candidate evaluation still costs CPU for very high-degree groups; bounded output does not imply bounded total ranking work.
+
+## 5. Native metadata and portability
+
+Implementation: platform-specific files behind a common metadata writer; portable sidecar always present. Only sanitized values enter xattrs, property stores, PDF metadata, and sidecars. Native integration is optional (`auto|off`), with per-file outcomes.
+
+- [x] Define sidecar schema: summary ID, document path, title, description, original tag labels, normalized source/website tags, persons, date basis, and native-attribute outcome.
+- [x] macOS: write/read back plist-encoded Finder tags and description comment metadata; eight synthetic Markdown/PDF files reported `applied`.
+- [ ] Verify Finder tags, Get Info comments, and Spotlight behavior separately; xattr readback alone is not UI proof.
+- [x] Implement Linux write/readback of `user.xdg.tags` and `user.xdg.comment`.
+- [ ] Execute Linux metadata tests on ext4 and a filesystem that does not support xattrs; verify Dolphin with indexing enabled and document GNOME/file-manager differences.
+- [x] Windows: implement writable Shell property-store probing, `System.Keywords`/`System.Comment`/`System.Title` set/commit/readback. Report unsupported for missing/read-only Markdown or PDF property handlers.
+- [ ] Run Windows property-store set/commit/readback on real Markdown/PDF handlers and inspect Explorer; cross-compilation does not validate COM runtime behavior.
+- [x] PDF: embed sanitized Title/Subject/Keywords during conversion. Do not describe NTFS alternate streams or JSON sidecars as native Explorer tags.
+- [ ] Test `--metadata off`, unsupported filesystems, metadata write/readback failures, redacted descriptions/tags, and no metadata leakage from excluded records.
+- [ ] Copy/ZIP/unzip to APFS, NTFS, ext4, and exFAT where available. Verify portable sidecar survives and document native attribute loss. Add reapply-metadata tooling if needed.
+
+## 6. Markdown and PDF export modes
+
+Implementation: render from canonical approved Markdown; retain it in PDF exports. Ship a local renderer and fonts with appropriate notices. Keep network/image fetching and HTML/script execution disabled.
+
+- [x] Add `--format markdown|pdf|both`; wire the interactive choice to the same code path.
+- [x] Render PDFs with headings, paragraphs, lists, code, long words/URLs, readable tables, page boundaries, and clickable Markdown-companion links.
+- [x] Mirror relationship siblings and summary basenames for PDF; offer both indexes where requested. `pdf` and `both` currently retain the same Markdown companions.
+- [x] Embed fonts and sanitized PDF metadata; test accented/non-Latin/emoji text. Detect unsupported glyphs and report them rather than silently deleting text. Document any custom font support.
+- [x] Validate extracted PDF text, annotations/link targets, metadata, and A4 page geometry. Inspect the two-page synthetic summary and relationship sections visually with Poppler; no clipping or detached link lines remain.
+- [ ] Expand PDF visual coverage to large tables, long code blocks, all requested scripts/fonts, and extreme relationship pages; complex-script shaping and multiple-font fallback are not implemented.
+- [x] Audit generated PDF page text, metadata, and annotations semantically; run the filtered privacy fixture in PDF mode and reject a deliberately unfiltered secret PDF. Only approved text/metadata enters PDFs; no imported attachments, hidden layers, images, or remote assets are added.
+- [ ] Expand adversarial tests across all generated surfaces/native properties; the implemented checks are not a universal secret-detection guarantee.
+- [ ] Exercise Preview, Acrobat/Edge, and a Linux viewer; document their handling of relative local-file links. Move the folder and retest.
+- [ ] Test PDF render failure/disk full/cancel and guarantee no falsely successful final archive.
+
+## 7. Completeness and privacy hardening
+
+- [ ] Full live filtered export: compare initial inventory, fetched, included, excluded, withheld, missing, and final inventory by type. Keep raw user content in ignored local export directories only.
+- [ ] Validate all persons/profile/persona paths, summary annotation bodies/hierarchies, and standalone records independently.
+- [ ] **Release blocker:** recover and reconcile projected summary-to-annotation links, person-to-summary links, and pipeline memberships. An evenly spaced live sample of 250 summaries omitted those fields; sampled persona annotations omitted their summary relationships too. Global annotation export preserves text but cannot prove attachment. Obtain supported relationship projections or enumerable association reads; avoid pairwise brute force and title/timestamp guessing. Hierarchy has a separate implemented traversal.
+- [ ] Complete association-object metadata and supplemental endpoints identified in EXPORT_GUIDE, or mark them explicitly out of scope in release acceptance.
+- [ ] Implement attachment/fingerprint audio extraction for preservation mode and validated format-specific filtering for supported attachments. Do not copy unscanned originals into filtered archives.
+- [ ] Extend privacy tests to filenames, all four relationship sections, sidecars, native metadata, PDF text/metadata, URLs with query credentials, and late-discovered credentials.
+- [ ] Add recorded large-history fixtures without private content; test memory, disk use, retries, server mutation, interrupted runs, and resumed runs once resume exists.
+- [ ] Implement disk-backed IDs/graph and resumable manifests for datasets beyond the current memory/response limits.
+- [x] Review manifest semantics: intentional exclusions versus failures, metadata warnings versus content failures, requested format versus generated format, and date/graph evidence.
+
+## 8. Release and platform acceptance
+
+- [x] Run `go test -race ./...`, `go vet ./...`, and the pinned `govulncheck` command in README after changes. Fix reachable findings; record non-reachable dependency advisories accurately.
+- [x] Build six targets with `CGO_ENABLED=0`; verify ZIP contents, binary formats, SHA-256 checksums, licenses/font notices, and absence of repository source or private test exports.
+- [ ] Native runtime matrix: macOS ARM64/AMD64; Windows ARM64/AMD64; Linux ARM64/AMD64. At minimum execute doctor, scan, synthetic export, PDF validation, metadata behavior, cancellation, and missing-OS launch tests.
+- [x] Adopt unsigned, unnotarized, closed-source distribution as explicitly requested. No signing/notarization release gate.
+- [ ] Test the actual unsigned download/run experience on each platform, including Linux executable permissions and desktop/headless launch behavior; do not disable system security controls automatically.
+- [ ] Verify download UX from a clean machine with no development tools installed; supported OS versions and optional desktop facilities documented.
+- [x] Add proprietary binary-use notice in LICENSE.txt and retain third-party notices in every package. Application source remains private; installer scripts are intended for a Gist.
+- [x] Publish the unlisted installer Gist and verify both uploaded files match the tested local scripts; pin raw revisions in DISTRIBUTION.md. No application source or exported records were published.
+- [ ] Configure the GCP bucket/download base URL, publish pinned release assets, and verify installation from those exact URLs. See DISTRIBUTION.md.
+- [x] Implement Bash and PowerShell download/hash/extraction/run/cleanup flows. Verify corrupted checksums, duplicate checksum entries, unsafe ZIP entries, retained exports, literal arguments, and complete/partial/error/interrupted CLI exit codes with native fixture executables.
+- [x] Add native packaged-CLI acceptance against a synthetic OS: doctor, scan, filtered Markdown/PDF export, user/profile placement, summary bodies, count reconciliation, privacy audit, and moved links. Passed locally on macOS ARM64.
+- [x] Prepare a six-target GitHub Actions matrix with pinned actions, native architecture checks, tests, supported race tests, vulnerability scan, binary packaging, and packaged-CLI acceptance. Add a separate Windows PowerShell 5.1 installer run.
+- [ ] Execute the prepared Windows/Linux/macOS Intel CI jobs and inspect artifacts/results. Prepared YAML and cross-builds are not executed runtime evidence.
+
+## 9. Adaptive performance and read-only dry runs
+
+Implementation: shared request pacing in `performance.go`, bounded calibration in `benchmark.go`, stage reporting in `progress.go`. Keep transport/body-read lifetime inside the one-request gate. Source batch reads take a global database write lock; do not add parallel hydration workers without source evidence and representative load measurements.
+
+- [x] Add `benchmark` and `export --dry-run`; no export directories, raw samples, Desktop closure, or source mutations. `--launch-os=false` disables OS activation.
+- [x] Start per-route batches at five or the lower user ceiling; grow only after healthy reads; maximum 50. Keep at most one outstanding data request.
+- [x] Measure request bytes/latency; halve batches and add bounded pauses on slow/large/error responses. Leave healthy-request headroom. Provide adaptive/conservative modes and latency/batch controls.
+- [x] Stop on repeated overload/very slow responses, exhausted transient errors, or transport failures. Never turn an overloaded batch into a flood of singular fallbacks. Test growth/backoff/circuit and concurrent callers against a fake slow server.
+- [x] Print two-second phase progress, counts/rate/phase ETA, recent p95, retries/backoffs; keep record IDs, names, and bodies out of pacing logs. Record aggregate performance in the manifest.
+- [x] Run bounded live calibration and a complete people-evidence preview with OS health checked afterward. Record caches/budgets and observed slowdowns, not an invented maximum-throughput claim.
+- [ ] Full-history throughput and resource profiling: fetch vs JSON/privacy/fsync vs graph vs rendering vs PDF/native metadata. Measure client memory/disk and OS responsiveness while capture continues. Define acceptance budgets on representative hardware.
+- [ ] Calibrate whole-export estimates on actual completed small/medium/large runs. Add persistent historical estimates only if they contain no private content and their hardware/source applicability is clear.
+- [ ] Test real OS overload/cancellation recovery in a controlled staging database; client cancellation does not prove already-started server DB work stopped. Never deliberately stress the user's primary database to failure.
+
+## 10. People selection, persona history, and identity review
+
+Implementation: `people.go` and `person_evidence.go`. Apply selection after privacy/provenance filtering, before path assignment. Keep selection omissions separate from excluded/withheld/missing. A profile-focused selection is not a personas-only material export.
+
+- [x] Add `--people all|profiles|connected`, `--min-person-connections`, and bounded aggregate `--people-report`. Default remains all.
+- [x] Retain explicit account identities, persona/profile evidence, and incomplete evidence conservatively. Connected mode additionally uses typed summary/content associations and indexed source event totals. Avoid mistaking absent projected fields for empty lists.
+- [x] Query projected persons' actual persona/profile annotations; use one newest result per type for preview and overlapping creation-time pages for retained histories. Test 75-version pagination and saturated timestamp ties; report unresolved history instead of skipping ties.
+- [x] Preserve globally inventoried annotations independently of selection. Do not invoke persona generation/regeneration, association mutations, or source deletion.
+- [x] Group navigation only for equal explicit platform user IDs, preserving separate original records. Mark same-email/full-name candidates for review, never automatically merge extracted aliases/names/emails.
+- [x] Test reverse-only annotation/person links, legacy singular person links, no profile text, unknown evidence, ghost/connection selection, typed summary associations, and narrative-only mentions. Selected people never cascade-delete otherwise valid summaries.
+- [x] Measure reduction on the live database: profiles preview 4,291 → 1,373, omitting 2,918 (68.0%); six stored account identities already qualify. Label this pre-privacy selection, not an exported/deduplicated database.
+- [ ] Obtain complete person-to-summary association coverage on the current projection schema. Until then, connected mode retains unknown people and profile summary indexes explicitly disclose incomplete coverage.
+- [ ] Full live selected-person export: reconcile profile/history versions, privacy exclusions, intentional omissions, canonical records, and index membership. The aggregate preview is not a replacement for this acceptance test.
+- [ ] Design a separate personas-only material/closure preset if desired. It must disclose which summaries/events/annotations it omits, preserve hierarchy references, and reconcile coverage; `--people profiles` alone does not implement it.
+- [ ] Optional user-approved identity override file: deterministic reviewed merges/splits with provenance, reversible canonical mappings, conflicting profile history, and no source mutations. Do not infer semantic identity from an LLM without an explicit design and user choice.
+
+## 11. Organized folders and canonical naming
+
+Implementation contract: [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md), archive format 4; `organization.go`, `paths.go`, `summary_hierarchy.go`, and `user_people.go`. Final included records determine paths. Every renderer uses relative paths from the authoritative map.
+
+- [x] Put profile folders under `workstream_summaries/personas/users/` and `related_persons/`, with `profile.md`, `profile_summaries/index.md`, and `related_workstream_summaries/index.md`. Single-owner profile versions live there; shared versions retain one canonical annotation file.
+- [x] Link every known direct person-to-summary association, not only the top related suggestions. Preserve parent/child navigation on canonical summaries. Do not label every authored/associated summary as exclusively describing that person.
+- [x] Classify SPECIFIC summaries with the SDK's `parentHierarchicalTypeDescriptor`: named built-ins such as daily standups, morning briefs, day/week recaps, and time tracker; collision-safe custom descriptor folders; explicit unclassified fallback. Keep known forward/reverse pipeline memberships in secondary indexes without duplicating canonical outputs.
+- [x] Put temporal and UNKNOWN/legacy summaries in `workstream_summaries/timeline/`; preserve exact enum values. Other explicit hierarchy types go under `hierarchical_summaries/<type>/`. Keep the all-material chronological index separate.
+- [x] Verify users/ placement through the exact `/user/<user>/person` endpoint, using the current and optionally retained user records. Test same-name persons and a misleading platform-ID equality; preserve separate identity records.
+- [x] Recover hierarchy from both global identifier sets and every parent's immediate children. Preserve multiple parents, reject malformed collections, report inventory inconsistencies, and remove the per-summary `association_metadata` retry loop. Live traversal: 20 parents, 1,004 children, 1,708 edges, matching returned sets.
+- [x] Reconcile reverse `annotation.summaries` attachments for body rendering and privacy propagation; label derived inverses. Traverse person → persona/profile annotation → workstream summaries in a distinct profile-context section. Test without direct summary-to-person/body projections.
+- [x] Preserve one global newest-first summary rank across folders and same-basename relationship/metadata siblings. Explain gaps within folders, unstable paths across exports, source IDs, Unicode/title limits, and opaque naming.
+- [x] Fix deeply nested root/backlinks and mirror PDFs without metadata-sidecar collisions. Test shared pipeline/person memberships, same-name different identities, reverse links, privacy-excluded pipeline labels, canonical history ownership, PDF links, and moving the export.
+- [ ] Confirm full live pipeline membership and annotation-body coverage. Classification is available even when membership projections are absent. Never re-run pipelines to reconstruct outputs.
+- [x] Resolve custom_pipeline_<id> descriptors to approved included pipeline display names without merging distinct IDs; retain descriptor classification if the pipeline is absent/excluded. Tests cover same-name pipelines, missing/excluded records, and opaque paths. This is a readability enhancement, not a substitute for membership enumeration.
+- [ ] Verify the layout in Finder/Explorer/Linux file managers, including long root paths, non-Latin names, ascending global rank with folder gaps, and PDF viewer navigation.
+
+## 12. Consolidated signals document (future)
+
+Individual `SIGNALS` records already export. The aggregate view is planned separately in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md#signals-digest-planned-next).
+
+- [ ] Verify live signal annotation/association projections against the source schema; inventory remains independent of summary reachability.
+- [ ] Add a single Markdown digest option and a bounded split option with `signals/index.md`. Initial split design: 1,000 signals or 8 MiB approved text per part, with reported handling of an oversized individual signal.
+- [ ] Include source ID/name/origin/category, creation/update and occurrence ranges, approved annotation text, and valid links to canonical signal/person/pipeline/summary/evidence records.
+- [ ] Sort newest-created first with stable ID tie-break and explicit undated handling. Reconcile digest membership to included signals, distinct from excluded/withheld/missing counts; never silently truncate.
+- [ ] Generate from sanitized staged records after path assignment; avoid re-fetching or regenerating signals. Reuse link rewriting, secret/metadata audits, and excluded-node policy.
+- [ ] Add bounded memory/disk/page budgets, progress/cancellation, and an explicit PDF splitting decision; a huge Markdown file must not imply an unbounded single PDF is practical.
+- [ ] Test empty/large/tied/undated inputs, long text, Unicode, missing/shared links, filtering, moved folders, PDF output, and interrupted runs. Benchmark real signal counts without logging bodies.
+
+## Verification procedures and evidence log
+
+For each completed task record date, test/command, platform, result, and remaining limitation. Synthetic lifecycle tests inject launch/quit functions and never invoke real application launch/quit. Live read-only discovery and scan can run with Desktop open. A real export uses the normal approval flow or an explicit `--yes`; lifecycle actions occur after that point. Never call the OS quit/shutdown endpoint during export testing.
+
+```sh
+go test -race ./...
+go vet ./...
+GOTOOLCHAIN=go1.27.1 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+go run ./cmd/pieces-export doctor
+go run ./cmd/pieces-export scan --launch-os=false
+go run ./cmd/pieces-export export --output ./exports/live-validation
+go run ./cmd/release --version 0.5.0-dev --output dist/0.5.0-dev
+```
+
+Live exports stay under ignored `exports/`. Record counts/timings/statuses in this log, not summary titles, people names, URLs from private records, or credentials. Before checking off release readiness, inspect a moved copy offline, reconcile the manifest, confirm relationship pages and native metadata in each file manager, and keep unresolved platform items unchecked.
+
+### Evidence recorded on 2026-09-29
+
+- macOS ARM64, Go 1.27.1: `go test -race ./...` and `go vet ./...` passed after ranking/link/PDF/lifecycle changes. Tests include the existing privacy/time-window fixtures plus new discovery, confirmation, ranking, readable-path, PDF, moved-folder, and lifecycle cases.
+- Dependency scan: `GOTOOLCHAIN=go1.27.1 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...` reported zero reachable vulnerabilities on macOS. It reported three advisories in imported packages and eighteen in required modules that the analyzer did not find called. Do not describe the whole dependency tree as vulnerability-free; repeat per release/target.
+- Live read-only scan: `go run ./cmd/pieces-export scan --launch-os=false --timeout 10s` discovered staging `12.6.29-staging` on `127.0.0.1:39301`. All 34 material counts were known: 1,902,150 records total, including 11,729 summaries, 4,265 persons, 688,627 events, 284,019 tags, and 73,927 annotations. Sampled 68 records. Initial rough Markdown ETA was 1h16m46s–7h40m51s; it is uncalibrated and not a full-run measurement. `INTERNAL_SUMMARY_REPORTS` had 241 IDs/count-only records without a read endpoint.
+- Bounded live export: `go run ./cmd/pieces-export export --environment staging --launch-os=false --close-desktop=false --yes --format both --materials ASSETS,FORMATS --output ./exports/live-assets-v2 --metadata auto`. Fetched/included all 12 assets and 12 formats; final inventories matched. Produced a partial archive (CLI exit 2): twelve unresolved out-of-selection references and one PDF with five unsupported glyphs. This proves those selected reads/render paths, not complete migration or summary export. Real contents stayed under ignored `exports/`; logs recorded aggregates only.
+- Synthetic PDF/metadata fixture: `PIECES_EXPORT_FIXTURE_OUTPUT="$PWD/exports/qa-synthetic-v4" go test ./internal/exporter -run '^TestReadableSummaryGraphPDFAndMetadata$' -count=1`. Fourteen Markdown files, fourteen PDFs; eight summary/relationship Markdown/PDF sidecars reported native metadata `applied` after readback. `pdfinfo` verified A4, embedded metadata, no JavaScript, and a two-page example summary. Poppler-rendered pages were visually reviewed after removing raw Markdown syntax and detached duplicate link lines. The ordinary test also moves the whole folder and rechecks Markdown/PDF targets.
+- No full-history export, real Desktop closure/relaunch, Finder/Explorer/Dolphin UI validation, or Windows/Linux execution is claimed. Keep those release gates unchecked.
+- Candidate microbenchmark: `go test ./internal/exporter -run '^$' -bench '^BenchmarkRelatedCandidatesLargeGroup$' -benchtime=3x -benchmem` on Apple M4 Max averaged 11.38 ms and 1.83 MB per query over a 10,000-member group sharing all four dimensions. This isolates ranking, not whole-export throughput or PDF/storage costs; full-history scaling remains unchecked.
+- Release build: `go run ./cmd/release --version 0.2.0-dev` built all six OS/architecture targets with `CGO_ENABLED=0`. Verified Mach-O/ELF/PE architectures, all six SHA-256 hashes, and exactly three files per ZIP (executable, end-user README, notices including embedded font license). No repository sources or exports were packaged. Root `./pieces-export` is also rebuilt as 0.2.0-dev.
+- Packaged macOS ARM64 binary: `doctor --launch-os=false` found the staging instance. Repeated the bounded ASSETS/FORMATS export with the packaged 0.2.0-dev binary into ignored `exports/live-assets-v3`; all 24 records fetched/included, 13 coverage issues (12 unresolved references + 1 unsupported-font issue), one warning, one-second export phase after scan, expected exit 2. Desktop and OS remained running. This run used the final PDF/link/ranking code.
+
+### Adaptive export and organization evidence, 2026-09-29
+
+- `go run ./cmd/pieces-export export --dry-run --environment staging --launch-os=false --people connected --people-report --benchmark-duration 30s --benchmark-reads 40` completed inventory/calibration without export files or Desktop closure. Inventory: 1,902,907 known records across 34 types, including 11,730 summaries, 4,291 persons, 688,767 events, 73,945 annotations, 6,650 signals, and 13 pipelines. The initial people calculation based solely on projected person snapshots was invalid and was replaced with the direct-query preview below; do not use its zero-persona result.
+- Corrected live `scan ... --materials PERSONS,ANNOTATIONS --people connected --people-report`: direct annotation queries found 1,373 persona-bearing people, zero separate profile descriptions, six stored account identities, and 3,720 people with at least ten source event associations. All 4,291 person-side summary projections were unknown. Connected mode therefore kept all; explicit profiles selection retained 1,373 and omitted 2,918 (68.0%). No source records were merged/deleted.
+- Final controller with healthy-request headroom: `go run ./cmd/pieces-export benchmark --environment staging --launch-os=false --people profiles --people-report --benchmark-duration 30s --benchmark-reads 40`. Calibration read 750 record samples in 40 batches in 454 ms; samples repeat and may be cached. The complete people preview took about 35 seconds and ended at 13,007 client requests, zero retries, two latency backoffs (~895/890 ms slow reads), and recent HTTP p95 ~2 ms. OS responded to the final readiness/version check. Preview bounds are separate from the calibration bounds. No raw bodies, names, or emails were printed or persisted.
+- Identity-candidate evidence across evaluated people: zero shared explicit platform-ID groups, zero shared explicit-email groups, twelve shared full-name groups. These are review candidates, not twelve verified duplicate identities. The exported review index contains only included candidates. The measured selection reduction is pre-privacy and does not imply a 68% reduction in total export cost.
+- Automated verification: `go test -race ./...` and `go vet ./...` passed after adaptive pacing, person evidence/history/selection, organized paths, canonical shared memberships, nested PDF/Markdown links, privacy-excluded folder labels, and moved-folder coverage were added. `TestOrganizedCanonicalPathsSharedMembershipAndPrivacy` exercises pipeline and person sharing through a full synthetic Markdown/PDF export.
+- Synthetic organized PDF fixture: `PIECES_EXPORT_FIXTURE_OUTPUT="$PWD/exports/qa-personas-v3" go test ./internal/exporter -run '^TestReadableSummaryGraphPDFAndMetadata$' -count=1` produced 22 Markdown files and 22 PDFs. Poppler rendered a one-page person profile and two-page temporal summary; all three pages were visually inspected with readable layout and no clipping. `pdfinfo` confirmed A4 and no JavaScript. Nested canonical-history/summary links passed the automated PDF/Markdown target checks. These are synthetic QA artifacts, not private user exports.
+- Repeated `GOTOOLCHAIN=go1.27.1 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...`: zero reachable vulnerabilities; three imported-package and eighteen required-module advisories remain reported as not called by this code on this host.
+- Additional bounded schema-only compatibility probe: five pipeline snapshots lacked `summaries`; five summary snapshots lacked `annotations`, `persons`, and `pipelines`; one singular summary with `association_metadata=true` also lacked those fields. Only field-presence counts were printed. This is a confirmed projection-coverage gap, not proof that relationships do not exist. The final health body was plain text rather than JSON; the ad-hoc decoder failed, so `go run ./cmd/pieces-export doctor --environment staging --launch-os=false` separately confirmed OS ready. Full membership and summary-body reconstruction remain unchecked release blockers.
+- Final version `0.3.0-dev`: `go run ./cmd/release --version 0.3.0-dev` built all six macOS/Linux/Windows ARM64/AMD64 targets. All ZIP SHA-256 hashes and Mach-O/ELF/PE architectures verified; each ZIP contains exactly executable, README, and notices (including the font license), with no project sources or exports. Root `./pieces-export --version` also reports `0.3.0-dev`. Builds remain unsigned and unpublished; cross-compilation is not native Windows/Linux execution.
+- Packaged macOS ARM64 smoke export: `./dist/pieces-export_0.3.0-dev_darwin_arm64/pieces-export export --environment staging --launch-os=false --close-desktop=false --yes --format markdown --materials ASSETS,FORMATS --output ./exports/live-adaptive-v3 --metadata off`. All 24 selected records fetched/included and final inventories matched. Output path printed absolutely; adaptive batches grew 5 → 10; export phase ~1 s, 20 measured client requests, recent p95 ~5 ms, zero retries/backoffs. Expected partial status/exit 2 for twelve unresolved out-of-selection references. No people were selected in this small material-only smoke test; it does not validate a full person/summary migration.
+
+### Layout and relationship traversal evidence, 2026-09-29
+
+- Archive format 4 implements the requested `workstream_summaries/timeline`, `personas/users`, `personas/related_persons`, and `single_click_summaries` tree. Single-owner persona/profile versions live under `profile_summaries/`; shared versions retain one canonical annotation. Built-in descriptors follow the SDK enum. Exact custom-pipeline IDs can supply an approved included pipeline display name; stable descriptor suffixes prevent same-name groups from merging. Missing/excluded pipelines keep their descriptor fallback.
+- Synthetic coverage verifies multiple hierarchy parents, missing/malformed hierarchy inventories, reverse annotation bodies and derived-inverse provenance, persona → annotation → summary traversal, exact user mapping, misleading platform-ID equality, custom pipeline naming/privacy, Windows reserved folder names, and Markdown/PDF navigation after moving the archive.
+- `PIECES_EXPORT_LIVE_HIERARCHY_URL=http://127.0.0.1:39301 go test ./internal/exporter -run '^TestLiveSummaryHierarchy$' -count=1 -v`: 11,733 summary IDs, 20 parent candidates, 1,004 child candidates, and 1,708 immediate edges recovered from 20 parent reads. Returned parent/child inventories matched with zero issues. The probe completed in 0.10 s; its pre-final-health sample measured 25 requests, 583,963 response bytes, p95 13.54 ms, peak 14.79 ms, and zero retries/backoffs. OS remained ready. This replaces the per-summary metadata retry with two global sets plus one read per parent. Matching returned sets does not prove completeness of the OS's internal association tables.
+- A later 250-summary field-presence sample exposed hierarchy type on all records (245 UNKNOWN, five SPECIFIC) and descriptors on five, including one `standup`. All omitted annotations/persons/pipelines and the other graph projections listed in EXPORT_GUIDE. Sampled persona annotations likewise omitted summary associations. No content/title/time guessing was used to replace absent edges. The earlier structural scan stopped at 10,475 summaries on repeated slow reads; neither scan was a completed migration.
+- `PIECES_EXPORT_LIVE_USER_MAPPING_URL=http://127.0.0.1:39301 go test ./internal/exporter -run '^TestLiveUserPersonMapping$' -count=1 -v`: the current user mapped successfully through `/user/<id>/person`, and the mapped person existed among 4,332 current person IDs. Seven requests including both readiness checks, 176,623 bytes, p95 5.94 ms, zero retries/backoffs, 0.02 s. Identities stayed in memory and were not logged. The older 4,291 → 1,373 selection result is historical; this check does not recompute it for the growing inventory.
+- `PIECES_EXPORT_FIXTURE_OUTPUT="$PWD/exports/qa-layout-v4" go test ./internal/exporter -run '^TestReadableSummaryGraphPDFAndMetadata$' -count=1`: 27 Markdown documents and 27 PDFs. Poppler-rendered profile (one page) and temporal summary (two pages) were visually inspected; text and related links were legible with no clipping. `pdfinfo` confirmed A4 and no JavaScript. The normal fixture also validates moved-folder links; this is synthetic evidence, not a live summary-body export.
+- The first packaged `0.4.0-dev` ASSETS/FORMATS smoke read all 24 records but failed final privacy audit. Investigation found a generated accumulated-wait float whose long decimal fraction passed the payment-card checksum. The archive stayed under `exports/live-layout-v4.partial` and was not finalized. Fixed duration accumulation to use integer nanoseconds internally and microsecond precision in the manifest. A regression verifies generated timing metadata passes while a real numeric payment-card value still fails; the audit was not bypassed. Use the replacement `0.4.1-dev` build, not the initial package.
+- Final validation after that fix: `go test -race ./...` and `go vet ./...` passed on macOS ARM64. The pinned vulnerability scan reported zero reachable vulnerabilities, with three imported-package and eighteen required-module advisories not found called on this host. No native Windows/Linux runtime claim is made.
+- `go run ./cmd/release --version 0.4.1-dev` built all six targets. Verified all six ZIP checksums, Mach-O/ELF/PE formats and architectures, exactly three files per archive (binary, README, notices), and runtime/font license notices. Root `./pieces-export --version` reports `0.4.1-dev`. Packages are local, unsigned, and unpublished.
+- Replacement packaged macOS ARM64 smoke: `./dist/pieces-export_0.4.1-dev_darwin_arm64/pieces-export export --environment staging --launch-os=false --close-desktop=false --yes --format markdown --materials ASSETS,FORMATS --output ./exports/live-layout-v4-fixed --metadata off`. All 24 records included; initial/final inventories matched. Privacy audit and link checks passed. Expected partial status/exit 2 for twelve out-of-selection references; no warnings. Export phase ~1 s, 20 requests, 165,154 response bytes, p95/peak 7.05 ms, zero retries/backoffs. Final `doctor` confirmed OS ready; Desktop was not closed. This remains a small selected-material smoke test, not full migration acceptance.

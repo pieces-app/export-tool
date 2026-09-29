@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "redact_financial": true,
+  "redact_emails": false,
+  "source_mode": "denylist",
+  "deny": [
+    {"domain": "bank.example", "include_subdomains": true},
+    {"domain": "adult.example", "include_subdomains": true}
+  ],
+  "allow": [
+    {"domain": "research.work.example", "include_subdomains": false}
+  ],
+  "domain_lists": [],
+  "withhold_unproven_generated_content": false
+}

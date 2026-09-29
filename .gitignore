@@ -1,0 +1,6 @@
+/dist/
+/pieces-export
+/pieces-export.exe
+/exports/
+*.partial/
+.DS_Store

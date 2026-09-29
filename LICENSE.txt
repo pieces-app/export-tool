@@ -1,0 +1,10 @@
+Pieces Export is proprietary, closed-source software. All rights reserved.
+
+You may download and run the binaries provided by the publisher to export data
+you own or are authorized to access. No license to the repository source code
+is granted. Publication of the installer scripts does not grant rights to the
+application source. Other uses require permission from the publisher.
+
+Third-party components are governed by their respective licenses, reproduced
+in THIRD_PARTY_NOTICES.txt in the binary download. This notice does not restrict
+rights granted by those third-party licenses.

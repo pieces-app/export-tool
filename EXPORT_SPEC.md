@@ -1,0 +1,201 @@
+# Pieces Export product and implementation specification
+
+Updated 2026-09-29. This document defines the requested product. [TODO.md](TODO.md) is the execution and acceptance checklist; checked items require implementation and evidence. [EXPORT_GUIDE.md](EXPORT_GUIDE.md) remains the source-backed API reference, and [PRIVACY_FILTERING.md](PRIVACY_FILTERING.md) explains privacy tradeoffs. The canonical folder map and naming contract are in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md). A requirement in this specification is not a claim that it already works.
+
+## Product outcome
+
+A user downloads one executable, starts an export, reviews a local inventory and approximate duration, chooses Markdown or PDFs, and opens a portable folder in Finder/Explorer/a Linux file manager. Newest summaries appear first when sorting by filename ascending. Summaries, persons, tags, sources, and websites remain navigable after Pieces is unavailable. A readable, explicit coverage report distinguishes intentional privacy exclusions from missing data or errors.
+
+Keep the repository private. Distribute platform binaries, notices, and end-user instructions. Do not depend on an installed Go/Python/Flutter runtime, a cloud renderer, or an online secret validator. No account credentials or exported content go to a remote service.
+
+Distribution decision, 2026-09-29: closed-source, unsigned binaries hosted in a GCP bucket; no signing or notarization gate. Publish only the bootstrap scripts in a GitHub Gist. The bootstrap detects the platform, downloads a pinned version and checksum over HTTPS, verifies it before executing, and runs the ordinary CLI flow. Its final prompt offers to remove the downloaded utility while preserving exports outside the installation directory. Native macOS acceptance comes first; Windows/Linux CI is prepared for when remote execution is available. See [DISTRIBUTION.md](DISTRIBUTION.md).
+
+## CLI flow and UX
+
+1. Parse and validate flags and policy before changing application state. Reject existing output/staging directories early.
+2. Find the requested OS environment on loopback ports **39300 through 39333 inclusive**. Verify health and version, not just an open TCP port. Show port, environment, readiness, and version. Do not print record text, people names, API keys, or installation paths during discovery.
+3. If missing and launch is enabled, start the requested installed OS application; wait with a deadline and rediscover. Distinguish absent installation, wrong environment, migration in progress, permission failure, and timeout. Never silently export a different environment.
+4. Scan selected collections. Show counts for summaries, persons, persona-bearing annotations, events, tags, conversations/messages, and every other selected material. Unsupported/error counts are **unknown**, not zero. Persona annotations are not a separate material collection; do not imply that all annotations are personas.
+5. Measure a bounded read sample to estimate fetch time; include scan/render/graph/PDF overhead and an uncertainty range. Show sampled records/batches, whether any category has no sample, and that exclusions and attachments can alter the result. No raw samples persist before approval.
+6. In interactive mode, offer Markdown, PDF plus retained Markdown, or both as appropriate to the actual renderer capability. Default to Markdown. PDF mode must preserve canonical Markdown so PDF links to Markdown remain useful.
+7. Show the selected format, privacy mode, destination, native metadata behavior, relationship layout, warnings, and planned desktop closure. Ask **Export now? [Y/n]**. Empty input means yes only for an actual interactive response; EOF, a closed pipe, or cancellation means no. Invalid answers repeat. `--yes`/`-y` explicitly bypasses questions for automation. `scan` never exports or closes Desktop.
+8. After approval, close Pieces for Developers cooperatively if requested (default for a normal interactive export). Verify it is gone and verify OS still responds. Do not kill broadly matching processes. Allow `--close-desktop=false` for environments without Desktop and tests. Explain that closing Desktop does not stop OS capture or produce an atomic database snapshot.
+9. Show stages: inventory/fetch, privacy processing, path assignment, graph construction, Markdown render, PDF render, metadata, validation, finalize. Show counts and elapsed time; adapt ETA as work completes. Non-TTY output uses readable lines rather than animation/control sequences.
+10. Print output location, included/excluded/withheld/missing counts, warnings, duration, and the index to open. Exit 0 for completed implemented scope, 2 for partial export, 1 for fatal failure. A user cancellation is successful cancellation with no export created. Never silently present a partial run as complete.
+
+Target commands (consult `--help` and TODO for implemented flags):
+
+```sh
+pieces-export doctor --environment production
+pieces-export scan --environment staging
+pieces-export export --environment production --output ./pieces-archive
+pieces-export export --environment staging --os-path '/path/to/staging/application' --format both
+pieces-export export --format markdown --yes --close-desktop=false --output ./automated-export
+pieces-export export --format pdf --metadata auto --relationships both --output ./pdf-export
+pieces-export export --related-order relevance --related-limit 25 --related-since 2026-01-01 --output ./ranked-export
+pieces-export export --related-order recent --output ./recent-export
+```
+
+`--environment auto|production|staging` selects an existing instance; auto accepts a unique ready instance and should refuse ambiguity. For launch with auto, prefer production and say so. An explicit `--base-url` must remain literal loopback/localhost; environment checks still apply when a named environment was selected. A development server outside this range requires an explicit base URL and auto environment, not an expanded production scan.
+
+## OS lifecycle: source findings and implementation instructions
+
+The SDK defines production/staging as 39300–39333 and debug as 39334–39367. Version strings such as `12.3.108-staging` identify staging; a port cannot. `GET /.well-known/health` returns `ok:<os>` when ready and `migrating` while the database is opening. `GET /.well-known/version` returns the version. `GET /.well-known/installation/path` returns the executable path and can help verify a chosen installation; never run an arbitrary executable path supplied by an HTTP response.
+
+Sources: [well-known server](../isomorphic_server/lib/well_known_internal_server.dart), [SDK port finder](../unified_monorepo/frontend/pieces_platform_client_sdk/packages/pieces_dart_client_sdk/lib/src/core/utils/pieces_os_port_finder.dart), [SDK environment](../unified_monorepo/frontend/pieces_platform_client_sdk/packages/pieces_dart_client_sdk/lib/src/core/utils/pieces_target_environment.dart), [SDK version handling](../unified_monorepo/frontend/pieces_platform_client_sdk/packages/pieces_dart_client_sdk/lib/src/providers/pieces_os_connection/pieces_os_connection.dart).
+
+Pieces OS registers **`pieces://`**, not `pieces-os://`. Staging/debug installs can register the same scheme; the last registration can win. Do not invent a staging URL scheme or rely on the shared scheme for environment-specific launches. Prefer an explicit installed application path for staging; on macOS the documented local staging bundle is `/Applications/Pieces OS (Local Staging).app`. On Windows/Linux, allow an executable path and invoke it directly without a shell. Re-probe after launch and reject a version/environment mismatch. Production may use the installed `pieces://` handler, but must still verify the resulting environment. Sources: [OS Info.plist](../os_server/macos/Runner/Info.plist), [OS entry point](../os_server/lib/main.dart), [side-by-side installation notes](../unified_monorepo/MULTI_RUN.md).
+
+The desktop quit URL is **`pieces-for-developers://quit`**. OS shutdown calls close the database and ultimately exit OS. The source explicitly warns that an older broad Pieces process terminator can accidentally terminate OS itself. Use the desktop quit scheme with exact process lookup (macOS `Pieces`/known bundle executable; Windows `pieces_for_x.exe`; Linux `pieces_for_x`), bounded polling, and no force-kill fallback. Do not send a quit URL if the desktop is already absent, because URL activation can otherwise launch it. If process detection is uncertain, report failure rather than claiming closure. Re-check OS after closure. Sources: [OS termination implementation](../os_server/lib/os_internal_server.dart), [safe desktop-close migration](../os_server/lib/migrations/desktop_update_check_reset_migration.dart).
+
+Do not switch an application's database/environment with runtime flags unless the source explicitly supports it; launch the correctly installed build. Do not change capture settings or restart OS as a side effect of export. Record lifecycle outcomes without private filesystem paths.
+
+## Inventory, estimates, and consistency
+
+Use the material metrics and identifiers APIs described in EXPORT_GUIDE. Batch reads stay at or below 50 IDs. Initial scan covers every selected material independently, including standalone persons, tags, and annotations. Summary-only traversal loses unreferenced records. Metrics failure is a visible per-material failure and prevents an exact total claim.
+
+Time windows are enumeration boundaries, not a cursor. Split dense creation windows, overlap/deduplicate ties, audit against unfiltered IDs for undated records, and reconcile final IDs. Preserve future dates. A live database can change while scanning or exporting; a preflight total is a dated estimate, not a snapshot guarantee. Reuse compatible preflight information where possible, but do not sacrifice reconciliation to avoid a read.
+
+ETA must distinguish measured work from assumptions. Sample small read-only batches across material families; extrapolate request cost and bytes/record with wide lower/upper bounds. Include privacy passes, references, summary hierarchy reads, graph generation, and PDF overhead. If there is no usable sample, display “estimate unavailable,” not a fabricated precise duration. Track estimate vs actual on synthetic small/medium/large fixtures and real histories; calibrate before release. Do not read an entire huge event inventory just to estimate a small summary export.
+
+## Export pipeline and file layout
+
+The order is required: fetch canonical records → sanitize/withhold → resolve allowed graph → assign every final path → create links/relationship indexes → write Markdown → validate text → convert approved Markdown to PDF → apply approved metadata → validate all representations → finalize.
+
+See [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete **implemented archive-format-4** tree, examples, canonical placement rules, person histories, descriptor groups, and planned signals digest.
+
+The primary browsing root is `workstream_summaries/`, containing `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/`. Temporal and UNKNOWN/legacy summaries go into its timeline. SPECIFIC hierarchical summaries use `parentHierarchicalTypeDescriptor` to choose a single-click folder, including `daily_standups`, `morning_briefs`, `end_of_day_recaps`, `week_recaps`, and other exact SDK descriptors. Missing descriptors go to `unclassified`; unknown custom descriptors use safe labels plus deterministic hash suffixes. Exact `custom_pipeline_<id>` descriptors use that included pipeline's approved name when available, with the same descriptor hash suffix; excluded/missing pipelines retain the fallback. This lookup does not add an association. Other explicit hierarchy types go into `hierarchical_summaries/<type>/`. No title matching is involved. The root-level `timeline/records.jsonl` and daily indexes cover all material types separately.
+
+Every retained person/group has `profile.md`, `profile_summaries/index.md`, and `related_workstream_summaries/index.md`. Single-owner persona/profile annotations live inside the profile_summaries folder; shared versions keep one canonical annotation file. Verify user placement through `GET /user/<user>/person`, using the current user and optionally retained USERS records. Platform ID/name/email equality alone never places someone in users/. Other explicit platform IDs may group related-person navigation while preserving separate identity records. Profiles distinguish direct person-to-summary associations from summary links through persona/profile annotations. Both permit navigation without proving exclusive subject matter. Generic pipeline memberships remain secondary indexes in `workstream_summaries/pipeline_associations/`; canonical pipeline records remain under `markdown/pipelines/`.
+
+Read both global hierarchy identifier sets, then each parent's immediate children. Preserve a DAG with multiple parents; derive reverse navigation without duplicating files. Compare recovered children against the global set and record `summary_hierarchy` counts/match status in the manifest. This uses 2 + P hierarchy requests instead of an additional snapshot for each of S summaries. Malformed collections, failed reads, and mismatched sets are coverage issues. The OS can swallow internal association errors, so a matching endpoint inventory is not an atomic database-level completeness proof.
+
+Reconcile `summary.annotations` with reverse `annotation.summaries` where exposed. Derived inverse edges are marked in Markdown and `relationships.jsonl`; source JSON remains the supplied record. Apply privacy propagation to these attachments before rendering. The live staging hierarchy traversal recovered 1,708 edges from 20 parent reads and 1,004 child IDs, but inspected summary/annotation snapshots still omit body/person/pipeline relationship projections. **Full summary-body attachment and person/pipeline membership remain release blockers**, independently of classification and hierarchy. Do not infer missing links from titles, matching timestamps, persona prose, or descriptor names. See the endpoint evidence in EXPORT_GUIDE.
+
+PDFs mirror document folders under `pdf/`, omitting the `markdown/` prefix for generic material pages; `index.pdf` stays at the root. PDF and Markdown summary metadata sidecars remain in their separate trees. JSON stays keyed by stable material/ID. The path map is authoritative; no caller reconstructs a path independently from a title. All root/backlinks must be calculated relative to the final document path, including deeply nested pipeline/persona files.
+
+### Summary naming and ordering
+
+Use `<zero-padded-rank>.<safe-title>.<date>.<uuid>.md`; `.pdf`, `.relationships_graph.md`, and `.metadata.json` share the basename. Rank is global across summary folders, starts at 0 for the newest included summary, and increases toward the oldest; gaps inside a folder are expected; width is at least six digits and grows for larger exports. Filtering happens before numbering, so excluded titles and ranks cannot leak through filenames. Sort newest creation timestamp first initially, with UUID as a deterministic tie-break; undated records follow dated ones and use `undated`. Explain that this is creation order; covered activity ranges remain separate and a future activity-date option must declare its basis.
+
+Use UTC dates by default, or the selected timezone consistently. Keep valid canonical UUIDs in names; non-UUID IDs use a deterministic opaque fallback. Normalize title Unicode, remove controls/path separators/reserved punctuation, prevent Windows reserved names, trim trailing periods/spaces, and bound UTF-8 filename length including the longest sibling suffix. Handle emoji, accents, collisions, no title, duplicate title/date, very long titles, and case-insensitive filesystems. The UUID/fallback makes collisions unambiguous. Support an opaque naming option for users who do not want titles in filenames. Re-export into a new directory; ranks can change as newer summaries arrive, so ranks are not persistent identifiers.
+
+### Links and the related-summary graph
+
+Build relative, URI-escaped local links from the final path map. Use forward slashes inside Markdown even on Windows. Never embed the original user's absolute home path or the temporary `.partial` path. The whole folder must work after being moved to another machine. Markdown links target canonical Markdown. PDF links also target the retained Markdown files by default, as requested; a later PDF-to-PDF option may use the same map. PDF readers can restrict local-file links; explain this and test major viewers.
+
+Rewrite supported `pieces://persons/<id>`, `pieces://tags/<id>`, and `pieces://anchors/<id>` Markdown destinations using the parsed AST and the final included path map. Inline, reference-style, nested-label, and autolink syntax follow the same rule. A target must exist in the included graph and have a final path before it becomes clickable. Strip unverified fragments from rewritten Pieces links; point to the document itself. All unresolved, excluded, unsupported/custom-scheme, original relative/file, and empty link destinations become their visible label as plain text (formatting such as bold may remain). Never emit `[]()` or a dead placeholder: an empty destination can navigate unexpectedly within a viewer. Original relative links refer to the source environment, so they are not assumed valid in the export.
+
+Retain permitted HTTP/HTTPS/email links as external links; export validates their syntax, not the continued availability of those remote sites. Do not contact source websites to validate them. No remote/local images are copied or loaded; preserve image labels. Render source HTML inertly as escaped text or a fenced sample. Code examples remain code. Markdown formatting is normalized by [goldmark-markdown](https://github.com/teekennedy/goldmark-markdown), while canonical JSON retains the sanitized source body. A removed/private target must not contribute its title, URI, or metadata to derived relationship pages. Missing records are reported in the manifest; flattening the narrative link is not a recovery of that record.
+
+After rendering, walk every Markdown local-link target and every PDF link annotation. Require a file within the completed export (the manifest path is reserved until finalization); reject traversal or missing generated files. Revalidate after moving the whole folder. A viewer may still restrict local-file navigation or require a Markdown-capable application; test those integrations independently.
+
+For each included summary, build inverted indexes by canonical tag ID, source ID, person ID, and normalized website hostname. Include relevant explicit relations and provenance-derived relations through included events/source windows, with documented hop limits. Do not connect every node transitively through generic “related” edges. By-source grouping is application/source identity; by-website grouping is hostname, so they are intentionally different. Strip URL credentials, query parameters, and fragments before deriving website keys; normalize case/IDNA/default ports. Keep full allowed source URLs in content only when policy permits them.
+
+Emit these exact sections at the bottom and/or in its sibling according to `--relationships inline|sidecar|both` (default both):
+
+```md
+#### Related Summaries by Tags
+- [Other summary](relative/path/to/other.md) — shared: tag label
+
+#### Related Summaries by Source
+- [Other summary](relative/path/to/other.md) — shared: source label
+
+#### Related Summaries by Person
+- [Other summary](relative/path/to/other.md) — shared: person label
+
+#### Related Summaries by Website
+- [Other summary](relative/path/to/other.md) — shared: example.com
+```
+
+No self-links; deduplicate each related summary within a section. Main and relationship pages link to each other. Empty sections explicitly say there are no included matches for the list settings. Each result includes the shared labels, distinct-dimension score, matching dimension names, and creation timestamp.
+
+The ranking contract is:
+
+- `--related-order relevance` (default): score = number of distinct shared dimensions among Tags, Source, Person, Website (1–4). A person + source + tag match scores 3, while ten matching tags alone score 1. Higher score comes first, followed by newest creation timestamp and lexicographic ID. There is no opaque AI similarity score or undocumented weighting.
+- `--related-order recent`: newest creation timestamp, then ID. Undated records follow dated ones. Scores and evidence are still displayed.
+- `--related-limit 50` (default; 1–500): maximum suggestions in each dimension section. Compute scores across the complete candidate union **before** choosing the visible subset. Never pre-truncate each group to recent members; that would discard older strong matches.
+- `--related-since YYYY-MM-DD|RFC3339`: optional inclusive creation-time cutoff for the related lists. A date is midnight UTC; an explicit timestamp can carry its own offset. Undated candidates are omitted when a cutoff is active. This controls suggestions only: it does not delete older exported records or change export inventory.
+
+When a limit or cutoff omits candidates, link to complete shared-group indexes under `markdown/relationships/<dimension>/<opaque-group>.md`. These contain all included members, newest first, including the current summary and dates outside the suggestion cutoff; explain that scope beside the links. The indexes preserve complete graph navigation without duplicating every high-degree edge on every summary. They are also converted when PDF is requested. Privacy filtering applies before indexing; excluded nodes never appear in complete indexes.
+
+Use inverted indexes, one candidate mask per summary ID, and one bit per dimension to count distinct overlap. Limit output per summary, not traversal completeness. Very common groups still cost significant CPU to rank; benchmark 1k/10k/100k groups and migrate to a disk-backed or indexed candidate strategy before claiming large-history scalability. Record `related_order`, `related_limit`, and any `related_since` in the manifest for reproducibility.
+
+## Native metadata and portability
+
+Descriptions, original tags, normalized source tags, website tags, and person labels must come from the **sanitized included graph**. Emit them in the document and a `.metadata.json` sidecar on every platform. Example normalized tags: `source:visual_studio_code`, `website:example.com`, and ordinary summary tag labels. Keep the original allowed display labels in the sidecar, deduplicate normalized tags, and avoid sensitive filesystem paths or query strings in tags. Description precedence: explicit description, then an included description annotation; never copy an entire excluded summary body as metadata.
+
+Native metadata is additive. `--metadata auto|off` controls OS integration, not the portable metadata in the document. Record applied/unsupported/failed outcomes. Failure of optional attributes should produce a warning with a sidecar fallback, not destroy valid content. Validate what was written by reading it back. Copying to ZIP, FAT/exFAT, cloud drives, or a different OS can strip native attributes; sidecars remain authoritative.
+
+| Platform | Mechanism | Required behavior and limitation |
+| --- | --- | --- |
+| macOS | Finder tags via `NSURLTagNamesKey` or its Finder metadata xattr representation; Finder comment metadata for description | Use plist-encoded values, not comma-separated strings. Read back tags/comment. A direct xattr write does not prove Finder/Spotlight has indexed or displayed it; verify Finder UI separately. Avoid assuming `kMDItemDescription` is a free-form Finder comment. |
+| Linux | `user.xdg.tags` and `user.xdg.comment` extended attributes on supporting filesystems | Use the conventions supported by KDE/KFileMetaData; verify in Dolphin with indexing configured. There is no universal tag UI across all Linux file managers. Unsupported xattrs fall back to sidecars. |
+| Windows | Shell property store: `System.Keywords`, `System.Comment`, and `System.Title`, when a writable property handler exists | Capabilities depend on the file extension and installed handler. Markdown commonly has no writable handler. Do not claim that NTFS alternate streams automatically create Explorer tags. Query/set/commit/read back or report unsupported; always keep sidecar metadata. PDF Keywords/Subject/Title can be embedded during rendering but Explorer visibility still depends on its handler. |
+
+Research references: [Apple tag names](https://developer.apple.com/documentation/foundation/urlresourcekey/tagnameskey), [Apple metadata keys and Finder comment distinction](https://developer.apple.com/library/archive/documentation/CoreServices/Reference/MetadataAttributesRef/Reference/CommonAttrs.html), [freedesktop common xattrs](https://www.freedesktop.org/wiki/CommonExtendedAttributes/), [KDE KFileMetaData source](https://invent.kde.org/frameworks/kfilemetadata), [Windows Keywords](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-keywords), [Windows property handlers](https://learn.microsoft.com/en-us/windows/win32/properties/building-property-handlers), [property handler write restrictions](https://learn.microsoft.com/en-us/windows/win32/properties/prophand-bestprac-faq).
+
+## PDF generation and ordinary files
+
+Markdown remains the canonical intermediate and is retained for portability. `markdown` writes Markdown folders; `pdf` writes PDFs with their Markdown companions; `both` currently has the same retained-companion output as `pdf`; both indexes are present. Explain this in the format prompt. “Normal files/folders” means OS-browsable documents, not an opaque database. Binary attachments are a separate work item and must not be implied complete by PDF support.
+
+Use a local renderer that can ship inside the CLI. Prefer an embedded Go renderer; do not silently invoke a cloud service or fetch images/fonts from record URLs. Treat input as text, not executable HTML/JavaScript. Support paragraphs, headings, lists, fenced code, tables or a documented readable table fallback, page breaks, long URLs, clickable links, document metadata, and Unicode with embedded licensed fonts. Record unsupported glyphs/layout rather than silently dropping words. `--pdf-font /path/to/font.ttf` selects a local TrueType font (maximum 32 MiB); validate it before application changes. The bundled Go Regular font covers Latin text but not all scripts/emoji. Unsupported glyph substitution makes the manifest partial and retains the complete Markdown text. A custom font replaces the bundled font for that run; there is not yet multi-font fallback or complex-script shaping. Do not interpret export content as shell commands, local file reads, or network requests.
+
+The initial renderer uses [gopdf](https://github.com/signintech/gopdf) with embedded fonts. It flattens emphasis to readable text and renders tables as separated text cells; it is not a browser print engine. Single-link paragraphs/list items are clickable blocks. Multi-link paragraphs have explicitly labeled link lines. Long blocks wrap, headings reserve space for following content, and page numbers identify continuations. Golden/visual coverage must grow before claiming arbitrary Markdown layout fidelity.
+
+PDFs must be produced exclusively from the approved Markdown/metadata. Re-scan extracted PDF text and inspect document metadata/links for secrets; scanning compressed PDF bytes is insufficient. No original hidden attachments, invisible text layers, thumbnails, or unfiltered metadata may be carried forward. Test generated PDFs visually with a renderer and structurally with a parser; verify the relationship links target existing companions. Include title, subject/description, and keywords from approved metadata. Keep font licenses in download notices.
+
+## Privacy, failures, and validation
+
+Apply the same policy to content, filenames, headings, PDF metadata, xattrs, sidecars, all relationship pages, indexes, logs, and link maps. Do not reintroduce excluded nodes through co-occurrence. A private persona/summary derived from excluded sources needs the existing conservative provenance policy. Filter before path assignment; final audits check filenames as well as file text. Exact known credentials found late must be removed from earlier staged records before any public output is rendered.
+
+Never overwrite an existing export. Publish only after validation; interrupted work remains explicitly partial. Cancellation must propagate through discovery, scans, reading prompts, fetching, rendering, and child processes. Record unreadable types, denied reads, drift, unsupported metadata, and PDF failures distinctly. Operational privacy failures cannot become successful filtered exports. No broad process kills, OS shutdown API, source mutations, or hidden source uploads.
+
+Acceptance requires unit/fixture tests, live read-only preflight, a real filtered export with reconciled counts, moved-folder link checks, PDF text/visual checks, metadata readback plus file-manager UI checks, six cross-builds, native tests on each supported OS/architecture, and signed distribution. See TODO for reproducible procedures and evidence.
+
+## Output destination, adaptive reads, and terminal progress
+
+The CLI resolves `--output` relative to the terminal working directory and prints its absolute path before confirmation. Without an option it uses `pieces-export-<timestamp>` in that directory. `export --dry-run` runs the inventory/sample scan and bounded calibration, optionally adding `--people-report`, without creating an export directory or closing Desktop. OS launch remains controlled by `--launch-os`; use `--launch-os=false` for a running-instance-only test.
+
+```sh
+pieces-export export --dry-run --launch-os=false --people profiles --people-report
+pieces-export benchmark --launch-os=false --benchmark-duration 30s --benchmark-reads 40
+pieces-export export --people profiles --performance adaptive --output ./exports/focused
+pieces-export export --performance conservative --batch-size 5 --output ./exports/gentle
+```
+
+### Control loop implemented in the Go client
+
+The [server guidance](../isomorphic_server/AGENTS.md) and [batch implementation](../isomorphic_server/lib/workstream_summaries_internal_server.dart) describe database batches taking a global write lock even for reads. Increasing concurrent client workers can queue behind that lock and interfere with capture. Therefore data requests are serialized by a shared in-flight gate; **at most one data HTTP request is outstanding**, including body consumption. Discovery's bounded health probes are separate and do not hydrate user data.
+
+- `--performance adaptive` starts each batch route at at most five IDs. After two successful batches below 75% of `--target-latency` (default 500 ms), double the batch size up to `--batch-size` (default and maximum 50). No concurrency ramp is used.
+- A response above the target or larger than 8 MiB halves the route's next batch size, down to one. Overload/network failures also back off. Pause at least 100 ms after a slow response, increasing to at most five seconds as needed.
+- Healthy adaptive reads leave at least 1 ms, or a quarter of the measured request duration, between requests; a previous longer delay decays. This gives capture/writers some headroom rather than continuously saturating the request loop.
+- Three consecutive overloaded or very slow requests on a route stop further requests. Very slow means above the larger of three seconds or six times the target. Transport failures/body interruptions and exhausted transient retries also stop. HTTP 429/5xx retries are bounded; 501/593 remain unsupported-operation errors. A busy batch never falls through into dozens of singular retries.
+- `conservative` mode starts at at most five IDs, does not increase the batch size, retains slowdown reductions, and leaves at least 100 ms between reads. `--batch-size` is a ceiling, not a guaranteed fixed chunk size.
+- Per-person annotation history queries use a bounded page of 50 with the same request pacing; their page length is not currently adjusted by the batch-route controller. Preview uses one record per annotation type. Indexed event counts request only one association row.
+- Cancellation interrupts waits and requests. It cannot guarantee that OS cancels database work already started. This is a cautious feedback controller, not proof of maximum throughput or a guarantee that OS can never stall.
+
+The terminal prints phase, elapsed time, completed/total when known, phase percentage, records/second, phase ETA, recent HTTP p95 over at most 128 requests, request/retry/backoff counts, and batch/pause changes. There is no invented overall percentage during unknown-size graph/inventory work. Progress emits lines every two seconds while work runs. The manifest records aggregate response bytes, latency, pauses, retries, and backoffs; request-derived IDs, names, and bodies are not in those logs.
+
+The calibration command defaults to five material families and at most 40 batch reads/30 seconds. The upper limits are 100 batch reads/two minutes; auxiliary identifier/health reads are additional, and `--people-report` has a separate two-minute, 20,000-person/10,000-referenced-annotation preview budget. It intentionally reuses bounded samples and can benefit from OS caches. Measured fetch latency cannot predict all filtering, fsync, graph-ranking, Markdown/PDF, or metadata costs. Whole-export ETA is still a broad uncalibrated estimate; phase ETA improves from completed work. Optimize local bottlenecks separately before increasing OS request load.
+
+### People selection, persona recovery, and consolidation
+
+`--people all` is the default. `profiles` selects retained persona/profile annotations and explicit platform-account identities; `connected` adds typed summary links or at least `--min-person-connections` distinct content connections (default 10). Unknown evidence is kept conservatively. Selection runs after privacy processing and never removes a valid summary merely because one linked person is intentionally omitted. The manifest counts `intentionally_omitted` separately; the renderer suppresses links to omitted identities. This is not name anonymization or a deduplicated source database.
+
+Current OS projections omit person `annotations`, `summaries`, and `workstream_events` in both batch and singular snapshots. Direct read-only `/person/<id>/annotations` queries recover `HIERARCHICAL_PROFILE_SUMMARY` and `PROFILE_DESCRIPTION` evidence/history. They use descending creation times and inclusive `created.to` boundaries with ID deduplication. A full page that cannot advance, dense equal timestamps, unreadable dates, query failure, or page-bound exhaustion must not silently certify completeness. Record `persona_history_unresolved`, retain uncertain people, and keep all globally inventoried annotations independently.
+
+The person event-association endpoint supplies a source-side count without hydrating every event. It does not establish person-to-summary coverage. Consequently `connected` conservatively keeps all 4,291 people in the measured current OS; `profiles` can retain 1,373 and omit 2,918 (68.0%). This is a pre-privacy preview, not the reconciled outcome of a full archive. Six stored account identities are already among those 1,373. Twelve shared-name groups need review; no name/email automatic merge is allowed. See EXPORT_LAYOUT for exact selection semantics and measured evidence.
+
+This option reduces person documents and navigation clutter. It does not eliminate the selected events, hints, tags, annotations, or summaries, nor avoid fetching people to determine eligibility. A future personas-only material/closure preset is a separate task, not implied by `--people profiles`.
+
+## Planned signals digest
+
+Individual signals already use the ordinary material export. Add a consolidated Markdown view only after confirming source content and association coverage. [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md#signals-digest-planned-next) defines a single-document option, bounded split alternative, chronology, canonical links, privacy ordering, counts, and PDF limits. Signal generation/updates are never part of an export. This aggregate presentation remains unchecked in TODO.
+
+## Installed-OS relationship coverage release blocker
+
+Live compatibility finding: five sampled pipeline snapshots and five sampled workstream-summary snapshots omitted their embedded relationship fields; one singular summary also omitted annotation/person/pipeline relationships with `association_metadata=true`. The exporter records projection warnings. Persona histories can be recovered through the direct person query, but complete summary-body attachment and pipeline/person membership need further API coverage work. Fixture-tested organization must not be mistaken for complete grouping of this installed OS dataset.
+
+Do not sign off migration completeness until retained annotation-to-summary links and pipeline/person membership can be reconciled from authoritative read endpoints. Standalone annotation text remains globally exportable, but that alone does not establish which summary/profile should embed it. Never generate new source content or guess IDs/names to fill the gap.
