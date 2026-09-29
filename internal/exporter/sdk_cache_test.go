@@ -277,8 +277,9 @@ func TestLiveSDKCacheCandidates(t *testing.T) {
 		t.Skip("set PIECES_EXPORT_LIVE_CACHE_CONFIG to opt into local cache/staging reads")
 	}
 	var config struct {
-		Caches []string `json:"caches"`
-		Stage  string   `json:"stage"`
+		Caches               []string `json:"caches"`
+		Stage                string   `json:"stage"`
+		ReconcileAnnotations bool     `json:"reconcile_completed_annotations"`
 	}
 	b, err := os.ReadFile(configPath)
 	if err != nil {
@@ -343,4 +344,72 @@ func TestLiveSDKCacheCandidates(t *testing.T) {
 		targetCounts[field] = len(values)
 	}
 	t.Logf("Staged summaries=%d cacheRows=%d matchedRows=%d invalid=%d expired=%d creationMismatch=%d unusableUpdate=%d conflicts=%d; candidate summary fields=%v; distinct referenced IDs=%v. Targets not reconciled; no archive was modified.", len(r.meta), r.manifest.SDKCache.Rows, r.manifest.SDKCache.Matching, r.manifest.SDKCache.Invalid, r.manifest.SDKCache.Expired, r.manifest.SDKCache.IdentityMismatch, r.manifest.SDKCache.UnusableTime, conflicts, counts, targetCounts)
+	if !config.ReconcileAnnotations {
+		return
+	}
+	// Only opt in after the annotation fetch phase has completed. This probe
+	// checks retained local files, not source completeness or final privacy.
+	present := map[string]bool{}
+	textPresent := map[string]bool{}
+	summaryText := map[string]bool{}
+	missing, mismatched, legacyCardMatches := 0, 0, 0
+	for id := range targets["annotations"] {
+		if ctx.Err() != nil {
+			t.Fatal("annotation reconciliation exceeded its time budget")
+		}
+		path := filepath.Join(config.Stage, "data/annotations", opaque("ANNOTATIONS", id)+".json")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			missing++
+			if uuidTokenPattern.FindString(id) == id {
+				for _, match := range cardPattern.FindAllString(id, -1) {
+					if validCard(match) {
+						legacyCardMatches++
+						break
+					}
+				}
+			}
+			continue
+		}
+		v, err := readRecord(path)
+		if err != nil {
+			t.Fatal("staged annotation unreadable")
+		}
+		if fieldString(v, "id") != id {
+			mismatched++
+			continue
+		}
+		present[id] = true
+		for _, block := range content(v) {
+			if strings.TrimSpace(block.Text) != "" {
+				textPresent[id] = true
+				if fieldString(v, "type") == "SUMMARY" {
+					summaryText[id] = true
+				}
+				break
+			}
+		}
+	}
+	allPresent, anyText, anySummaryText := 0, 0, 0
+	for field, candidate := range candidates {
+		if field.relation != "annotations" || candidate.conflict || len(candidate.ids) == 0 {
+			continue
+		}
+		all, text, body := true, false, false
+		for _, id := range candidate.ids {
+			all = all && present[id]
+			text = text || textPresent[id]
+			body = body || summaryText[id]
+		}
+		if all {
+			allPresent++
+		}
+		if text {
+			anyText++
+		}
+		if body {
+			anySummaryText++
+		}
+	}
+	t.Logf("Completed annotation-stage probe: candidate targets=%d matched files=%d missing files=%d identity mismatches=%d nonempty-text annotations=%d SUMMARY-type nonempty-text annotations=%d; summaries with all cached annotation targets present=%d, any annotation text=%d, SUMMARY-type text=%d. Historical attachment candidates only; final privacy and authoritative completeness are not established. No archive was modified.", len(targets["annotations"]), len(present), missing, mismatched, len(textPresent), len(summaryText), allPresent, anyText, anySummaryText)
+	t.Logf("Missing annotation UUIDs matching the older payment-card heuristic=%d; this is diagnostic evidence, not proof of the omission reason. Reconcile finalized manifest decisions before any recovery.", legacyCardMatches)
 }
