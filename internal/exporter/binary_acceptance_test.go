@@ -101,3 +101,68 @@ func TestPackagedCLI(t *testing.T) {
 	}
 	t.Log("native binary doctor/scan/export, counts, user profile, body, PDF/privacy checks, and moved local links passed")
 }
+
+func TestPackagedCacheCLI(t *testing.T) {
+	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
+	if binary == "" {
+		t.Skip("set PIECES_EXPORT_TEST_BINARY to the native release executable")
+	}
+	binary, err := filepath.Abs(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary := record("summary", "2026-09-20T00:00:00Z")
+	summary["persons"], summary["pipelines"] = refs(), refs()
+	body := record("body", "2026-09-20T00:00:00Z")
+	body["type"], body["text"] = "SUMMARY", "Packaged cache recovery body."
+	cached := record("summary", "2026-09-20T00:00:00Z")
+	cached["annotations"] = refs("body")
+	cache, _ := cacheFixture(t, []map[string]any{cached}, true)
+	f := &fakeOS{data: map[string][]map[string]any{"WORKSTREAM_SUMMARIES": {summary}, "ANNOTATIONS": {body}}}
+	srv := f.server(t)
+	defer srv.Close()
+	out := filepath.Join(t.TempDir(), "cache archive")
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	args := []string{"export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off", "--materials", "WORKSTREAM_SUMMARIES,ANNOTATIONS", "--output", out, "--sdk-cache", cache}
+	b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput()
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("cache export must return partial exit 2: %v\n%s", err, b)
+	}
+	if strings.Contains(string(b), cache) {
+		t.Fatal("cache path leaked to terminal")
+	}
+	data, err := os.ReadFile(filepath.Join(out, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Status != "partial" || manifest.SDKCache.AddedEdges != 2 || manifest.SDKCache.RetainedEdges != 2 {
+		t.Fatalf("cache evidence missing: %+v", manifest.SDKCache)
+	}
+	files, _ := filepath.Glob(filepath.Join(out, "workstream_summaries/timeline/*.md"))
+	found := false
+	for _, path := range files {
+		data, _ := os.ReadFile(path)
+		found = found || strings.Contains(string(data), "Packaged cache recovery body.") && strings.Contains(string(data), "Historical attachment")
+	}
+	if !found {
+		t.Fatal("packaged cache recovery failed to attach current body with provenance")
+	}
+	moved := out + "-moved"
+	if err := os.Rename(out, moved); err != nil {
+		t.Fatal(err)
+	}
+	r := &run{ctx: ctx, stage: moved, opts: Options{Mode: "filtered", Scanner: scanner(t, DefaultPolicy())}}
+	if err := r.validateMarkdownLinks(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.auditOutput(); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("native binary read-only SDK-cache recovery, body/provenance, partial exit status, PDF/privacy checks and moved links passed")
+}

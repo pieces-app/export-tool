@@ -235,6 +235,7 @@ func (s *Scanner) SourceFiltering() bool {
 var urlPattern = regexp.MustCompile(`(?i)https?://[^\s<>"\x60]+`)
 var emailPattern = regexp.MustCompile(`[A-Za-z0-9.!#$%&'*+/=?^_` + "`" + `{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+`)
 var cardPattern = regexp.MustCompile(`\b(?:[0-9][ -]?){12,18}[0-9]\b`)
+var uuidTokenPattern = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b`)
 var ibanPattern = regexp.MustCompile(`\b[A-Z]{2}[0-9]{2}(?:[ ]?[A-Z0-9]){11,30}\b`)
 var ssnPattern = regexp.MustCompile(`\b([0-9]{3})-([0-9]{2})-([0-9]{4})\b`)
 
@@ -458,13 +459,7 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 		return raw
 	})
 	if s.Policy.Financial {
-		value = cardPattern.ReplaceAllStringFunc(value, func(v string) string {
-			if validCard(v) {
-				stats.Redactions++
-				return "[REDACTED:PAYMENT_CARD]"
-			}
-			return v
-		})
+		value = redactPaymentCards(value, stats)
 		value = ibanPattern.ReplaceAllStringFunc(value, func(v string) string {
 			if validIBAN(v) {
 				stats.Redactions++
@@ -514,6 +509,37 @@ func (s *Scanner) ObserveCredentials(v any) {
 			s.ObserveCredentials(item)
 		}
 	}
+}
+
+// A UUID can contain a Luhn-valid numeric prefix before its next hyphen. It is
+// one identifier, not a payment-card value. Exempt only matches wholly inside
+// a complete UUID token; adjacent cards and numeric JSON values still scan.
+func redactPaymentCards(value string, stats *ScanResult) string {
+	matches := cardPattern.FindAllStringIndex(value, -1)
+	if len(matches) == 0 {
+		return value
+	}
+	uuids := uuidTokenPattern.FindAllStringIndex(value, -1)
+	var b strings.Builder
+	last, uuid := 0, 0
+	for _, match := range matches {
+		for uuid < len(uuids) && uuids[uuid][1] <= match[0] {
+			uuid++
+		}
+		identifier := uuid < len(uuids) && uuids[uuid][0] <= match[0] && match[1] <= uuids[uuid][1]
+		if identifier || !validCard(value[match[0]:match[1]]) {
+			continue
+		}
+		b.WriteString(value[last:match[0]])
+		b.WriteString("[REDACTED:PAYMENT_CARD]")
+		last = match[1]
+		stats.Redactions++
+	}
+	if last == 0 {
+		return value
+	}
+	b.WriteString(value[last:])
+	return b.String()
 }
 
 func validCard(s string) bool {

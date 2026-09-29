@@ -92,3 +92,5 @@ Local evidence so far:
 - Workflow passed actionlint. GitHub Actions attempts returned startup failures with no jobs; the user confirmed outstanding billing prevents Actions until next week. Do not retry CI until billing is resolved. Windows and remote native runners remain unverified.
 
 Record full live migration and published-URL install evidence in [TODO.md](TODO.md) before marking the release production ready.
+
+The `0.6.0-dev` packages add optional [SDK-cache recovery](SDK_CACHE_RECOVERY.md) and a UUID/payment-card false-positive fix. All six packages compile with CGO disabled and include SQLite/libc notices. Packaged ordinary and cache-recovery acceptance passed on macOS ARM64, Linux ARM64 in the isolated local VM, and macOS AMD64 under Rosetta. These remain development builds: the full live migration, remote native matrix, GUI behavior, and GCP download path are still unverified.

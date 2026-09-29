@@ -21,6 +21,10 @@ func (r *run) reconcileSummaryAnnotations() {
 			}
 			if inverse != "" && r.addEdge(target.Key, m.Key, inverse) {
 				r.derivedEdges[Edge{target.Key, m.Key, inverse}] = true
+				if evidence, ok := r.cachedEdges[e]; ok {
+					r.cachedEdges[Edge{target.Key, m.Key, inverse}] = evidence
+					r.manifest.SDKCache.AddedEdges++
+				}
 			}
 		}
 	}

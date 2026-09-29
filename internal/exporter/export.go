@@ -16,6 +16,7 @@ import (
 )
 
 type Options struct {
+	SDKCaches                               []string
 	Output, Mode, Timezone, Version         string
 	Format, Naming, Relationships, Metadata string
 	PDFFont                                 string
@@ -47,6 +48,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	SDKCache                CacheCoverage            `json:"sdk_cache"`
 	RelationshipCoverage    []RelationshipCoverage   `json:"relationship_coverage"`
 	People                  PeopleStats              `json:"people"`
 	Performance             PerformanceStats         `json:"performance"`
@@ -76,6 +78,7 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	SupplementableFields                                           map[string]bool
 	ProjectionStates                                               map[string]string
 	RelationshipProjectionUnknown                                  bool
 	PersonProjection                                               bool
@@ -100,6 +103,7 @@ type run struct {
 	people           map[string]*PersonFacts
 	userPersonIDs    map[string]bool
 	derivedEdges     map[Edge]bool
+	cachedEdges      map[Edge]CacheEvidence
 	progress         *Progress
 	documentMetadata map[string]*DocumentMetadata
 }
@@ -177,6 +181,18 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	if err := ValidateSDKCaches(ctx, o.SDKCaches); err != nil {
+		return Manifest{}, err
+	}
+	if len(o.SDKCaches) > 0 {
+		selected := false
+		for _, m := range o.Materials {
+			selected = selected || m.Type == "WORKSTREAM_SUMMARIES"
+		}
+		if !selected {
+			return Manifest{}, errConfig("SDK cache recovery requires WORKSTREAM_SUMMARIES in selected materials")
+		}
+	}
 	if o.PeopleMode == "" {
 		o.PeopleMode = "all"
 	}
@@ -394,6 +410,9 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			return r.manifest, err
 		}
 	}
+	if err = r.recoverSDKCacheRelationships(); err != nil {
+		return r.manifest, err
+	}
 	r.reconcileSummaryAnnotations()
 	if err = r.filterGraph(); err != nil {
 		return r.manifest, err
@@ -602,6 +621,10 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 	meta.Edges = extractEdges(m.Type, id, v)
 	meta.ProjectionStates = projectionStates(m.Type, v)
 	if m.Type == "WORKSTREAM_SUMMARIES" {
+		meta.SupplementableFields = map[string]bool{}
+		for _, field := range cacheRelations {
+			meta.SupplementableFields[field] = v[field] == nil
+		}
 		for _, field := range []string{"annotations", "persons", "pipelines"} {
 			if object(v, field) == nil {
 				meta.RelationshipProjectionUnknown = true

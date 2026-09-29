@@ -92,13 +92,17 @@ Supported Pieces narrative links become local links only when the target is incl
 
 Descriptions, tags, normalized source tags, persons, and website hosts appear in documents and portable `.metadata.json` sidecars. `--metadata auto` also attempts macOS Finder xattrs, Linux XDG xattrs, or Windows writable Shell properties and records readback outcomes. Actual file-manager visibility depends on the platform, filesystem, indexing, and property handlers. `--metadata off` keeps portable metadata only. Sidecars survive ZIP/cross-platform copying where native attributes may be lost.
 
+## Historical SDK-cache recovery
+
+`--sdk-cache /path/to/pieces_client_sqlite.db` optionally recovers historical summary relationships to records fetched from the current OS. Repeat the flag for multiple caches. Current fields take precedence, cached text is never imported, conflicting/tombstoned links are handled conservatively, and the archive remains partial. [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md) documents selection, bounds, privacy, provenance, and the 87.9% candidate body-link coverage measured on this machine. Candidate coverage is not a completed live recovery.
+
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.5.1-dev --output dist/0.5.1-dev
+go run ./cmd/release --version 0.6.0-dev --output dist/0.6.0-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.5.1-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.6.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 

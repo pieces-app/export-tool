@@ -149,7 +149,8 @@ type TimelineEntry struct {
 }
 type PublicEdge struct {
 	Source, Target, Relation string
-	Provenance               string `json:"provenance,omitempty"`
+	Provenance               string         `json:"provenance,omitempty"`
+	CacheEvidence            *CacheEvidence `json:"cache_evidence,omitempty"`
 }
 
 func (r *run) render() error {
@@ -183,7 +184,16 @@ func (r *run) render() error {
 			if r.derivedEdges[e] {
 				provenance = "derived_inverse"
 			}
-			edges = append(edges, PublicEdge{m.Path, target.Path, e.Relation, provenance})
+			var cached *CacheEvidence
+			if evidence, ok := r.cachedEdges[e]; ok {
+				cached = &evidence
+				provenance = "historical_client_cache"
+				if r.derivedEdges[e] {
+					provenance += "_derived_inverse"
+				}
+				r.manifest.SDKCache.RetainedEdges++
+			}
+			edges = append(edges, PublicEdge{Source: m.Path, Target: target.Path, Relation: e.Relation, Provenance: provenance, CacheEvidence: cached})
 		}
 		if created, err := time.Parse(time.RFC3339Nano, m.Created); err == nil {
 			entries = append(entries, TimelineEntry{m.Type, m.ID, m.Path, m.Title, created.UTC().Format(time.RFC3339Nano), m.Updated, "record_created"})
@@ -230,6 +240,12 @@ func (r *run) render() error {
 			fmt.Fprintf(&b, "Updated: %s\n\n", md(m.Updated))
 		}
 		fmt.Fprintf(&b, "[Record JSON](%s) · [Export index](%s)\n\n", relative(m.Path, m.DataPath), relative(m.Path, "index.md"))
+		for _, e := range m.Edges {
+			if _, ok := r.cachedEdges[e]; ok {
+				fmt.Fprintf(&b, "Some relationships were recovered from an explicitly selected historical client cache and may be stale. Current record JSON is unchanged. [Recovery coverage](%s).\n\n", relative(m.Path, "coverage.md"))
+				break
+			}
+		}
 		if m.Redactions > 0 {
 			b.WriteString("Some fields were redacted by the export policy.\n\n")
 		}
@@ -251,6 +267,9 @@ func (r *run) render() error {
 					return err
 				}
 				if text := fieldString(av, "text"); text != "" {
+					if evidence, ok := r.cachedEdges[e]; ok {
+						fmt.Fprintf(&b, "Historical attachment: cache %d, summary updated %s; current OS summary updated %s. The annotation text below comes from the current OS record.\n\n", evidence.Cache, evidence.CachedUpdated, evidence.OSUpdated)
+					}
 					fmt.Fprintf(&b, "## Annotation: %s\n\n[Canonical annotation](%s)\n\n%s\n\n", md(fieldString(av, "type")), relative(m.Path, a.Path), rewriteMarkdown(text, m.Path, r.meta))
 				}
 			}
@@ -267,13 +286,20 @@ func (r *run) render() error {
 				if r.derivedEdges[e] {
 					label += " (derived inverse)"
 				}
+				if _, ok := r.cachedEdges[e]; ok {
+					label += " (historical client cache)"
+				}
 				fmt.Fprintf(&b, "- %s: [%s](%s)\n", md(label), md(target.Title), relative(m.Path, target.Path))
 			}
 		}
 		b.WriteString("\n## Referenced by\n\n")
 		for _, e := range backlinks[m.Key] {
 			source := r.meta[e.Source]
-			fmt.Fprintf(&b, "- [%s](%s) — %s (derived backlink)\n", md(source.Title), relative(m.Path, source.Path), md(e.Relation))
+			label := e.Relation
+			if _, ok := r.cachedEdges[e]; ok {
+				label += " (historical client cache)"
+			}
+			fmt.Fprintf(&b, "- [%s](%s) — %s (derived backlink)\n", md(source.Title), relative(m.Path, source.Path), md(label))
 		}
 		if meta := graph.Metadata[m.Key]; meta != nil {
 			if r.opts.Relationships == "inline" || r.opts.Relationships == "both" {
@@ -290,6 +316,9 @@ func (r *run) render() error {
 					return err
 				}
 				body := fmt.Sprintf("# Relationships: %s\n\n[Summary](%s)\n\n", md(m.Title), relative(sibling, m.Path)) + related
+				if len(r.opts.SDKCaches) > 0 {
+					body += "\nHistorical client-cache relationships may contribute to these suggestions. See the summary and export coverage for provenance.\n"
+				}
 				if err := writeFile(filepath.Join(r.stage, sibling), []byte(body)); err != nil {
 					return err
 				}

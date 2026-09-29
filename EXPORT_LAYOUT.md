@@ -215,6 +215,8 @@ Descriptions, tags, normalized source/website tags, and approved person labels a
 
 The root `coverage.md` links to the manifest and reports per-material counts alongside the core summary/person/pipeline projection counts. Absent or malformed relationship fields make an export partial, even if all returned IDs reconcile. Explicitly empty fields are counted separately. Inverse body recovery and hierarchy traversal preserve supported links without certifying the omitted projections. Counts concern included records; private record labels and identifiers do not appear in this report. The root index links to it, and PDF mode adds `pdf/coverage.pdf` with Markdown companion links.
 
+With explicit `--sdk-cache` inputs, this report also reconciles historical candidate/recovered edges. Body attachments and graph JSONL identify cache provenance while retaining the same canonical folder tree and filenames. No duplicate cached record tree is emitted. See [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md).
+
 ## Signals digest: planned next
 
 Individual `SIGNALS` records already export; the earlier live inventory counted 6,650. A consolidated `signals/index.md` with optional `all-signals.md` or `parts/000000.signals.<from>.<to>.md` remains planned.

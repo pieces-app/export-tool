@@ -29,6 +29,10 @@ These are proposed product choices, not current command-line flags:
 
 A filtered export is deliberately not a lossless backup or a guarantee of anonymity. Names, dates, and relationships may remain useful and identifying. Offer broader PII masking separately from credential/financial filtering so enabling API-key protection does not automatically erase the user's entire person graph or chronological dates.
 
+The implemented payment-card heuristic excludes numeric matches wholly contained in a complete UUID token. Otherwise a Luhn-valid numeric UUID prefix can wrongly withhold a record or break its references. This exemption applies only to the card heuristic: adjacent/standalone/formatted/numeric card values, credential fields, and exact copies of known secrets still redact. Tests exercise UUID record IDs, reference-map keys, URLs, filenames and final Markdown/PDF auditing.
+
+Optional [SDK-cache recovery](SDK_CACHE_RECOVERY.md) imports historical typed relationship IDs, not cached text or embedded records. Targets must be current fetched records. Excluded/withheld targets remain in the private graph for dependency propagation before any output link is generated; a cached link must not restore content excluded by the selected policy. Missing targets stay unlinked, historical evidence remains labeled, and the archive remains partial.
+
 Do not put a preservation archive inside the filtered export directory or ZIP. If the user selects both, produce separate artifacts and clearly identify the private original. For filtered-only runs, process raw responses locally before writing content to the export; do not quietly create an unredacted sidecar, debug log, crash attachment, or checkpoint payload.
 
 Track collection inventory, successful fetches, included records, redacted records, intentional exclusions, withheld/review-needed items, missing records, and operational failures. Redacted records are a subset of included records, not an extra set to add to totals. An export with unresolved scanner failures cannot be labeled as having successfully applied the policy.

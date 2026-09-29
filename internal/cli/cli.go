@@ -126,6 +126,14 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		minConnections := fs.Int("min-person-connections", 10, "distinct content connections to qualify in connected mode; profiles and summary-linked people always qualify")
 		peopleReport := fs.Bool("people-report", false, "read persons and referenced annotation types for an aggregate selection preview")
 		metadata := fs.String("metadata", "auto", "auto native attributes or off; portable sidecars always included")
+		var sdkCaches []string
+		fs.Func("sdk-cache", "optional historical SDK SQLite cache; repeat for up to eight files; recovered links remain unverified", func(path string) error {
+			if strings.TrimSpace(path) == "" {
+				return fmt.Errorf("sdk-cache needs a local file path")
+			}
+			sdkCaches = append(sdkCaches, path)
+			return nil
+		})
 
 		if err := fs.Parse(args[1:]); err != nil {
 			if errors.Is(err, flag.ErrHelp) {
@@ -135,6 +143,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		}
 		if fs.NArg() != 0 {
 			return fail(fmt.Errorf("unexpected positional arguments"))
+		}
+		if err := exporter.ValidateSDKCaches(ctx, sdkCaches); err != nil {
+			return fail(err)
 		}
 		if (*performance != "adaptive" && *performance != "conservative") || *targetLatency < 50*time.Millisecond || *targetLatency > 5*time.Second || *benchmarkDuration <= 0 || *benchmarkDuration > 2*time.Minute || *benchmarkReads < 1 || *benchmarkReads > 100 {
 			return fail(fmt.Errorf("invalid performance mode, target-latency (50ms–5s), or benchmark budget"))
@@ -210,6 +221,15 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		selected, err := exporter.SelectMaterials(*materials)
 		if err != nil {
 			return fail(err)
+		}
+		if len(sdkCaches) > 0 {
+			hasSummaries := false
+			for _, m := range selected {
+				hasSummaries = hasSummaries || m.Type == "WORKSTREAM_SUMMARIES"
+			}
+			if !hasSummaries {
+				return fail(fmt.Errorf("SDK cache recovery requires WORKSTREAM_SUMMARIES in selected materials"))
+			}
 		}
 		if args[0] == "export" && !*dryRun && *people != "all" {
 			has := map[string]bool{}
@@ -287,6 +307,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 		}
 		preflight.Print(stdout, *format)
+		if len(sdkCaches) > 0 {
+			fmt.Fprintf(stdout, "Historical SDK caches selected: %d. Export may recover stale links to current records; it will remain partial. Caches are not applied during scan or dry run.\n", len(sdkCaches))
+		}
 		if *peopleReport {
 			if _, e := exporter.PeopleReport(ctx, client, *people, *minConnections, stdout); e != nil {
 				return fail(e)
@@ -325,7 +348,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)
