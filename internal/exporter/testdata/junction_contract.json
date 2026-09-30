@@ -1,0 +1,872 @@
+[
+  {
+    "family": "anchor_to_anchor_point_associations",
+    "left_route": "anchor",
+    "right_route": "anchor_point",
+    "left_field": "anchor",
+    "right_field": "anchorPoint",
+    "model": "AnchorToAnchorPointAssociation",
+    "left_type": "ANCHORS",
+    "right_type": "ANCHOR_POINTS"
+  },
+  {
+    "family": "anchor_to_asset_associations",
+    "left_route": "anchor",
+    "right_route": "asset",
+    "left_field": "anchor",
+    "right_field": "asset",
+    "model": "AnchorToAssetAssociation",
+    "left_type": "ANCHORS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "anchor_to_workstream_pattern_engine_source_associations",
+    "left_route": "anchor",
+    "right_route": "source",
+    "left_field": "anchor",
+    "right_field": "workstreamPatternEngineSource",
+    "model": "AnchorToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "ANCHORS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "annotation_to_anchor_associations",
+    "left_route": "annotation",
+    "right_route": "anchor",
+    "left_field": "annotation",
+    "right_field": "anchor",
+    "model": "AnnotationToAnchorAssociation",
+    "left_type": "ANNOTATIONS",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "annotation_to_asset_associations",
+    "left_route": "annotation",
+    "right_route": "asset",
+    "left_field": "annotation",
+    "right_field": "asset",
+    "model": "AnnotationToAssetAssociation",
+    "left_type": "ANNOTATIONS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "connector_to_annotation_associations",
+    "left_route": "connector",
+    "right_route": "annotation",
+    "left_field": "connector",
+    "right_field": "annotation",
+    "model": "ConnectorToAnnotationAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "connector_to_conversation_associations",
+    "left_route": "connector",
+    "right_route": "conversation",
+    "left_field": "connector",
+    "right_field": "conversation",
+    "model": "ConnectorToConversationAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "CONVERSATIONS"
+  },
+  {
+    "family": "connector_to_conversation_message_associations",
+    "left_route": "connector",
+    "right_route": "message",
+    "left_field": "connector",
+    "right_field": "conversationMessage",
+    "model": "ConnectorToConversationMessageAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "connector_to_person_associations",
+    "left_route": "connector",
+    "right_route": "person",
+    "left_field": "connector",
+    "right_field": "person",
+    "model": "ConnectorToPersonAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "connector_to_website_associations",
+    "left_route": "connector",
+    "right_route": "website",
+    "left_field": "connector",
+    "right_field": "website",
+    "model": "ConnectorToWebsiteAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "connector_to_workstream_event_associations",
+    "left_route": "connector",
+    "right_route": "workstream_event",
+    "left_field": "connector",
+    "right_field": "workstreamEvent",
+    "model": "ConnectorToWorkstreamEventAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "WORKSTREAM_EVENTS"
+  },
+  {
+    "family": "connector_to_workstream_summary_associations",
+    "left_route": "connector",
+    "right_route": "workstream_summary",
+    "left_field": "connector",
+    "right_field": "workstreamSummary",
+    "model": "ConnectorToWorkstreamSummaryAssociation",
+    "left_type": "CONNECTORS",
+    "right_type": "WORKSTREAM_SUMMARIES"
+  },
+  {
+    "family": "conversation_message_to_anchor_associations",
+    "left_route": "message",
+    "right_route": "anchor",
+    "left_field": "conversationMessage",
+    "right_field": "anchor",
+    "model": "ConversationMessageToAnchorAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "conversation_message_to_annotation_associations",
+    "left_route": "message",
+    "right_route": "annotation",
+    "left_field": "conversationMessage",
+    "right_field": "annotation",
+    "model": "ConversationMessageToAnnotationAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "conversation_message_to_asset_associations",
+    "left_route": "message",
+    "right_route": "asset",
+    "left_field": "conversationMessage",
+    "right_field": "asset",
+    "model": "ConversationMessageToAssetAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "conversation_message_to_conversation_message_associations",
+    "left_route": "message",
+    "right_route": "additional_message",
+    "left_field": "x",
+    "right_field": "y",
+    "model": "ConversationMessageToConversationMessageAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "conversation_message_to_hint_associations",
+    "left_route": "message",
+    "right_route": "hint",
+    "left_field": "conversationMessage",
+    "right_field": "hint",
+    "model": "ConversationMessageToHintAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "HINTS"
+  },
+  {
+    "family": "conversation_message_to_range_associations",
+    "left_route": "message",
+    "right_route": "range",
+    "left_field": "conversationMessage",
+    "right_field": "range",
+    "model": "ConversationMessageToRangeAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "RANGES"
+  },
+  {
+    "family": "conversation_message_to_website_associations",
+    "left_route": "message",
+    "right_route": "website",
+    "left_field": "conversationMessage",
+    "right_field": "website",
+    "model": "ConversationMessageToWebsiteAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "conversation_message_to_workstream_pattern_engine_source_associations",
+    "left_route": "message",
+    "right_route": "source",
+    "left_field": "conversationMessage",
+    "right_field": "source_",
+    "model": "ConversationMessageToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "CONVERSATION_MESSAGES",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "conversation_to_anchor_associations",
+    "left_route": "conversation",
+    "right_route": "anchor",
+    "left_field": "conversation",
+    "right_field": "anchor",
+    "model": "ConversationToAnchorAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "conversation_to_annotation_associations",
+    "left_route": "conversation",
+    "right_route": "annotation",
+    "left_field": "conversation",
+    "right_field": "annotation",
+    "model": "ConversationToAnnotationAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "conversation_to_asset_associations",
+    "left_route": "conversation",
+    "right_route": "asset",
+    "left_field": "conversation",
+    "right_field": "asset",
+    "model": "ConversationToAssetAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "conversation_to_conversation_message_associations",
+    "left_route": "conversation",
+    "right_route": "message",
+    "left_field": "conversation",
+    "right_field": "conversationMessage",
+    "model": "ConversationToConversationMessageAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "conversation_to_range_associations",
+    "left_route": "conversation",
+    "right_route": "range",
+    "left_field": "conversation",
+    "right_field": "range",
+    "model": "ConversationToRangeAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "RANGES"
+  },
+  {
+    "family": "conversation_to_tag_associations",
+    "left_route": "conversation",
+    "right_route": "tag",
+    "left_field": "conversation",
+    "right_field": "tag",
+    "model": "ConversationToTagAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "TAGS"
+  },
+  {
+    "family": "conversation_to_website_associations",
+    "left_route": "conversation",
+    "right_route": "website",
+    "left_field": "conversation",
+    "right_field": "website",
+    "model": "ConversationToWebsiteAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "conversation_to_workstream_pattern_engine_source_associations",
+    "left_route": "conversation",
+    "right_route": "source",
+    "left_field": "conversation",
+    "right_field": "workstreamPatternEngineSource",
+    "model": "ConversationToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "CONVERSATIONS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "entity_to_subscription_associations",
+    "left_route": "entity",
+    "right_route": "subscription",
+    "left_field": "entity",
+    "right_field": "subscription",
+    "model": "EntityToSubscriptionAssociation",
+    "left_type": "ENTITIES",
+    "right_type": "SUBSCRIPTIONS"
+  },
+  {
+    "family": "entity_to_user_associations",
+    "left_route": "entity",
+    "right_route": "user",
+    "left_field": "entity",
+    "right_field": "user",
+    "model": "EntityToUserAssociation",
+    "left_type": "ENTITIES",
+    "right_type": "USERS"
+  },
+  {
+    "family": "fingerprint_to_person_associations",
+    "left_route": "fingerprint",
+    "right_route": "person",
+    "left_field": "fingerprint",
+    "right_field": "person",
+    "model": "FingerprintToPersonAssociation",
+    "left_type": "FINGERPRINTS",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "fingerprint_to_workstream_event_associations",
+    "left_route": "fingerprint",
+    "right_route": "workstream_event",
+    "left_field": "fingerprint",
+    "right_field": "workstream_event",
+    "model": "FingerprintToWorkstreamEventAssociation",
+    "left_type": "FINGERPRINTS",
+    "right_type": "WORKSTREAM_EVENTS"
+  },
+  {
+    "family": "hint_to_asset_associations",
+    "left_route": "hint",
+    "right_route": "asset",
+    "left_field": "hint",
+    "right_field": "asset",
+    "model": "HintToAssetAssociation",
+    "left_type": "HINTS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "person_to_anchor_associations",
+    "left_route": "person",
+    "right_route": "anchor",
+    "left_field": "person",
+    "right_field": "anchor",
+    "model": "PersonToAnchorAssociation",
+    "left_type": "PERSONS",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "person_to_annotation_associations",
+    "left_route": "person",
+    "right_route": "annotation",
+    "left_field": "person",
+    "right_field": "annotation",
+    "model": "PersonToAnnotationAssociation",
+    "left_type": "PERSONS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "person_to_asset_associations",
+    "left_route": "person",
+    "right_route": "asset",
+    "left_field": "person",
+    "right_field": "asset",
+    "model": "PersonToAssetAssociation",
+    "left_type": "PERSONS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "person_to_conversation_message_associations",
+    "left_route": "person",
+    "right_route": "message",
+    "left_field": "person",
+    "right_field": "conversationMessage",
+    "model": "PersonToConversationMessageAssociation",
+    "left_type": "PERSONS",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "person_to_person_associations",
+    "left_route": "person",
+    "right_route": "additional_person",
+    "left_field": "x",
+    "right_field": "y",
+    "model": "PersonToPersonAssociation",
+    "left_type": "PERSONS",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "person_to_tag_associations",
+    "left_route": "person",
+    "right_route": "tag",
+    "left_field": "person",
+    "right_field": "tag",
+    "model": "PersonToTagAssociation",
+    "left_type": "PERSONS",
+    "right_type": "TAGS"
+  },
+  {
+    "family": "person_to_website_associations",
+    "left_route": "person",
+    "right_route": "website",
+    "left_field": "person",
+    "right_field": "website",
+    "model": "PersonToWebsiteAssociation",
+    "left_type": "PERSONS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "person_to_workstream_pattern_engine_source_associations",
+    "left_route": "person",
+    "right_route": "source",
+    "left_field": "person",
+    "right_field": "source_",
+    "model": "PersonToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "PERSONS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "pipeline_to_connector_associations",
+    "left_route": "pipeline",
+    "right_route": "connector",
+    "left_field": "pipeline",
+    "right_field": "connector",
+    "model": "PipelineToConnectorAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "CONNECTORS"
+  },
+  {
+    "family": "pipeline_to_range_associations",
+    "left_route": "pipeline",
+    "right_route": "range",
+    "left_field": "pipeline",
+    "right_field": "range",
+    "model": "PipelineToRangeAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "RANGES"
+  },
+  {
+    "family": "pipeline_to_schedule_associations",
+    "left_route": "pipeline",
+    "right_route": "schedule",
+    "left_field": "pipeline",
+    "right_field": "schedule",
+    "model": "PipelineToScheduleAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "SCHEDULES"
+  },
+  {
+    "family": "pipeline_to_signal_associations",
+    "left_route": "pipeline",
+    "right_route": "signal",
+    "left_field": "pipeline",
+    "right_field": "signal",
+    "model": "PipelineToSignalAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "SIGNALS"
+  },
+  {
+    "family": "pipeline_to_website_associations",
+    "left_route": "pipeline",
+    "right_route": "website",
+    "left_field": "pipeline",
+    "right_field": "website",
+    "model": "PipelineToWebsiteAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "pipeline_to_workstream_pattern_engine_source_associations",
+    "left_route": "pipeline",
+    "right_route": "source",
+    "left_field": "pipeline",
+    "right_field": "source",
+    "model": "PipelineToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "pipeline_to_workstream_summary_associations",
+    "left_route": "pipeline",
+    "right_route": "workstream_summary",
+    "left_field": "pipeline",
+    "right_field": "workstreamSummary",
+    "model": "PipelineToWorkstreamSummaryAssociation",
+    "left_type": "PIPELINES",
+    "right_type": "WORKSTREAM_SUMMARIES"
+  },
+  {
+    "family": "signal_to_annotation_associations",
+    "left_route": "signal",
+    "right_route": "annotation",
+    "left_field": "signal",
+    "right_field": "annotation",
+    "model": "SignalToAnnotationAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "signal_to_person_associations",
+    "left_route": "signal",
+    "right_route": "person",
+    "left_field": "signal",
+    "right_field": "person",
+    "model": "SignalToPersonAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "signal_to_range_associations",
+    "left_route": "signal",
+    "right_route": "range",
+    "left_field": "signal",
+    "right_field": "range",
+    "model": "SignalToRangeAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "RANGES"
+  },
+  {
+    "family": "signal_to_website_associations",
+    "left_route": "signal",
+    "right_route": "website",
+    "left_field": "signal",
+    "right_field": "website",
+    "model": "SignalToWebsiteAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "signal_to_workstream_event_associations",
+    "left_route": "signal",
+    "right_route": "workstream_event",
+    "left_field": "signal",
+    "right_field": "workstream_event",
+    "model": "SignalToWorkstreamEventAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "WORKSTREAM_EVENTS"
+  },
+  {
+    "family": "signal_to_workstream_summary_associations",
+    "left_route": "signal",
+    "right_route": "workstream_summary",
+    "left_field": "signal",
+    "right_field": "workstream_summary",
+    "model": "SignalToWorkstreamSummaryAssociation",
+    "left_type": "SIGNALS",
+    "right_type": "WORKSTREAM_SUMMARIES"
+  },
+  {
+    "family": "subscription_to_user_associations",
+    "left_route": "subscription",
+    "right_route": "user",
+    "left_field": "subscription",
+    "right_field": "user",
+    "model": "SubscriptionToUserAssociation",
+    "left_type": "SUBSCRIPTIONS",
+    "right_type": "USERS"
+  },
+  {
+    "family": "tag_to_anchor_associations",
+    "left_route": "tag",
+    "right_route": "anchor",
+    "left_field": "tag",
+    "right_field": "anchor",
+    "model": "TagToAnchorAssociation",
+    "left_type": "TAGS",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "tag_to_annotation_associations",
+    "left_route": "tag",
+    "right_route": "annotation",
+    "left_field": "tag",
+    "right_field": "annotation",
+    "model": "TagToAnnotationAssociation",
+    "left_type": "TAGS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "tag_to_asset_associations",
+    "left_route": "tag",
+    "right_route": "asset",
+    "left_field": "tag",
+    "right_field": "asset",
+    "model": "TagToAssetAssociation",
+    "left_type": "TAGS",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "tag_to_conversation_message_associations",
+    "left_route": "tag",
+    "right_route": "message",
+    "left_field": "tag",
+    "right_field": "conversationMessage",
+    "model": "TagToConversationMessageAssociation",
+    "left_type": "TAGS",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "tag_to_website_associations",
+    "left_route": "tag",
+    "right_route": "website",
+    "left_field": "tag",
+    "right_field": "website",
+    "model": "TagToWebsiteAssociation",
+    "left_type": "TAGS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "tag_to_workstream_event_associations",
+    "left_route": "tag",
+    "right_route": "workstream_event",
+    "left_field": "tag",
+    "right_field": "workstreamEvent",
+    "model": "TagToWorkstreamEventAssociation",
+    "left_type": "TAGS",
+    "right_type": "WORKSTREAM_EVENTS"
+  },
+  {
+    "family": "tag_to_workstream_pattern_engine_source_window_associations",
+    "left_route": "tag",
+    "right_route": "source_window",
+    "left_field": "tag",
+    "right_field": "sourceWindow",
+    "model": "TagToWorkstreamPatternEngineSourceWindowAssociation",
+    "left_type": "TAGS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCE_WINDOWS"
+  },
+  {
+    "family": "tag_to_workstream_summary_associations",
+    "left_route": "tag",
+    "right_route": "workstream_summary",
+    "left_field": "tag",
+    "right_field": "workstreamSummary",
+    "model": "TagToWorkstreamSummaryAssociation",
+    "left_type": "TAGS",
+    "right_type": "WORKSTREAM_SUMMARIES"
+  },
+  {
+    "family": "website_to_annotation_associations",
+    "left_route": "website",
+    "right_route": "annotation",
+    "left_field": "website",
+    "right_field": "annotation",
+    "model": "WebsiteToAnnotationAssociation",
+    "left_type": "WEBSITES",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "website_to_asset_associations",
+    "left_route": "website",
+    "right_route": "asset",
+    "left_field": "website",
+    "right_field": "asset",
+    "model": "WebsiteToAssetAssociation",
+    "left_type": "WEBSITES",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "website_to_workstream_pattern_engine_source_associations",
+    "left_route": "website",
+    "right_route": "source",
+    "left_field": "website",
+    "right_field": "source_",
+    "model": "WebsiteToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "WEBSITES",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "website_to_workstream_pattern_engine_source_window_associations",
+    "left_route": "website",
+    "right_route": "source_window",
+    "left_field": "website",
+    "right_field": "sourceWindow",
+    "model": "WebsiteToWorkstreamPatternEngineSourceWindowAssociation",
+    "left_type": "WEBSITES",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCE_WINDOWS"
+  },
+  {
+    "family": "workstream_event_to_anchor_associations",
+    "left_route": "workstream_event",
+    "right_route": "anchor",
+    "left_field": "workstreamEvent",
+    "right_field": "anchor",
+    "model": "WorkstreamEventToAnchorAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "workstream_event_to_annotation_associations",
+    "left_route": "workstream_event",
+    "right_route": "annotation",
+    "left_field": "workstreamEvent",
+    "right_field": "annotation",
+    "model": "WorkstreamEventToAnnotationAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "workstream_event_to_conversation_message_associations",
+    "left_route": "workstream_event",
+    "right_route": "message",
+    "left_field": "workstreamEvent",
+    "right_field": "conversationMessage",
+    "model": "WorkstreamEventToConversationMessageAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "workstream_event_to_hint_associations",
+    "left_route": "workstream_event",
+    "right_route": "hint",
+    "left_field": "workstreamEvent",
+    "right_field": "hint",
+    "model": "WorkstreamEventToHintAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "HINTS"
+  },
+  {
+    "family": "workstream_event_to_person_associations",
+    "left_route": "workstream_event",
+    "right_route": "person",
+    "left_field": "workstream_event",
+    "right_field": "person",
+    "model": "WorkstreamEventToPersonAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "workstream_event_to_website_associations",
+    "left_route": "workstream_event",
+    "right_route": "website",
+    "left_field": "workstreamEvent",
+    "right_field": "website",
+    "model": "WorkstreamEventToWebsiteAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "workstream_event_to_workstream_pattern_engine_source_associations",
+    "left_route": "workstream_event",
+    "right_route": "source",
+    "left_field": "workstreamEvent",
+    "right_field": "source_",
+    "model": "WorkstreamEventToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "workstream_event_to_workstream_pattern_engine_source_window_associations",
+    "left_route": "workstream_event",
+    "right_route": "source_window",
+    "left_field": "workstreamEvent",
+    "right_field": "sourceWindow",
+    "model": "WorkstreamEventToWorkstreamPatternEngineSourceWindowAssociation",
+    "left_type": "WORKSTREAM_EVENTS",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCE_WINDOWS"
+  },
+  {
+    "family": "workstream_summary_to_anchor_associations",
+    "left_route": "workstream_summary",
+    "right_route": "anchor",
+    "left_field": "workstreamSummary",
+    "right_field": "anchor",
+    "model": "WorkstreamSummaryToAnchorAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "ANCHORS"
+  },
+  {
+    "family": "workstream_summary_to_annotation_associations",
+    "left_route": "workstream_summary",
+    "right_route": "annotation",
+    "left_field": "workstreamSummary",
+    "right_field": "annotation",
+    "model": "WorkstreamSummaryToAnnotationAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "ANNOTATIONS"
+  },
+  {
+    "family": "workstream_summary_to_asset_associations",
+    "left_route": "workstream_summary",
+    "right_route": "asset",
+    "left_field": "workstreamSummary",
+    "right_field": "asset",
+    "model": "WorkstreamSummaryToAssetAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "ASSETS"
+  },
+  {
+    "family": "workstream_summary_to_conversation_associations",
+    "left_route": "workstream_summary",
+    "right_route": "conversation",
+    "left_field": "workstreamSummary",
+    "right_field": "conversation",
+    "model": "WorkstreamSummaryToConversationAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "CONVERSATIONS"
+  },
+  {
+    "family": "workstream_summary_to_conversation_message_associations",
+    "left_route": "workstream_summary",
+    "right_route": "message",
+    "left_field": "workstreamSummary",
+    "right_field": "conversationMessage",
+    "model": "WorkstreamSummaryToConversationMessageAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "CONVERSATION_MESSAGES"
+  },
+  {
+    "family": "workstream_summary_to_hint_associations",
+    "left_route": "workstream_summary",
+    "right_route": "hint",
+    "left_field": "workstreamSummary",
+    "right_field": "hint",
+    "model": "WorkstreamSummaryToHintAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "HINTS"
+  },
+  {
+    "family": "workstream_summary_to_person_associations",
+    "left_route": "workstream_summary",
+    "right_route": "person",
+    "left_field": "workstreamSummary",
+    "right_field": "person",
+    "model": "WorkstreamSummaryToPersonAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "PERSONS"
+  },
+  {
+    "family": "workstream_summary_to_range_associations",
+    "left_route": "workstream_summary",
+    "right_route": "range",
+    "left_field": "workstreamSummary",
+    "right_field": "range",
+    "model": "WorkstreamSummaryToRangeAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "RANGES"
+  },
+  {
+    "family": "workstream_summary_to_website_associations",
+    "left_route": "workstream_summary",
+    "right_route": "website",
+    "left_field": "workstreamSummary",
+    "right_field": "website",
+    "model": "WorkstreamSummaryToWebsiteAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "WEBSITES"
+  },
+  {
+    "family": "workstream_summary_to_workstream_event_associations",
+    "left_route": "workstream_summary",
+    "right_route": "workstream_event",
+    "left_field": "workstreamSummary",
+    "right_field": "workstreamEvent",
+    "model": "WorkstreamSummaryToWorkstreamEventAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "WORKSTREAM_EVENTS"
+  },
+  {
+    "family": "workstream_summary_to_workstream_pattern_engine_source_associations",
+    "left_route": "workstream_summary",
+    "right_route": "source",
+    "left_field": "workstreamSummary",
+    "right_field": "source_",
+    "model": "WorkstreamSummaryToWorkstreamPatternEngineSourceAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "WORKSTREAM_PATTERN_ENGINE_SOURCES"
+  },
+  {
+    "family": "workstream_summary_to_workstream_summaries_associations",
+    "left_route": "workstream_summary",
+    "right_route": "additional_workstream_summary",
+    "left_field": "x",
+    "right_field": "y",
+    "model": "WorkstreamSummaryToWorkstreamSummaryAssociation",
+    "left_type": "WORKSTREAM_SUMMARIES",
+    "right_type": "WORKSTREAM_SUMMARIES"
+  }
+]

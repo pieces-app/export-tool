@@ -2,6 +2,7 @@
 
 Implementation status and the current filename/link/UX contract are maintained in [EXPORT_SPEC.md](EXPORT_SPEC.md) and [TODO.md](TODO.md). This document is the endpoint research reference; proposed layouts below are superseded by the spec.
 
+**2026-09-30 source correction:** refreshed September source exposes **87 association read families**, including summary-to-annotation/person and pipeline membership, with per-side count/list/bulk routes. ObjectBox intentionally stores these links outside material snapshots. The older "no enumeration route" findings below do not describe this newer contract. See [JUNCTION_API.md](JUNCTION_API.md) for exact routes, bounds, source revisions, the current SDK traversal and integration gates. Installed-OS capability and complete traversal still require verification.
 
 Research date: 2026-09-28. This is the source-backed implementation guide for a migration/export application for the Pieces sunset. A first runnable Go CLI now exists; see [README](README.md) for implemented features, commands, and gaps. This guide also describes future work. This opening section records the initial research baseline. Later sections and TODO record live staging probes, the ongoing all-data export, and remaining completeness gaps; the export is not yet accepted end to end.
 
@@ -492,9 +493,9 @@ An earlier attempted structural scan stopped safely after 10,475 summaries on re
 
 A later read-only inspection of the active export's 11,732 staged summary records found 170 exact built-in descriptors, 10 `custom_pipeline_` descriptors, 13 other descriptors, and 11,539 absent descriptors. It read local JSON only and added no OS requests. The exact custom prefix encodes a pipeline ID according to the server constructor cited above; these counts do not establish that the corresponding pipeline records are retained or recover missing typed memberships. Final inventory/privacy reconciliation is still pending.
 
-**Remaining API gap:** models contain `WorkstreamSummaryToPersonAssociation` and `PipelineToWorkstreamSummaryAssociation`, but a model's existence is not an enumeration endpoint. The inspected server has no summary-to-person association enumeration route. [Pipeline association reads](../isomorphic_server/lib/pipeline_to_workstream_summary_associations_internal_server.dart) offer an exact known pair and a batch of known association IDs, not a complete membership listing. Brute-force testing every person/summary or pipeline/summary pair is not an appropriate export strategy. The generic `RELATIONSHIPS` node enum only supports ASSET, FORMAT, TAG, and WEBSITE, so it cannot rebuild these memory edges. Streamed identifiers report changes rather than a full historical association snapshot.
+**Historical API gap, superseded for newer source:** the initial checkout had no summary-to-person association enumeration route, and its pipeline association server exposed known-pair/batch reads only. Refreshed September source has per-side counts/listings/bulk for both families and summary-to-annotation. Use the [current association contract](JUNCTION_API.md), not pairwise brute force or the generic `RELATIONSHIPS` collection, to recover these links. Streamed identifiers still describe changes rather than a complete historical snapshot.
 
-To close the release blocker, obtain a supported server response that includes active relationship IDs on at least one side, or provide a read-only, paginated association enumeration API with verifiable totals. Then test forward/reverse consistency and compare summary bodies/person memberships/pipeline memberships against a known reference dataset. Do not generate/regenerate or mutate associations to manufacture missing history. Independently exporting annotation text preserves exposed records but does not prove attachment to the correct summary.
+To close the release blocker, verify the newer count/list/bulk APIs on the installed OS, integrate their current relationships and reconcile bodies/person/pipeline membership end to end. Preserve original absent projection fields separately from completed junction-read evidence. Do not generate/regenerate or mutate associations to manufacture missing history. Independently exporting annotation text preserves exposed records but does not prove attachment to the correct summary.
 
 ### Tags, people, annotations, and source context
 
@@ -614,7 +615,7 @@ For text/code, create a Markdown page and a separate original-content file. Choo
 
 Relationships have two layers: references on material records and separate association objects with provenance/metadata. Preserve both where the API exposes them. Do not confuse a material ID with the ID of an association.
 
-The following families have **GET pair lookup** and **POST batch fetch** in the inspected server. For each row, the pair URL is `/<family>/<pair suffix>` and the batch URL is `/<family>/batch/fetch`. This table lists all 23 exposed association server families found in the inspected `lib/` tree. [Implementations][server-lib], [contract][http-spec].
+The following historical table records the **23 families in the initial checkout**, retained for older-server compatibility and the existing pair-reader implementation. It is not the current full inventory: [JUNCTION_API.md](JUNCTION_API.md) lists all 87 families in refreshed source and their count/list/bulk traversal. For the pair reads below, the pair URL is `/<family>/<pair suffix>` and the batch URL is `/<family>/batch/fetch`. [Initial implementations][server-lib], [initial contract][http-spec].
 
 | Family | Pair suffix after the family |
 | --- | --- |

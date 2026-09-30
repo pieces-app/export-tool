@@ -13,6 +13,11 @@ import (
 
 func (r *run) validateMarkdownLinks() error {
 	return filepath.WalkDir(r.stage, func(path string, d fs.DirEntry, err error) error {
+		if r.ctx != nil {
+			if canceled := r.ctx.Err(); canceled != nil {
+				return canceled
+			}
+		}
 		if err != nil {
 			return err
 		}
@@ -25,6 +30,11 @@ func (r *run) validateMarkdownLinks() error {
 		}
 		root := goldmark.DefaultParser().Parse(text.NewReader(data))
 		return ast.Walk(root, func(n ast.Node, enter bool) (ast.WalkStatus, error) {
+			if r.ctx != nil {
+				if canceled := r.ctx.Err(); canceled != nil {
+					return ast.WalkStop, canceled
+				}
+			}
 			if !enter {
 				return ast.WalkContinue, nil
 			}
