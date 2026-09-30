@@ -105,7 +105,7 @@ New reset/boundary tests also exposed an existing integrity bug: `Decoder.Token`
 
 Package verification for `0.13.1-dev` passed on macOS ARM64 (66.855 seconds including installers), Rosetta AMD64 (47.485 seconds), and isolated Linux ARM64, which also passed the new audit regressions and actual disk-exhaustion tests. All six ZIP checksums and four-file layouts were checked. Windows binaries and test executables compile; native Windows and real-history measurements remain open. Full combined-source `go test -race ./...` passed (exporter 477.861 seconds), along with vet, actionlint and zero reachable vulnerability findings. No binary upload or Actions job occurred.
 
-Latest live checkpoint: after about 23 h 02 min, the original executable was rendering 325,892/1,907,456 records (17.1%), at about 69.7 records/second. The rendering-only estimate was 6 h 18 min; later phases are excluded. Its roughly 4.92 GiB RSS and unchanged HTTP counters are observations, not source health or whole-run resource guarantees. The final directory is absent and staging remains active.
+Latest live checkpoint: after about 23 h 49 min, the original executable was rendering 530,148/1,907,456 records (27.8%), at about 71.1 records/second. The rendering-only estimate was 5 h 23 min; later phases are excluded. Its roughly 4.92 GiB RSS and unchanged HTTP counters are observations, not source health or whole-run resource guarantees. Approximately 199 GiB remained free on the output filesystem. The final directory is absent and staging remains active.
 
 ## Transactional recovery storage experiment
 

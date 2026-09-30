@@ -1,6 +1,6 @@
 # Resumable export and durable staging
 
-Updated 2026-09-30. **Design and storage experiment; not a shipped resume command.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+Updated 2026-09-30. **Design, verified storage experiment, and initial internal workspace layer; not a shipped resume command.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
 
 ## Decision and implementation order
 
@@ -36,12 +36,15 @@ chosen-parent/
   Pieces-Export.work/          # private recovery workspace; encrypted payloads
     state.sqlite
     state.sqlite-journal      # present only as required by SQLite
-    owner.lock
+    owner.lock                # per-directory operating-system lock
+    header.json               # version, random ID, config digest and size bound
+    proof.bin                 # authenticated ownership/configuration proof
   Pieces-Export.partial/       # generated output, still unfinished
   Pieces-Export/               # appears only after final validation/rename
 
 per-user persistent state/
   pieces-export/keys/<random-workspace-id>.key
+  pieces-export/keys/<random-workspace-id>.lock # common lease for copied workspaces
 ```
 
 The key must not be inside `.work`, `.partial`, the completed archive, a log, a manifest, a ZIP, or an environment variable. Create a random per-workspace key with exclusive creation in a private persistent user-state directory. Use restrictive permissions on POSIX and verified user-only ACLs on Windows. Resolve the platform state directory deliberately; a temporary/cache directory that the OS may purge is unsuitable for the only recovery key. Filesystem confinement, symlinks/reparse points, key-file replacement and ownership checks are implementation gates.
@@ -104,6 +107,30 @@ Inspection should report phase, committed/remaining aggregate counts, last succe
 
 Ordinary failures retain recoverable state and print a usable command only after a valid checkpoint is established. Key/config/source mismatches stop before source calls or file changes. Successful finalization cleans up the owned private workspace and key; a cleanup failure is reported without deleting the completed export. Installer cleanup removes its own utility files, not unfinished recovery inputs. Specify explicit discard behavior separately; do not implicitly discard a workspace when retrying.
 
+## Internal workspace layer (implemented, not connected to export)
+
+`internal/recovery` now provides `Create`, `Open`, `Close`, `Seal` and `Unseal`. This is an internal library; there is still no CLI resume command, SQLite state adapter, default platform key-directory resolver or automatic workspace cleanup. Release packages remain `0.13.1-dev`, and the original live process is unchanged.
+
+The caller supplies separate workspace/key directories with existing parents and a nonzero immutable-configuration digest. Directory paths are checked lexically and by filesystem identity to reject nesting and aliases. A workspace is created exclusively. Keys are random 32-byte values, created exclusively outside the workspace; existing keys are never regenerated. Header/proof/key reads are bounded. The canonical header rejects unknown/duplicate fields, unsupported versions, changed settings and invalid identifiers. Open performs no content writes. A failed initialization may retain an incomplete private directory/key; cleanup and interruption during initialization still need integration.
+
+The ownership proof binds the key to a random workspace ID, format, configuration digest and payload limit. Envelopes also authenticate their item kind, opaque record reference and generation. Every envelope derives its own AES key using HKDF-SHA256 with a fresh 32-byte random salt, then uses the standard library's AES-GCM random-nonce API. This avoids sharing one GCM nonce budget across an entire migration and retries. A payload defaults to at most 128 MiB, with smaller caller-selected bounds; encrypted lengths are checked before decryption. Clearing the retained master key on `Close` is not a guarantee of forensic memory erasure. Whole-workspace completeness, generation ordering and database row integrity belong to the next transactional layer.
+
+Two kernel locks are held: one in the workspace and one beside its external key. The second prevents a copied workspace using the same key directory from acquiring independent ownership through a copied `owner.lock`. Neither stale timestamps nor PID files authorize recovery. Tests prove rejection of both active original/copy opens and release after an abrupt synthetic child exit. This does not defend against a same-user process deliberately bypassing locks or duplicating the entire key directory.
+
+Platform behavior:
+
+- **macOS:** require current-user ownership, private mode bits, regular singly-linked files and no ACL entries. Newly created directories lose inherited ACLs before key creation via the system `chmod` operating on a held descriptor. ACL verification uses `fgetattrlist` directly on that descriptor, with a fixed-size extended-security reference. A regression fixture exposed that `ls` on `/dev/fd` does not report the underlying ACL; that approach was removed. The native ABI/ACL fixtures pass on ARM64 and Rosetta AMD64. Unsupported ACL queries fail closed.
+- **Linux:** require current-user ownership, private mode bits and regular singly-linked files. POSIX ACL named-user/group access is limited by the mask reflected in group-class mode bits. The fixture accepts a fully masked named-user entry, then rejects it after its read permission becomes effective. [Linux ACL permission mapping](https://man7.org/linux/man-pages/man5/acl.5.html).
+- **Windows:** directory creation supplies a protected user/SYSTEM ACL immediately. New empty files receive the actual user's ownership before content is written; existing ownership/ACLs are checked rather than repaired. Checks reject reparse points, multiple links and additional ACL principals. Locks use nonblocking `LockFileEx`; extended-length local/UNC directory paths are supported in the implementation. Windows AMD64/ARM64 tests compile, including an extra-principal ACL regression, but **none of this is native Windows acceptance yet**. [CreateDirectory security attributes](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectoryw), [LockFileEx](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex).
+
+Verification: macOS ARM64 focused race suite passed (3.022 seconds); actual Rosetta AMD64 test executable passed; Linux ARM64 passed as unprivileged UID 65534 in an isolated container. The Linux tmpfs skipped the ACL-specific fixture because it lacked ACL support; a separate run on the container's writable filesystem passed that fixture (0.06 seconds). No private source/cache/export directories were mounted. Vet and diff checks passed. Covered cases include encrypted-state persistence, wrong/missing/oversized keys, changed header/configuration, truncated/tampered/misbound envelopes, payload limits, cancellation, close/encryption races, directory moves, symlinks/hardlinks, permissions, active copies and abrupt lock-owner exit.
+
+Key/header/proof file writes currently call `File.Sync`; crash/power-loss guarantees for directory entries and initial key provisioning remain unverified. No persistence barrier in the current exporter changed. The earlier storage benchmark used the simpler test-only cipher and does not measure this layer's per-envelope derivation, permission checks or future whole-export integration. The export adapter must additionally keep keys/workspaces outside every output/archive tree, define and freeze the actual configuration digest, select persistent per-user locations, and manage safe finalization/cleanup.
+
+```sh
+go test -race ./internal/recovery -count=1 -v
+```
+
 ## Storage experiment and evidence
 
 `internal/exporter/recovery_storage_test.go` is test-only. The child receives an ephemeral key through stdin, commits 16 encrypted synthetic records, then writes another 512 records and updated cumulative scanner/cursor state in one transaction. A 64 KiB SQLite page cache forces the larger transaction to spill pages. The child calls `os.Exit` before or after commit, bypassing rollback/close/deferred cleanup. The parent checks the actual hot journal before reopening, database integrity, recovered row counts, matching scanner/cursor generation, payload authentication, wrong-key rejection and record-binding/tamper rejection. It inspects database/journal bytes for the synthetic credential markers and key. This is evidence for these fixtures, not a universal absence-of-plaintext or recovery guarantee.
@@ -133,7 +160,8 @@ go test ./internal/exporter -run '^$' -bench '^BenchmarkRecoveryStorage$' \
 - [x] Measure batched encrypted storage with synchronization enabled, including a one-record control.
 - [x] Test abrupt child-process exit with real spilled transactions, atomic record/scanner/cursor recovery, and ciphertext rejection on macOS and Linux ARM64.
 - [ ] Implement versioned production workspace schema, bounded reads, encrypted fields and authenticated completion evidence.
-- [ ] Implement persistent private key storage, ownership locks, path confinement, key-loss/config-mismatch behavior and safe cleanup on every target OS.
+- [x] Implement and test the internal key/envelope/ownership layer on macOS and Linux, including copied-workspace locks and actual ACL fixtures.
+- [ ] Connect persistent platform key locations, archive-root exclusion, initialization durability and safe cleanup; execute native Windows ACL/ownership/long-path acceptance.
 - [ ] Add round-trip fixtures for every `Meta`, projection, association, person, cache and omission state; test credentials discovered before and after a checkpoint.
 - [ ] Integrate capture commits with counters/cursors and eliminate duplicate authoritative persistence; benchmark combined capture/materialization rather than the database alone.
 - [ ] Integrate privacy, graph, path and artifact phases; verify final content/decisions against an uninterrupted export after interruption at every boundary.
