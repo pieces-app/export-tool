@@ -1,12 +1,12 @@
 # Resumable export and durable staging
 
-Updated 2026-09-30. **Design, verified storage experiment, and initial internal workspace layer; not a shipped resume command.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+Updated 2026-09-30. **Internal workspace and transactional storage implemented; exporter integration and CLI resume still pending.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
 
 ## Decision and implementation order
 
 Pursue a private, encrypted, batched SQLite workspace as the authoritative recovery input. SQLite is already a compiled dependency for SDK-cache recovery; users would not install another runtime. Keep the final archive as ordinary Markdown/PDF/JSON files. A database workspace is internal recovery state, not a replacement for the requested files and folders.
 
-Start with a tested store/key/ownership layer, then persist and restore actual exporter state. Integrate local rendering recovery before enabling interrupted source-fetch recovery: the latter additionally needs verified source identity and persisted inventory boundaries. These are implementation milestones toward full resume, not a change to the release objective. Do not advertise either milestone until its end-to-end tests pass.
+The internal store/key/ownership layer now passes the available local acceptance checks described below. Next persist and restore actual exporter state. Integrate local rendering recovery before enabling interrupted source-fetch recovery: the latter additionally needs verified source identity and persisted inventory boundaries. These are implementation milestones toward full resume, not a change to the release objective. Do not advertise either milestone until its end-to-end tests pass.
 
 The current file writer still calls `File.Sync`. Keep that behavior until a separate replay and durability test proves a replacement. Adding a checkpoint database beside every unchanged file write will add overhead; it is not itself a performance fix. The eventual capture adapter must avoid duplicating authoritative persistence, then materialize ordinary output files from committed records. Measure both phases together.
 
@@ -109,7 +109,7 @@ Ordinary failures retain recoverable state and print a usable command only after
 
 ## Internal workspace layer (implemented, not connected to export)
 
-`internal/recovery` now provides `Create`, `Open`, `Close`, `Seal` and `Unseal`. This is an internal library; there is still no CLI resume command, SQLite state adapter, default platform key-directory resolver or automatic workspace cleanup. Release packages remain `0.13.1-dev`, and the original live process is unchanged.
+`internal/recovery` provides `Create`, `Open`, `Close`, `Seal` and `Unseal`, plus the transactional store described next. This is an internal library; there is still no CLI resume command, exporter-state adapter, default platform key-directory resolver or automatic workspace cleanup. Release packages remain `0.13.1-dev`, and the original live process is unchanged.
 
 The caller supplies separate workspace/key directories with existing parents and a nonzero immutable-configuration digest. Directory paths are checked lexically and by filesystem identity to reject nesting and aliases. A workspace is created exclusively. Keys are random 32-byte values, created exclusively outside the workspace; existing keys are never regenerated. Header/proof/key reads are bounded. The canonical header rejects unknown/duplicate fields, unsupported versions, changed settings and invalid identifiers. Open performs no content writes. A failed initialization may retain an incomplete private directory/key; cleanup and interruption during initialization still need integration.
 
@@ -129,6 +129,53 @@ Key/header/proof file writes currently call `File.Sync`; crash/power-loss guaran
 
 ```sh
 go test -race ./internal/recovery -count=1 -v
+```
+
+## Transactional store (implemented, not connected to export)
+
+`CreateStore`, `OpenStore`, `Commit`, `Snapshot`, `Visit` and `Close` now use the workspace's persistent key and ownership locks. Initialization commits generation zero. Every later commit atomically replaces a bounded batch of encrypted records, extends the change history and stores the complete caller-encoded checkpoint state. The caller supplies the expected previous generation; stale concurrent callers cannot overwrite newer progress. Excluded/withheld records remain explicit encrypted decisions rather than disappearing from storage.
+
+The store treats record payloads and checkpoint state as opaque bytes. **It does not yet serialize `Meta`, restore the real `Scanner.known`, validate phase prerequisites, or persist the exporter's inventory/graph state.** Its synthetic fixtures model cumulative credentials and cursor advancement; those tests do not prove replay of the actual exporter. Internal record counts describe stored items, not accepted OS-export totals. Large inventories and graph state will need bounded fragments in the adapter, rather than one unbounded checkpoint blob.
+
+Ordinary batches accept at most 50 records and 8 MiB of combined plaintext including checkpoint framing/state. One larger record may commit alone, subject to the per-payload bound and a 128 MiB combined bound; state-only checkpoints are supported. SQLite row/SQL/attachment limits and bounded blob queries are enforced. These are input/allocation limits, not a total process-memory guarantee. A storage error stops further writes on that handle and requires close/reopen to resolve commit uncertainty. Validation/conflict errors do not advance the generation.
+
+The database has three tables and one supporting index:
+
+| Storage | Contents |
+| --- | --- |
+| `items` | Opaque reference, current generation, authenticated encrypted record payload |
+| `changes` | Ordered sequence, opaque reference, generation and ciphertext digest for every committed replacement |
+| `checkpoint` | One authenticated encrypted state containing generation, current-item/change counts, change-chain head and caller state |
+| `changes_ref` | Latest change lookup for each opaque reference |
+
+Each change extends a SHA-256 chain covering its previous head, sequence, generation, reference and ciphertext digest. The chain head and counts are inside the authenticated checkpoint envelope. Open verifies the exact schema/version, SQLite integrity, complete chain/counts and the current record set against each reference's latest committed change. Deleting rows, adding rows, substituting a stale valid record, truncating history, changing ciphertext or replaying only an older checkpoint fails verification. Visits decrypt one bounded current record at a time; callers must copy callback payloads they retain. History grows with replacements; compaction is not implemented.
+
+This authenticates an internally consistent stored generation. It cannot detect restoration of an **entire older valid workspace** without an independent trusted anti-rollback anchor, and does not establish source-database identity or source completeness. A same-user process that deliberately bypasses ownership and reads the key remains outside the encryption threat model. Full verification at open is proportional to stored history/payload volume and still needs large-history timing.
+
+One pinned connection uses DELETE journaling, EXTRA synchronization, fullfsync, a 4 MiB page-cache target, memory temporary storage and disabled mmap/trusted schema; settings are read back. Database and journal files must remain regular/private, and unexpected WAL/SHM files are rejected before opening SQLite. Moving/replacing the active directory fails before creating a journal at the new path. The main database's held descriptor is checked without opening/closing another descriptor while SQLite is active: POSIX close can release that process's SQLite locks. A second-process writer test verifies the lock survives the checks. See [SQLite's advisory-lock warning](https://www.sqlite.org/howtocorrupt.html) and [PRAGMA settings](https://www.sqlite.org/pragma.html).
+
+Verification on 2026-09-30:
+
+- macOS ARM64 complete recovery-package race suite passed (8.842 seconds); actual Rosetta AMD64 and isolated unprivileged Linux ARM64 tests passed. Windows AMD64/ARM64 executables compile; native Windows remains unverified. Vet and diff checks passed.
+- Abrupt synthetic child exit before/after the second commit recovered exactly 16/66 records with matching accumulated credentials and progress. The uncommitted case left a real spilled hot journal. Wrong configuration/key attempts left files unchanged before SQLite recovery. Workspace/journal checks found no synthetic plaintext credential/title markers.
+- Real filesystem exhaustion on a dedicated 16 MiB Linux tmpfs passed both before transaction and during commit. After reclaiming only the fixture filler, reopening retained the previous record/scanner/cursor generation. This is separate from the additional `max_page_count`/SQLITE_FULL test. No production filesystem was filled.
+- Cancellation after transaction writes, stale concurrent generations, replacements, empty payloads, large-record bounds, malformed/truncated state, unexpected schema, symlinks/hardlinks, unsafe journal permissions and directory moves are covered. The Linux tmpfs skips the separate ACL-mask fixture; that unchanged fixture was verified on the container's writable filesystem in the workspace-layer acceptance above.
+
+These tests do not certify hardware power loss, initial key/directory provisioning durability, native Windows flush behavior, exporter interruption/replay equivalence or CLI cleanup.
+
+The actual store's bounded benchmark includes envelope key derivation, permission checks, record encryption, change-log writes and checkpoint commits. It stores 128 roughly 4 KiB synthetic records; medians of three one-iteration samples on the development Mac were:
+
+| Records per transaction | Median time | Median records/second |
+| --- | ---: | ---: |
+| 1 | 3.715 s | 34.45 |
+| 16 | 0.309 s | 414.2 |
+| Up to 50 | 0.120 s | 1,070 |
+
+Initialization, key provisioning, verification on reopen, source reads, privacy scanning, graph work, ordinary archive-file materialization, Markdown/PDF and final audits are excluded. The original live export was active on the same filesystem. This supports batched capture, **not a complete-export speedup**. The earlier experiment used different cache/cipher machinery; do not attribute differences between the two benchmark runs to one code change. The existing exporter's file-sync behavior is unchanged.
+
+```sh
+go test ./internal/recovery -run '^$' -bench '^BenchmarkTransactionalStore$' \
+  -benchtime=1x -count=3 -benchmem
 ```
 
 ## Storage experiment and evidence
@@ -159,7 +206,8 @@ go test ./internal/exporter -run '^$' -bench '^BenchmarkRecoveryStorage$' \
 - [x] Inventory in-memory recovery state and its privacy hazards from current source.
 - [x] Measure batched encrypted storage with synchronization enabled, including a one-record control.
 - [x] Test abrupt child-process exit with real spilled transactions, atomic record/scanner/cursor recovery, and ciphertext rejection on macOS and Linux ARM64.
-- [ ] Implement versioned production workspace schema, bounded reads, encrypted fields and authenticated completion evidence.
+- [x] Implement versioned internal transactional schema, bounded reads, encrypted fields and authenticated checkpoint/current-item-set evidence; test available local runtimes and actual Linux filesystem exhaustion.
+- [ ] Integrate the exporter-specific state schema and phase-completion prerequisites; authenticate output artifact ownership and completion separately from stored-record completeness.
 - [x] Implement and test the internal key/envelope/ownership layer on macOS and Linux, including copied-workspace locks and actual ACL fixtures.
 - [ ] Connect persistent platform key locations, archive-root exclusion, initialization durability and safe cleanup; execute native Windows ACL/ownership/long-path acceptance.
 - [ ] Add round-trip fixtures for every `Meta`, projection, association, person, cache and omission state; test credentials discovered before and after a checkpoint.

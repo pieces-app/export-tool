@@ -321,7 +321,7 @@ Legacy profile-selection supplement: an explicit all-people report may recover a
 
 ## Failed output and finalization
 
-The planned replacement is specified in [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md), including encrypted scanner/relationship state, transactional progress, ownership, source continuity and artifact replay. Its storage experiment and initial internal key/ownership layer are verified separately on available local platforms; the transactional exporter adapter and production resume command are not implemented.
+The planned replacement is specified in [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md), including encrypted scanner/relationship state, transactional progress, ownership, source continuity and artifact replay. Its internal workspace and encrypted transactional store are verified separately on available local platforms, including process exit and actual Linux filesystem exhaustion. The exporter-state adapter, artifact replay and production resume command are not implemented; current file persistence is unchanged.
 
 A `.partial` folder remains unfinished even if it contains a provisional manifest. The CLI exits 1 on output failure; exit 2 applies only to a finalized archive with recorded coverage limitations. Late export/rebuild failures return `failed` status with no completion timestamp, and filesystem errors omit generated private paths while preserving their underlying causes. Resume is not implemented.
 
