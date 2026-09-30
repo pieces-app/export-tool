@@ -490,9 +490,10 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 			}
 			links = append(links, pdfLink{link.Label, destination})
 		}
-		if len(links) == 1 && len(block.Links) == 1 {
-			// A single-link paragraph/list item is one clickable block, avoiding
-			// duplicated labels and detached link lines at page boundaries.
+		if len(links) == 1 && len(block.Links) == 1 && strings.TrimSpace(strings.TrimPrefix(block.Text, "• ")) == strings.TrimSpace(links[0].Label) {
+			// A standalone link (including a list bullet) can be clicked directly.
+			// Surrounding prose must stay plain: an unavailable relationship label
+			// in that prose must never inherit this link's destination.
 			if err := write(block.Text, block.Size, links[0].Destination, block.Heading); err != nil {
 				return 0, err
 			}

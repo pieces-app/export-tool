@@ -11,6 +11,105 @@ import (
 	pdfread "github.com/ledongthuc/pdf"
 )
 
+// Check the actual PDF click rectangles, not only that their destinations exist.
+// A missing/filtered link becomes plain text before PDF rendering; that text
+// must not inherit another link's destination merely by sharing a paragraph.
+func TestPDFClickableAreasExcludeUnlinkedText(t *testing.T) {
+	for _, tc := range []struct {
+		name, text string
+		direct     bool
+	}{
+		{"paragraph", "Missing record beside [Target](target.md).", false},
+		{"list_context", "- Missing record beside [Target](target.md).", false},
+		{"heading_context", "## Missing record beside [Target](target.md)", false},
+		{"table", "| Context | Link |\n| --- | --- |\n| Missing record | [Target](target.md) |", false},
+		{"standalone", "[Target](target.md)", true},
+		{"list_link_only", "- [Target](target.md)", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			for path, data := range map[string]string{"index.md": tc.text, "target.md": "# Target"} {
+				if err := writeFile(filepath.Join(root, path), []byte(data)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			r := &run{ctx: context.Background(), stage: root, opts: Options{Mode: "preserve"}}
+			if err := r.renderPDFs(); err != nil {
+				t.Fatal(err)
+			}
+			f, doc, err := pdfread.Open(filepath.Join(root, "index.pdf"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			page := doc.Page(1)
+			annotations := page.V.Key("Annots")
+			if annotations.Len() != 1 {
+				t.Fatalf("expected one navigation action, got %d", annotations.Len())
+			}
+			a := annotations.Index(0)
+			if a.Key("A").Key("F").Key("UF").Text() != "pdf/target.pdf" {
+				t.Fatal("link destination changed")
+			}
+			rect := a.Key("Rect")
+			x0, y0, x1, y1 := rect.Index(0).Float64(), rect.Index(1).Float64(), rect.Index(2).Float64(), rect.Index(3).Float64()
+			x0, x1 = min(x0, x1), max(x0, x1)
+			y0, y1 = min(y0, y1), max(y0, y1)
+			var label strings.Builder
+			// The reader's GetTextByRow does not handle the writer's TD operator.
+			// Read positioned text from the emitted content stream instead, using
+			// the PDF's own font encoding. This is specific to this writer fixture.
+			var x, y float64
+			var encoding pdfread.TextEncoding
+			show := func(raw string) {
+				if encoding == nil {
+					t.Fatal("text drawn without a font")
+				}
+				if x >= x0 && x <= x1 && y >= y0 && y <= y1 {
+					label.WriteString(encoding.Decode(raw))
+				}
+			}
+			pdfread.Interpret(page.V.Key("Contents"), func(stack *pdfread.Stack, op string) {
+				args := make([]pdfread.Value, stack.Len())
+				for i := len(args) - 1; i >= 0; i-- {
+					args[i] = stack.Pop()
+				}
+				switch op {
+				case "BT":
+					x, y = 0, 0
+				case "TD", "Td":
+					x, y = x+args[0].Float64(), y+args[1].Float64()
+				case "Tf":
+					font := page.Font(args[0].Name())
+					encoding = font.Encoder()
+				case "TJ":
+					for i := 0; i < args[0].Len(); i++ {
+						if value := args[0].Index(i); value.Kind() == pdfread.String {
+							show(value.RawString())
+						}
+					}
+				case "Tj":
+					show(args[0].RawString())
+				case "Tm", "cm", "T*", "'", "\"":
+					t.Fatalf("click fixture needs support for new position operator %s", op)
+				}
+			})
+			want := "Open: Target"
+			if tc.direct {
+				want = "Target"
+			}
+			got := strings.TrimSpace(strings.TrimPrefix(label.String(), "• "))
+			if got != want {
+				t.Fatalf("clickable text %q, expected only %q", got, want)
+			}
+			text, err := page.GetPlainText(nil)
+			if err != nil || !tc.direct && !strings.Contains(text, "Missing record") {
+				t.Fatal("unlinked context disappeared")
+			}
+		})
+	}
+}
+
 func TestPDFLocalNavigationAndRelocation(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "original")
 	accent := "docs/café (review)#%.md"
