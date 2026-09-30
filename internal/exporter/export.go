@@ -17,6 +17,7 @@ import (
 )
 
 type Options struct {
+	FileWorkers                             int
 	Associations                            string
 	Scope                                   string
 	ReferenceOnly                           map[string]bool
@@ -55,6 +56,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	FileWorkers             int                      `json:"file_workers,omitempty"`
 	LocalPerformance        *LocalPerformanceReport  `json:"local_performance,omitempty"`
 	Associations            *AssociationCoverage     `json:"associations,omitempty"`
 	Naming                  string                   `json:"naming"`
@@ -216,6 +218,12 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	if o.FileWorkers == 0 {
+		o.FileWorkers = defaultFileWorkers
+	}
+	if err := ValidateFileWorkers(o.FileWorkers); err != nil {
+		return Manifest{}, err
+	}
 	if err := ValidateAssociations(o.Associations); err != nil {
 		return Manifest{}, err
 	}
@@ -333,6 +341,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if !o.RelatedSince.IsZero() {
 		r.manifest.RelatedSince = o.RelatedSince.UTC().Format(time.RFC3339Nano)
 	}
+	r.manifest.FileWorkers = o.FileWorkers
 	if o.Mode == "filtered" {
 		r.manifest.PolicyHash = o.Scanner.Hash
 		r.manifest.CategoryHashes = o.Scanner.ListHashes

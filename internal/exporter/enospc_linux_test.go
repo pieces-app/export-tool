@@ -128,6 +128,12 @@ func runActualENOSPC(t *testing.T, root, phase string, reserve int64) {
 }
 
 func TestPackagedDiskFullCLI(t *testing.T) {
+	for _, phase := range []string{"Stage: Render Markdown", "Stage: Render PDFs"} {
+		t.Run(phase, func(t *testing.T) { packagedDiskFullAtPhase(t, phase) })
+	}
+}
+
+func packagedDiskFullAtPhase(t *testing.T, phase string) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {
 		t.Skip("requires the packaged Linux executable")
@@ -149,7 +155,7 @@ func TestPackagedDiskFullCLI(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	out := filepath.Join(work, "archive")
-	cmd := exec.CommandContext(ctx, binary, "export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--materials", "WORKSTREAM_SUMMARIES,ANNOTATIONS", "--output", out, "--yes", "--format", "both", "--metadata", "off")
+	cmd := exec.CommandContext(ctx, binary, "export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--materials", "WORKSTREAM_SUMMARIES,ANNOTATIONS", "--output", out, "--yes", "--format", "both", "--metadata", "off", "--file-workers", "4")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	pipe, err := cmd.StderrPipe()
@@ -166,7 +172,7 @@ func TestPackagedDiskFullCLI(t *testing.T) {
 	for lines.Scan() {
 		line := lines.Text()
 		fmt.Fprintln(&stderr, line)
-		if !fired && strings.HasPrefix(line, "Stage: Render PDFs") {
+		if !fired && strings.HasPrefix(line, phase) {
 			fired = true
 			// Pause only our synthetic child in this container. Confirm the
 			// stop before filling the dedicated mount, then immediately resume.
@@ -189,7 +195,7 @@ func TestPackagedDiskFullCLI(t *testing.T) {
 		t.Fatalf("packaged disk-full failure not observed: injection=%v process=%v scanner=%v", injectionErr, err, lines.Err())
 	}
 	if strings.Contains(stdout.String(), "Export written:") || strings.Contains(stderr.String(), "Stage: Native and portable metadata") || !strings.Contains(stderr.String(), "output was not finalized") {
-		t.Fatalf("packaged PDF failure had unexpected output: %s\n%s", stdout.String(), stderr.String())
+		t.Fatalf("packaged rendering failure had unexpected output: %s\n%s", stdout.String(), stderr.String())
 	}
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
 		t.Fatal("packaged disk-full export finalized its output")
@@ -200,7 +206,16 @@ func TestPackagedDiskFullCLI(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(out+".partial", "manifest.json")); !os.IsNotExist(err) {
 		t.Fatal("packaged disk-full export wrote a success manifest")
 	}
-	t.Log("actual packaged PDF conversion on full tmpfs exited 1 without finalization or success output")
+	if phase == "Stage: Render Markdown" {
+		if strings.Contains(stderr.String(), "Stage: Render PDFs") {
+			t.Fatal("Markdown write failure was deferred past the pool barrier")
+		}
+		summaries, _ := filepath.Glob(filepath.Join(out+".partial", "workstream_summaries", "timeline", "000000.*.md"))
+		if len(summaries) >= 2 {
+			t.Fatal("exhaustion happened after summary and relationship rendering; injection was too late")
+		}
+	}
+	t.Log("actual packaged rendering on full tmpfs exited 1 without finalization or success output")
 }
 
 func waitFixtureStopped(pid int) error {

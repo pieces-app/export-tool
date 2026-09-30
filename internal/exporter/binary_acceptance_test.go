@@ -62,7 +62,7 @@ func TestPackagedCLI(t *testing.T) {
 		t.Fatalf("synthetic archive is incomplete: %+v", manifest.Issues)
 	}
 	diagnostics := readLocalPerformance(t, out)
-	if diagnostics.HTTP.Requests == 0 || manifest.LocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 || diagnostics.State != "finalizing" {
+	if diagnostics.HTTP.Requests == 0 || manifest.FileWorkers != 2 || diagnostics.FileWorkers != 2 || manifest.LocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 || diagnostics.State != "finalizing" {
 		t.Fatal("packaged export did not report HTTP/local persistence measurements")
 	}
 	for _, coverage := range manifest.Coverage {
@@ -183,7 +183,7 @@ func TestPackagedRebuildCLI(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	out := filepath.Join(t.TempDir(), "offline archive")
-	args := []string{"rebuild", "--source", source, "--output", out, "--policy", policyPath, "--format", "both", "--metadata", "off", "--people", "profiles"}
+	args := []string{"rebuild", "--source", source, "--output", out, "--policy", policyPath, "--format", "both", "--metadata", "off", "--people", "profiles", "--file-workers", "4"}
 	// EOF declines without writing or connecting to any server.
 	if b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil || !strings.Contains(string(b), "Canceled") {
 		t.Fatalf("packaged rebuild EOF did not decline: %v %s", err, b)
@@ -201,7 +201,7 @@ func TestPackagedRebuildCLI(t *testing.T) {
 		t.Fatal("packaged rebuild evidence/selection incorrect")
 	}
 	diagnostics := readLocalPerformance(t, out)
-	if diagnostics.HTTP.Requests != 0 || m.Rebuild.SourceLocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 {
+	if diagnostics.HTTP.Requests != 0 || m.FileWorkers != 4 || diagnostics.FileWorkers != 4 || m.Rebuild.SourceLocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 {
 		t.Fatal("packaged rebuild did not separate source and local measurements")
 	}
 	r := &run{ctx: ctx, stage: out, opts: Options{Scanner: scanner(t, policy)}}

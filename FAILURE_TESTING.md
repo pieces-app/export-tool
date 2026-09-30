@@ -14,6 +14,7 @@ Real `ENOSPC` tests run inside an isolated Linux ARM64 container with a separate
 | PDF byte write | Real short-write/exhaustion error; no final directory or success manifest. The incomplete PDF is removed by the ordinary writer. |
 | Metadata sidecar output | Stops with `ENOSPC`; previously written documents remain under `.partial`. |
 | Reconstruction-state output | Stops with `ENOSPC`; the returned manifest reports failure rather than provisional success. |
+| Packaged CLI during parallel Markdown persistence (four workers) | Exits 1 with incomplete summary documents in staging; never starts PDF generation, announces success or finalizes. |
 | Packaged CLI during PDF conversion | Actual executable exits 1 with an actionable error, no success announcement, and no finalized archive. |
 | Cancellation entering PDF/metadata stages | Returns `context.Canceled`, failed status, and no success manifest. |
 | Destination occupied after preflight | Source archive and existing file/empty directory remain unchanged; `.partial` cannot be opened as a finalized rebuild source. |
@@ -48,7 +49,7 @@ docker --context desktop-linux run --rm --platform linux/arm64 \
   --network none --read-only --cpus=2 --memory=512m \
   --tmpfs /tmp:rw,size=128m --tmpfs /enospc:rw,size=8m \
   --mount type=bind,source="$PWD/exports/native-acceptance-linux-arm64",target=/tests,readonly \
-  --mount type=bind,source="$PWD/dist/0.8.6-dev/pieces-export_0.8.6-dev_linux_arm64",target=/app,readonly \
+  --mount type=bind,source="$PWD/dist/0.13.0-dev/pieces-export_0.13.0-dev_linux_arm64",target=/app,readonly \
   --env PIECES_EXPORT_ENOSPC_ROOT=/enospc \
   --env PIECES_EXPORT_TEST_BINARY=/app/pieces-export \
   debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \

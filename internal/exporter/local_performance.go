@@ -31,6 +31,7 @@ type PhaseMeasurement struct {
 }
 
 type LocalPerformanceReport struct {
+	FileWorkers int                             `json:"file_workers,omitempty"`
 	Version     int                             `json:"version"`
 	State       string                          `json:"state"`
 	Boundary    string                          `json:"measurement_boundary"`
@@ -179,7 +180,8 @@ func (r *run) performanceReport(state string) *LocalPerformanceReport {
 		return nil
 	}
 	report := &LocalPerformanceReport{
-		Version: 1, State: state,
+		FileWorkers: r.opts.FileWorkers,
+		Version:     1, State: state,
 		Boundary:  "before diagnostic/final-manifest writes and directory finalization",
 		ElapsedMS: time.Since(r.local.started).Milliseconds(), Operations: r.local.snapshot(), Phases: r.progress.measurements(),
 		Limitations: []string{

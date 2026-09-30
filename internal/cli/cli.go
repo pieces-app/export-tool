@@ -116,6 +116,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		fs.BoolVar(yes, "y", false, "approve export without interactive prompts")
 		format := fs.String("format", "", "markdown, pdf (with Markdown companions), or both")
 		pdfFont := fs.String("pdf-font", "", "optional local TrueType font for additional Unicode coverage")
+		fileWorkers := fs.Int("file-workers", 2, "local Markdown file writers (1–4); 1 keeps writes serial; OS reads remain serialized")
 		pdfLimits := pdfLimitFlags(fs)
 		signalDigest := signalDigestFlags(fs, false)
 		naming := fs.String("naming", "readable", "readable summary names or opaque")
@@ -193,6 +194,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 		}
 		if err := signalDigest.Validate(); err != nil {
+			return fail(err)
+		}
+		if err := exporter.ValidateFileWorkers(*fileWorkers); err != nil {
 			return fail(err)
 		}
 		if err := pdfLimits.Validate(); err != nil {
@@ -351,6 +355,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			fmt.Fprintf(stdout, ", since %s", since.UTC().Format(time.RFC3339))
 		}
 		fmt.Fprintln(stdout)
+		fmt.Fprintf(stdout, "Local Markdown writers: %d (file sync retained).\n", *fileWorkers)
 		fmt.Fprintf(stdout, "Performance: %s, ≤1 outstanding data request, batch ceiling %d, target %s | People: %s\n", *performance, *batch, *targetLatency, *people)
 		fmt.Fprintln(stdout, "Website categories apply only if domain lists are configured in the policy.")
 		if *closeDesktop {
@@ -372,7 +377,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{Associations: *associations, Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{FileWorkers: *fileWorkers, Associations: *associations, Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)

@@ -20,6 +20,8 @@ Without `--output`, the destination is `pieces-export-<timestamp>` under the cur
 
 `performance.json` is produced at finalization (or best effort after a failure), starting with `0.12.3-dev`. It contains aggregate diagnostics only and cannot certify completeness or resume a partial archive. See [measurement boundaries](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev).
 
+`--file-workers` changes local rendering throughput without changing file names, document content or relative links. The default is two; one keeps writes serial. Every file is still synced, and all writers settle before validation/finalization.
+
 PDF limits and failure behavior are described in the [specification](EXPORT_SPEC.md#pdf-resource-limits-and-cancellation). Oversized documents are not truncated or automatically split; the entire PDF export stays unfinished on a limit failure. A finalized Markdown archive can be rebuilt repeatedly into separate destinations without rereading OS.
 
 ## Optional event history

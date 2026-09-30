@@ -154,7 +154,7 @@ type PublicEdge struct {
 	CacheEvidence            *CacheEvidence `json:"cache_evidence,omitempty"`
 }
 
-func (r *run) render() error {
+func (r *run) render() (result error) {
 	r.assignPaths()
 	graph, err := r.buildSummaryGraph()
 	if err != nil {
@@ -220,12 +220,28 @@ func (r *run) render() error {
 		return entries[i].ID < entries[j].ID
 	})
 	r.progress.Stage("Render Markdown", len(r.meta))
+	workers := r.opts.FileWorkers
+	if workers == 0 {
+		workers = defaultFileWorkers
+	}
+	if err := ValidateFileWorkers(workers); err != nil {
+		return err
+	}
+	writes := newMarkdownWriter(r.ctx, workers, maxAsyncMarkdownBytes, r.writeFile)
+	defer func() {
+		if err := writes.Close(); result == nil {
+			result = err
+		}
+	}()
 	for _, m := range r.sortedMeta() {
-		r.progress.Add(1)
+		if err := writes.Err(); err != nil {
+			return err
+		}
 		if err := r.ctx.Err(); err != nil {
 			return err
 		}
 		if m.State != "included" {
+			r.progress.Add(1)
 			continue
 		}
 		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
@@ -234,6 +250,9 @@ func (r *run) render() error {
 		}
 		if r.opts.Mode == "filtered" {
 			if pruneReferences(v, r.meta) {
+				if err := writes.Flush(); err != nil {
+					return err
+				}
 				if err = r.rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
 					return err
 				}
@@ -318,6 +337,11 @@ func (r *run) render() error {
 		if meta := graph.Metadata[m.Key]; meta != nil {
 			// Both documents share a directory, so all relative destinations are
 			// identical. Rank and render the related sections only once.
+			// Group indexes are synchronous; drain the pool first so they do
+			// not add extra concurrent filesystem writers.
+			if err := writes.Flush(); err != nil {
+				return err
+			}
 			related, err := graph.render(r, m, m.Path)
 			if err != nil {
 				return err
@@ -331,7 +355,7 @@ func (r *run) render() error {
 				if len(r.opts.SDKCaches) > 0 {
 					body += "\nHistorical client-cache relationships may contribute to these suggestions. See the summary and export coverage for provenance.\n"
 				}
-				if err := r.writeFile(filepath.Join(r.stage, sibling), []byte(body)); err != nil {
+				if err := writes.Submit(filepath.Join(r.stage, sibling), []byte(body), nil); err != nil {
 					return err
 				}
 				fmt.Fprintf(&b, "\n[Relationship graph](%s)\n", relative(m.Path, sibling))
@@ -340,9 +364,12 @@ func (r *run) render() error {
 			r.documentMetadata[m.Path] = meta
 		}
 
-		if err = r.writeFile(filepath.Join(r.stage, m.Path), []byte(b.String())); err != nil {
+		if err = writes.Submit(filepath.Join(r.stage, m.Path), []byte(b.String()), func() { r.progress.Add(1) }); err != nil {
 			return err
 		}
+	}
+	if err := writes.Close(); err != nil {
+		return err
 	}
 	if err := writeJSONL(filepath.Join(r.stage, "relationships.jsonl"), edges, r.local); err != nil {
 		return err

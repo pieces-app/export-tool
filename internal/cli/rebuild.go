@@ -28,6 +28,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	relationships := fs.String("relationships", "", "inline, sidecar, or both; default inherits the archive setting")
 	metadata := fs.String("metadata", "", "auto or off; default inherits the archive setting; sidecars always retained")
 	font := fs.String("pdf-font", "", "optional local TrueType font")
+	fileWorkers := fs.Int("file-workers", 2, "local Markdown file writers (1–4); 1 keeps writes serial")
 	pdfLimits := pdfLimitFlags(fs)
 	signalDigest := signalDigestFlags(fs, true)
 	people := fs.String("people", "", "inherit original selection, or narrow an all-people archive to profiles/connected")
@@ -48,6 +49,9 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return fail(fmt.Errorf("unexpected positional arguments"))
 	}
 	if err := signalDigest.Validate(); err != nil {
+		return fail(err)
+	}
+	if err := exporter.ValidateFileWorkers(*fileWorkers); err != nil {
 		return fail(err)
 	}
 	if err := pdfLimits.Validate(); err != nil {
@@ -77,6 +81,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	}
 	fmt.Fprintf(stdout, "Offline rebuild: %d included records; privacy mode %s; %d original coverage issues.\nDestination: %s\n", included, m.Mode, len(m.Issues), *out)
 	fmt.Fprintln(stdout, "No OS connection, launch, or Desktop closure. Source omissions remain; missing records cannot be downloaded offline.")
+	fmt.Fprintf(stdout, "Local Markdown writers: %d (file sync retained).\n", *fileWorkers)
 	digestMode := signalDigest.Mode
 	if digestMode == "" {
 		digestMode = "split"
@@ -98,7 +103,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 			return 0
 		}
 	}
-	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
+	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{FileWorkers: *fileWorkers, Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
 	if err != nil {
 		return fail(err)
 	}

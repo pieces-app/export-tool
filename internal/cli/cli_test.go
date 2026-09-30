@@ -13,6 +13,17 @@ import (
 	"testing"
 )
 
+func TestFileWorkersValidatedBeforeSourceAccess(t *testing.T) {
+	for _, command := range []string{"export", "rebuild"} {
+		for _, value := range []string{"-1", "0", "5"} {
+			var out, errs bytes.Buffer
+			if code := Run(context.Background(), []string{command, "--file-workers", value}, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "file-workers must be") {
+				t.Fatalf("file-worker validation did not precede source access: %d %s", code, errs.String())
+			}
+		}
+	}
+}
+
 func TestConfirmationAnswers(t *testing.T) {
 	for _, test := range []struct {
 		input    string

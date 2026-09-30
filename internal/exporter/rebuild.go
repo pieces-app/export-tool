@@ -80,6 +80,12 @@ func InspectArchive(source string) (Manifest, error) {
 // No Client is constructed: rebuilding cannot discover, launch, close, or query
 // Pieces OS. It writes a new archive and only imports canonical included JSON.
 func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
+	if input.FileWorkers == 0 {
+		input.FileWorkers = defaultFileWorkers
+	}
+	if err := ValidateFileWorkers(input.FileWorkers); err != nil {
+		return Manifest{}, err
+	}
 	input.PDFLimits = input.PDFLimits.defaults()
 	if err := input.PDFLimits.Validate(); err != nil {
 		return Manifest{}, err
@@ -209,6 +215,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
 	r.manifest = original
+	r.manifest.FileWorkers = o.FileWorkers
 	r.manifest.LocalPerformance = nil
 	r.legacySignalPrivacy = original.SignalPrivacyVersion < currentSignalPrivacyVersion && o.Mode == "filtered" && o.Scanner.SourceFiltering()
 	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.

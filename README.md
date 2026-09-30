@@ -75,6 +75,8 @@ Dry run scans and calibrates without creating export files or closing Desktop. T
 
 Adaptive pacing is on by default: one outstanding data request, batches starting at five and growing toward at most 50, latency/response-size backoff, short pauses for OS headroom, and a stop on persistent overload or transport failure. Progress shows phase counts, rate, phase ETA, last HTTP p95, retries, backoffs, cumulative file-write attempts, and flush time. New exports/rebuilds save aggregate phase/scan/read/write/flush measurements in `performance.json` and the manifest; failed runs attempt to leave diagnostics in staging. These reports are not resume checkpoints. See [measurement boundaries](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev). `--performance conservative --batch-size 5` uses smaller reads and at least 100 ms pauses. OS uses a database write lock even for batch reads, so adding concurrent read workers is deliberately avoided. This cannot guarantee OS will never stall; see the control loop in [EXPORT_SPEC.md](EXPORT_SPEC.md#output-destination-adaptive-reads-and-terminal-progress).
 
+`--file-workers 2` is the default for local record Markdown writes; use `1` for serial writes or up to `4` for more parallelism. Each file is still synced, large documents run alone, and OS reads stay serialized. [Bounds and failure behavior](EXPORT_SPEC.md#bounded-local-markdown-writes-0130-dev) apply to export and offline rebuild.
+
 `--people all` preserves all included identities by default. `profiles` selects persona/profile-bearing people and stored account identities; `connected` additionally keeps summary-linked/high-connectivity people. Missing evidence is retained conservatively. Selection does not remove summaries/events or merge names/emails. In the live pre-privacy preview, `profiles` retained **1,373 of 4,291 persons**, omitting **2,918 (68.0%)**. That is meaningful for person documents and navigation, not a 68% reduction in the entire export. The current OS omits person-to-summary projections, so `connected` conservatively retains all 4,291. Twelve same-name candidate groups were identified for review; no automatic identity merges occurred.
 
 ## What this version implements
@@ -133,7 +135,7 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.12.3-dev --output dist/0.12.3-dev
+go run ./cmd/release --version 0.13.0-dev --output dist/0.13.0-dev
 ```
 
 This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.6.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.

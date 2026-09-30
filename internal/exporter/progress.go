@@ -124,7 +124,7 @@ func (p *Progress) printLocal() {
 	}
 	counts := p.local.snapshot()
 	writes, syncs := counts["artifact_write"], counts["artifact_sync"]
-	fmt.Fprintf(p.out, " | file writes %d | flush time %s", writes.Calls, (time.Duration(syncs.Milliseconds) * time.Millisecond).Round(time.Millisecond))
+	fmt.Fprintf(p.out, " | file writes %d | flush time (sum) %s", writes.Calls, (time.Duration(syncs.Milliseconds) * time.Millisecond).Round(time.Millisecond))
 }
 
 func (p *Progress) phaseAt(now time.Time) PhaseMeasurement {

@@ -54,3 +54,27 @@ See [the execution checklist](TODO.md) for the independent data-coverage, native
 ## Diagnostics implementation verification (`0.12.3-dev`)
 
 New export/rebuild reports and terminal counters passed focused persistence, cancellation, exclusive-file collision, phase aggregation, and offline-provenance checks. Full `go test -race ./...` passed (exporter 477.812 seconds), as did vet, actionlint and ZIP/hash validation. Actual packages passed on macOS ARM64, Rosetta AMD64 and isolated Linux ARM64; native Windows remains pending. These timings are test-suite durations, not live export benchmarks. Measurements do not remove file sync, bypass privacy, or add resume support.
+
+## Bounded local writers (`0.13.0-dev`)
+
+A bounded, synthetic filesystem experiment kept exclusive creation and every `File.Sync`, comparing 128 files at one/two/four writers. It used temporary directories and no source OS requests. The original export remained active on the same filesystem, so these are observed development-machine samples, not isolated storage benchmarks or full-history predictions. After implementing a bounded pool, the actual renderer was also measured on 128 staged synthetic annotation records with local diagnostics enabled. Three one-iteration samples per case on Apple M4 Max produced these median results:
+
+| Workload | One writer | Two writers | Four writers |
+| --- | ---: | ---: | ---: |
+| 4 KiB artifact writes | 112.73 files/s | 162.31 files/s | 206.50 files/s |
+| 64 KiB artifact writes | 93.74 files/s | 137.93 files/s | 202.55 files/s |
+| Actual staged Markdown renderer with diagnostics | 82.54 records/s | 112.32 records/s | 137.05 records/s |
+
+The instrumented renderer's median wall time was 1.551 s serial, 1.140 s with two writers, and 0.934 s with four. Two writers gave about **36% more records/second (27% less stage time)** in this fixture; four had a wider 0.821–1.677 s range. Diagnostics recorded exactly **144 file-sync calls in every case**, including supporting indexes. Summed sync time can exceed wall time with parallel writers; it is not an exclusive elapsed-time breakdown. The earlier run without diagnostics had medians of 91.01 / 129.57 / 161.38 records/s; differing concurrent filesystem activity prevents attributing the difference solely to instrumentation. The default is two, with `--file-workers 1–4` on export/rebuild. This is bounded manual parallelism for local record documents, not more OS readers or a calibrated universal optimum. First canonical writes, privacy and final audits were excluded from the renderer benchmark; they still cost time. Pool payloads are bounded, oversized documents run alone, and barriers preserve existing error/finalization behavior. See [the exact contract](EXPORT_SPEC.md#bounded-local-markdown-writes-0130-dev).
+
+Reproduce the bounded experiment without auto-calibrating to a large disk workload:
+
+```sh
+go test ./internal/exporter -run '^$' \
+  -bench '^Benchmark(DurableArtifactWrites|StagedMarkdownWrites)$' \
+  -benchtime=1x -count=3 -benchmem
+```
+
+Focused race checks passed for serial/parallel content equivalence, file-sync accounting, bounded workers, oversized documents, cancellation, persistence failures and report settings. Actual packaged parallel Markdown exhaustion on a dedicated Linux tmpfs also passed: exit 1, incomplete staging retained, no PDF phase, no success/final directory. Full release evidence is recorded in TODO. No change affects the running original executable.
+
+Release verification completed for the bounded-writer change: full race suite passed (exporter 488.442 seconds), along with static checks, six ZIP/hash checks, macOS ARM64/Rosetta/Linux ARM64 packaged acceptance and the actual Linux exhaustion cases. Windows binaries/test executables compile; native Windows is still unverified. At the final live checkpoint, the original export was still active after about 22 h 29 min, rendering 189,211/1,907,456 records (9.9%) at about 70.3 records/second. Its rendering-only ETA was about 6 h 48 min, excluding later phases; no archive completion is claimed.
