@@ -383,6 +383,12 @@ func (r *run) render() error {
 	if err := r.renderOrganization(); err != nil {
 		return err
 	}
+	if err := r.renderSignalDigest(); err != nil {
+		return err
+	}
+	if r.manifest.SignalDigest.Index != "" {
+		index.WriteString("\n[Consolidated signals](signals/index.md)\n")
+	}
 	if err := r.renderCoverage(); err != nil {
 		return err
 	}

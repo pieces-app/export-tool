@@ -24,6 +24,7 @@ type Options struct {
 	Format, Naming, Relationships, Metadata string
 	PDFFont                                 string
 	PDFLimits                               PDFLimits
+	SignalDigest                            SignalDigestOptions
 	PeopleMode                              string
 	MinPersonConnections                    int
 	RelatedOrder                            string
@@ -70,6 +71,7 @@ type Manifest struct {
 	Format                  string                   `json:"format"`
 	PDFLimits               *PDFLimits               `json:"pdf_limits,omitempty"`
 	SignalPrivacyVersion    int                      `json:"signal_privacy_version,omitempty"`
+	SignalDigest            *SignalDigestCoverage    `json:"signals_digest,omitempty"`
 	Warnings                []string                 `json:"warnings,omitempty"`
 	FormatVersion           int                      `json:"format_version"`
 	ToolVersion             string                   `json:"tool_version"`
@@ -199,6 +201,10 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	o.SignalDigest = o.SignalDigest.defaults()
+	if err := o.SignalDigest.Validate(); err != nil {
+		return Manifest{}, err
+	}
 	o.PDFLimits = o.PDFLimits.defaults()
 	if err := o.PDFLimits.Validate(); err != nil {
 		return Manifest{}, err
@@ -833,7 +839,7 @@ func extractEdges(t, id string, v map[string]any) []Edge {
 }
 
 func (r *run) filterGraph() error {
-	r.manifest.SignalPrivacyVersion = 1
+	r.manifest.SignalPrivacyVersion = currentSignalPrivacyVersion
 	if r.opts.Mode != "filtered" {
 		return nil
 	}

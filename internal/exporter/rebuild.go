@@ -114,6 +114,13 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		return Manifest{}, errConfig("archive reconstruction checksums are missing or invalid")
 	}
 	o := input.Options
+	if o.SignalDigest.Mode == "" && original.SignalDigest != nil {
+		o.SignalDigest.Mode = original.SignalDigest.Options.Mode
+	}
+	o.SignalDigest = o.SignalDigest.defaults()
+	if err := o.SignalDigest.Validate(); err != nil {
+		return Manifest{}, err
+	}
 	if o.Scanner == nil || (original.Mode != "filtered" && original.Mode != "preserve") {
 		return Manifest{}, errConfig("rebuild requires a policy scanner and a supported source privacy mode")
 	}
@@ -201,7 +208,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
 	r.manifest = original
-	r.legacySignalPrivacy = original.SignalPrivacyVersion < 1 && o.Mode == "filtered" && o.Scanner.SourceFiltering()
+	r.legacySignalPrivacy = original.SignalPrivacyVersion < currentSignalPrivacyVersion && o.Mode == "filtered" && o.Scanner.SourceFiltering()
 	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.
 	digest := sha256.Sum256(manifestBytes)
 	r.manifest.Rebuild = &RebuildInfo{SourceManifestSHA256: hex.EncodeToString(digest[:]), SourceToolVersion: original.ToolVersion, SourceStarted: original.Started, SourceFinished: original.Finished, SourceStatus: original.Status, SourceCoverage: original.Coverage, SourcePeople: original.People, SourcePerformance: original.Performance, LegacyEvidence: original.ArchiveState == nil}

@@ -64,7 +64,7 @@ func assertNoSignalPrivateText(t *testing.T, root string) {
 
 func TestSignalPrivacyAttachmentsAndSourceDependencies(t *testing.T) {
 	for _, direction := range []string{"forward", "inverse"} {
-		for _, scenario := range []string{"event", "website", "signal", "annotation", "shared-description", "strict", "strict-without-source-rules", "preserve"} {
+		for _, scenario := range []string{"event", "inverse-event", "website", "inverse-website", "signal", "annotation", "shared-description", "strict", "strict-without-source-rules", "preserve"} {
 			t.Run(direction+"/"+scenario, func(t *testing.T) {
 				private, clean := signalRecord("private-signal"), signalRecord("clean-signal")
 				private["name"] = "Private signal label sentinel"
@@ -85,6 +85,10 @@ func TestSignalPrivacyAttachmentsAndSourceDependencies(t *testing.T) {
 					event["url"], private["workstream_events"] = "https://bank.example/private", refs("event")
 				case "website":
 					website["url"], private["websites"] = "https://bank.example/private", refs("website")
+				case "inverse-event":
+					event["url"], event["signals"] = "https://bank.example/private", refs("private-signal")
+				case "inverse-website":
+					website["url"], website["signals"] = "https://bank.example/private", refs("private-signal")
 				case "signal":
 					private["url"] = "https://bank.example/private"
 				case "annotation":
@@ -111,7 +115,7 @@ func TestSignalPrivacyAttachmentsAndSourceDependencies(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if m.SignalPrivacyVersion != 1 {
+				if m.SignalPrivacyVersion != currentSignalPrivacyVersion {
 					t.Fatal("signal privacy capability not recorded")
 				}
 				for _, c := range m.Coverage {
@@ -215,6 +219,10 @@ func verifySignalPrivacyCLI(t *testing.T, binary string, legacy bool) {
 	signal["name"], signal["annotations"], signal["workstream_events"] = "Private signal label sentinel", refs("body"), refs("event")
 	body["type"], body["text"] = "SIGNAL_DESCRIPTION", "Private signal narrative sentinel"
 	event["url"] = "https://bank.example/private"
+	if legacy {
+		signal["workstream_events"] = refs()
+		event["signals"] = refs("signal")
+	}
 	f := &fakeOS{data: map[string][]map[string]any{"SIGNALS": {signal}, "ANNOTATIONS": {body}, "WORKSTREAM_EVENTS": {event}}}
 	srv := f.server(t)
 	defer srv.Close()
@@ -238,7 +246,7 @@ func verifySignalPrivacyCLI(t *testing.T, binary string, legacy bool) {
 		t.Fatal(err)
 	}
 	if legacy {
-		if m.SignalPrivacyVersion != 0 {
+		if m.SignalPrivacyVersion >= currentSignalPrivacyVersion {
 			t.Fatal("fixture executable already has signal dependency filtering")
 		}
 		kept := 0

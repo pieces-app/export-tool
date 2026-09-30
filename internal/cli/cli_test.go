@@ -70,6 +70,17 @@ func TestPDFLimitsValidatedBeforeConnectionOrArchiveReads(t *testing.T) {
 	}
 }
 
+func TestSignalDigestValidationBeforeSourceReads(t *testing.T) {
+	for _, command := range []string{"export", "rebuild"} {
+		for _, flags := range [][]string{{"--signals-digest", "bad"}, {"--signals-per-part", "0"}, {"--signals-max-part-mib", "129"}} {
+			var out, errs bytes.Buffer
+			if code := Run(context.Background(), append([]string{command}, flags...), &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "signals-") {
+				t.Fatalf("digest options did not fail before source access: %d %s", code, errs.String())
+			}
+		}
+	}
+}
+
 func TestPolicyInitDoesNotOverwrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "policy.json")
 	var out, errs bytes.Buffer

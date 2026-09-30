@@ -59,6 +59,10 @@ Advanced `--materials TYPE,TYPE` still selects full inventories of those types; 
 
 This reads only a finalized archive and writes a new folder. It preserves the source policy, exclusions, graph provenance, and coverage gaps, and can optionally use historical `--sdk-cache` links to records already exported. It never connects to or launches OS. Legacy archives remain partial where reconstruction evidence is unavailable. Use the original `--policy` when one was configured. See [offline rebuilding](OFFLINE_REBUILD.md) for integrity checks, conservative cache handling, and limitations.
 
+## Consolidated signals
+
+Starting with `0.9.0-dev`, the CLI adds `--signals-digest split|single|off`. Split is the default, with `--signals-per-part 1000` and `--signals-max-part-mib 8`; canonical signal files remain available in every mode. The digest preserves approved attached descriptions, reports missing projections, and links to included records. It makes no extra OS requests. Oversized documents fail without truncation. Rebuild can change digest presentation offline; independent PDF limits still apply. See [layout and limits](EXPORT_LAYOUT.md#signals-digest).
+
 ## Measure performance and choose people
 
 ```sh
@@ -145,7 +149,7 @@ Live hierarchy verification recovered **1,708 direct edges**, using two global i
 An evenly spaced sample of 250 summary snapshots still omitted annotation/person/pipeline relationship fields. Sampled persona annotations also omitted summary links. Enums/descriptors classify the files, and the exporter follows both forward and reverse attachment fields wherever present, but **full summary-body attachment and person/pipeline membership remain release blockers**. The current OS omits those inspected response fields even though the source model defines them; missing data is not an empty relationship. Full-history export has not been verified.
 
 
-- Person-to-summary and pipeline membership indexes depend on available typed associations; projected snapshots can omit them. New exports disclose absent/malformed core projections in `coverage.md` and the manifest, and return partial status (exit 2) even if material counts reconcile. The exporter queries persona/profile histories directly but cannot promise every summary describing a person. The consolidated signals digest is planned, not implemented.
+- Person-to-summary and pipeline membership indexes depend on available typed associations; projected snapshots can omit them. New exports disclose absent/malformed core projections in `coverage.md` and the manifest, and return partial status (exit 2) even if material counts reconcile. The exporter queries persona/profile histories directly but cannot promise every summary describing a person. The consolidated signals digest reports missing descriptions explicitly; complete live description recovery remains pending.
 - Association-object metadata, supplementary settings/analysis views, fingerprint audio downloads, and separate binary attachment extraction are not implemented. Preservation JSON retains encoded representations returned by the server; filtered mode withholds unsupported binary forms. Inaccessible internal records are reported.
 - The current timeline uses **record creation time**, not summary activity ranges or scheduled calendar occurrence times. Those source fields remain in record JSON for a later activity timeline. The CLI exports full history; it does not yet offer a user-selected date range.
 - There is no atomic server snapshot. The final inventory catches ID changes, not in-place updates to existing records. Deleted history and unavailable/cloud-only data cannot be recovered. Failed reads result in a partial manifest and nonzero exit status.

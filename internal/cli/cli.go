@@ -116,6 +116,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		format := fs.String("format", "", "markdown, pdf (with Markdown companions), or both")
 		pdfFont := fs.String("pdf-font", "", "optional local TrueType font for additional Unicode coverage")
 		pdfLimits := pdfLimitFlags(fs)
+		signalDigest := signalDigestFlags(fs, false)
 		naming := fs.String("naming", "readable", "readable summary names or opaque")
 		relationships := fs.String("relationships", "both", "inline, sidecar, or both")
 		relatedOrder := fs.String("related-order", "relevance", "rank related summaries by relevance or recent")
@@ -189,6 +190,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			if err != nil {
 				return fail(fmt.Errorf("related-since must be YYYY-MM-DD or RFC3339"))
 			}
+		}
+		if err := signalDigest.Validate(); err != nil {
+			return fail(err)
 		}
 		if err := pdfLimits.Validate(); err != nil {
 			return fail(err)
@@ -320,6 +324,12 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 		}
 		preflight.Print(stdout, *format)
+		for _, material := range selected {
+			if material.Type == "SIGNALS" {
+				fmt.Fprintf(stdout, "Signals digest: %s; up to %d signals per split document and %d MiB per document. Approved sizes are measured after privacy filtering; PDF budgets apply separately.\n", signalDigest.Mode, signalDigest.RecordsPerPart, signalDigest.MaxPartMiB)
+				break
+			}
+		}
 		if len(sdkCaches) > 0 {
 			fmt.Fprintf(stdout, "Historical SDK caches selected: %d. Export may recover stale links to current records; it will remain partial. Caches are not applied during scan or dry run.\n", len(sdkCaches))
 		}
@@ -361,7 +371,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)

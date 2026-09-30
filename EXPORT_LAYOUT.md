@@ -1,6 +1,6 @@
 # Export folders, naming, and navigation
 
-Updated 2026-09-30. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest below remains planned.
+Updated 2026-09-30. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest is included starting with `0.9.0-dev`; live completeness still requires acceptance.
 
 ## Where the export goes
 
@@ -96,6 +96,10 @@ Pieces-Export/
       index.md                              # secondary indexes of known explicit memberships
       <pipeline-name>.<id>.md                # links to canonical outputs and pipeline record
 
+  signals/                                  # selected SIGNALS only
+    index.md                                # counts, missing descriptions, links to parts
+    parts/000000.signals.<newest>.<oldest>.md # default: at most 1,000 entries / 8 MiB
+    all-signals.md                          # alternative with --signals-digest single
   timeline/
     index.md                                # chronological navigation across ALL material types
     records.jsonl                           # all included dated records, creation-time ascending
@@ -226,15 +230,27 @@ The root `coverage.md` links to the manifest and reports per-material counts alo
 
 With explicit `--sdk-cache` inputs, this report also reconciles historical candidate/recovered edges. Body attachments and graph JSONL identify cache provenance while retaining the same canonical folder tree and filenames. No duplicate cached record tree is emitted. See [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md).
 
-## Signals digest: planned next
+## Signals digest
 
-Individual `SIGNALS` records already export; the earlier live inventory counted 6,650. A consolidated `signals/index.md` with optional `all-signals.md` or `parts/000000.signals.<from>.<to>.md` remains planned.
+Individual records remain in `markdown/signals/`. Version `0.9.0-dev` adds a consolidated view without new OS requests or signal generation. It renders from approved staged records after privacy filtering and final path assignment. See TODO for package/platform acceptance; full live-archive recovery remains unverified.
 
-Generate from sanitized staged data and the final path map. Include signal identity, origin/category, timestamps/ranges, approved annotation text, and links to canonical signal/person/pipeline/summary/evidence records. Sort newest-created first, display occurrence ranges separately, and reconcile every included signal to a digest entry. Do not refetch or regenerate signals.
+| Option | Result |
+| --- | --- |
+| `--signals-digest split` (default) | `signals/index.md` plus numbered `parts/` documents with previous/next navigation. |
+| `--signals-digest single` | The same index plus `signals/all-signals.md`, subject to the document byte budget. |
+| `--signals-digest off` | Canonical signal records only; no consolidated folder. |
+| `--signals-per-part 1000` | Split after this many entries; allowed range 1–10,000. |
+| `--signals-max-part-mib 8` | Maximum Markdown bytes per digest document; allowed range 1–128 MiB. |
 
-Descriptions come from attached `SIGNAL_DESCRIPTION` annotations. Preserve all approved versions/attachments and flag ambiguous multiplicity; do not infer prose from a name or category when the relationship is absent. The seven relationship collections and batch embedding omission are documented in [the signal traversal contract](EXPORT_GUIDE.md#signals-and-their-description-annotations).
+When signals are outside the selected scope, no digest is generated. An explicitly selected empty inventory gets an index explaining zero entries, with no nonexistent part link. Ordering is creation time descending, source ID ascending for ties, then invalid/missing dates last. Occurrence ranges are displayed separately. Part basenames contain their zero-based part number and newest/oldest entry creation dates in the export timezone; `undated` is explicit. Entry ranks are global across parts.
 
-Initial splitting design: 1,000 signals or 8 MiB approved text per part; report oversized single signals explicitly. A single-document choice needs a size estimate. PDF needs its own page/memory/cancellation budget. Test empty, large, tied, undated, missing-link, filtered, Unicode, moved-folder, and interrupted cases before claiming full digest coverage. Track the work in [TODO.md](TODO.md).
+Entries include identity, origin/category, creation/update times, exposed occurrence ranges, and links to included canonical signal/person/pipeline/summary/event/website/range/annotation records. Only attached nonempty `SIGNAL_DESCRIPTION` annotations supply description prose. Every approved version is retained with its timestamp and attachment provenance; multiple descriptions are reported, without choosing an authoritative current version. Either endpoint can expose a supported signal relationship; derived inverse edges are identified explicitly. Missing/private/unselected targets remain unlinked. Unsupported embedded Pieces links become visible labels, using the same rules as other documents.
+
+The index and `manifest.signals_digest` reconcile entries to included signals and report description presence/multiplicity, unavailable target occurrences, undated signals, unknown projections, part counts, and bytes. Excluded, withheld, and intentionally omitted records are counted separately. Disabled/unselected digests do not compute description statistics. Current staged data contains 6,716 signals with all seven forward relationship projections absent; this does not prove descriptions are absent. See [the source contract](EXPORT_GUIDE.md#signals-and-their-description-annotations).
+
+Planning renders one bounded entry at a time and reports approved entry bytes before writing. A second pass checks content hashes against the plan. Each document reserves 16 KiB for headings/navigation; canonical input reads are capped at 128 MiB per record. Filtered exports also enforce the existing 2 MiB text-field scanner limit before rendering. An oversized individual entry, single document, or index fails without truncation or archive finalization. Choose smaller split parts, a larger allowed byte budget, or `off` in a new export/rebuild destination. These limits do not cap total process memory or disk usage, and interrupted `.partial` directories cannot be resumed.
+
+PDF mode mirrors these documents under `pdf/signals/`, with the independent PDF input/page/output limits. Markdown splitting does not automatically satisfy a PDF page limit or split an oversized PDF further. For large histories, finish Markdown first, then rebuild the finalized archive offline with fewer entries per part if PDF conversion needs it. Rebuild inherits a recorded digest mode (otherwise `split`); count/byte budgets use current defaults unless explicitly supplied. Synthetic checks cover 6,716 entries, chronology, Unicode, filtering, missing/shared links, moved archives, cancellation, and size failures. Live recovery and native viewer acceptance remain open in [TODO.md](TODO.md).
 
 ## Regenerating an archive
 

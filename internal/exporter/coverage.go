@@ -179,9 +179,20 @@ func (r *run) renderCoverage() error {
 		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d |\n", c.Material, c.Field, c.Included, c.Absent, c.Invalid, c.Empty, c.Linked)
 	}
 	if len(r.manifest.RelationshipCoverage) == 0 {
-		b.WriteString("\nNo included records use the core summary/person/pipeline projections checked here.\n")
+		b.WriteString("\nNo included records use the core summary/person/pipeline/signal projections checked here.\n")
 	}
 	b.WriteString("\nAny absent or invalid core projection makes this export partial. Unknown body attachments cannot be reconstructed from titles, timestamps, or hierarchy enums. Persona history and hierarchy reads are separate evidence; they do not fill every body/person/pipeline projection. See the manifest for all issues, hierarchy coverage, warnings, privacy settings, and limitations.\n")
+	if d := r.manifest.SignalDigest; d != nil {
+		b.WriteString("\n## Consolidated signals\n\n")
+		switch {
+		case !d.Selected:
+			b.WriteString("Signals were not selected by this material scope; no digest was generated.\n")
+		case d.Options.Mode == "off":
+			fmt.Fprintf(&b, "Digest generation was disabled; %d canonical signal records remain included.\n", d.Included)
+		default:
+			fmt.Fprintf(&b, "[Signals index](%s): %d entries for %d included signals in %d documents, %d Markdown bytes including the index. %d signals have attached description text; %d do not; %d have multiple retained descriptions. %d signals have unknown relationship projections. These counts do not certify complete source provenance or embeddings.\n", d.Index, d.Entries, d.Included, len(d.Parts), d.TotalBytes, d.WithDescription, d.WithoutDescription, d.MultipleDescriptions, d.UnknownProjections)
+		}
+	}
 	if c := r.manifest.SDKCache; c.Selected > 0 {
 		fmt.Fprintf(&b, "\n## Historical SDK-cache recovery\n\nExplicitly selected caches: %d. Rows read: %d; matching summary rows: %d; expired rows: %d; invalid/oversized rows: %d; creation-time mismatches: %d; invalid/future update times: %d.\n\nCandidate fields: %d; conflicting fields skipped: %d; unavailable target references skipped: %d. Edges added before privacy (including derived inverses): %d; retained historical edges after filtering/selection: %d.\n\nCache evidence is historical and may be stale. Current OS records were not replaced. Present OS collections, including explicit empties, take precedence. A newer valid cache field supersedes an older field, including empties and tombstones; equal-time conflicts are not merged. Absent cache fields do not prove deletion. Only exact current record IDs with matching summary creation times and non-future cache update times qualify. Missing targets produce no links. The graph JSONL records cache ordinal and summary update times for each retained historical edge; private cache paths and cached prose are not exported. This does not close the current relationship-projection gap.\n", c.Selected, c.Rows, c.Matching, c.Expired, c.Invalid, c.IdentityMismatch, c.UnusableTime, c.Fields, c.Conflicts, c.MissingTargets, c.AddedEdges, c.RetainedEdges)
 	}

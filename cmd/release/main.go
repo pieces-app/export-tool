@@ -30,7 +30,7 @@ func main() {
 	}
 }
 func run() error {
-	version := flag.String("version", "0.8.10-dev", "embedded release version")
+	version := flag.String("version", "0.9.0-dev", "embedded release version")
 	out := flag.String("output", "dist", "release directory")
 	targets := flag.String("targets", "darwin/arm64,darwin/amd64,linux/amd64,linux/arm64,windows/amd64,windows/arm64", "comma-separated OS/architecture pairs")
 	flag.Parse()

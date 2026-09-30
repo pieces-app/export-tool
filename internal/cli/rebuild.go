@@ -29,6 +29,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	metadata := fs.String("metadata", "", "auto or off; default inherits the archive setting; sidecars always retained")
 	font := fs.String("pdf-font", "", "optional local TrueType font")
 	pdfLimits := pdfLimitFlags(fs)
+	signalDigest := signalDigestFlags(fs, true)
 	people := fs.String("people", "", "inherit original selection, or narrow an all-people archive to profiles/connected")
 	relatedOrder := fs.String("related-order", "", "relevance or recent; default inherits the archive setting")
 	relatedLimit := fs.Int("related-limit", 0, "maximum suggestions per dimension (1–500); default inherits the archive setting")
@@ -45,6 +46,9 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	}
 	if fs.NArg() != 0 {
 		return fail(fmt.Errorf("unexpected positional arguments"))
+	}
+	if err := signalDigest.Validate(); err != nil {
+		return fail(err)
 	}
 	if err := pdfLimits.Validate(); err != nil {
 		return fail(err)
@@ -73,6 +77,14 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	}
 	fmt.Fprintf(stdout, "Offline rebuild: %d included records; privacy mode %s; %d original coverage issues.\nDestination: %s\n", included, m.Mode, len(m.Issues), *out)
 	fmt.Fprintln(stdout, "No OS connection, launch, or Desktop closure. Source omissions remain; missing records cannot be downloaded offline.")
+	digestMode := signalDigest.Mode
+	if digestMode == "" {
+		digestMode = "split"
+		if m.SignalDigest != nil {
+			digestMode = m.SignalDigest.Options.Mode
+		}
+	}
+	fmt.Fprintf(stdout, "Signals digest: %s when signals are selected; up to %d signals per split document, %d MiB per document. Approved sizes are measured after privacy filtering.\n", digestMode, signalDigest.RecordsPerPart, signalDigest.MaxPartMiB)
 	if m.ArchiveState == nil {
 		fmt.Fprintln(stdout, "Legacy archive: original relationship/selection evidence is incomplete; rebuilt output will remain partial.")
 	}
@@ -86,7 +98,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 			return 0
 		}
 	}
-	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PDFLimits: *pdfLimits, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
+	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
 	if err != nil {
 		return fail(err)
 	}
