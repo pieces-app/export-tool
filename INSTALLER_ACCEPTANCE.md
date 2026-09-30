@@ -70,3 +70,5 @@ The unattended complete/remove, complete/keep, and partial/remove cases were rep
 The same unattended cases also passed with the `0.8.8-dev` packages on those platforms and transports, after the unchanged-record optimization. The CLI still scans retained records, returns partial status when selected content is unavailable, and leaves the finalized export after installer cleanup.
 
 The unattended actual-package cases also passed for `0.8.9-dev` on macOS ARM64 (Bash local HTTPS and PowerShell substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). Complete/remove, complete/keep, and partial/remove retained the exported files as intended. Installer scripts and the published Gist are unchanged; this does not verify public hosting or native Windows execution.
+
+The unattended actual-package cases passed again for `0.8.10-dev` on macOS ARM64 (Bash local HTTPS and PowerShell substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). Installer cleanup continued to preserve complete and partial-status exports. The scripts/Gist are unchanged; native Windows and public-host download verification remain open.

@@ -69,6 +69,7 @@ type Manifest struct {
 	RelatedSince            string                   `json:"related_since,omitempty"`
 	Format                  string                   `json:"format"`
 	PDFLimits               *PDFLimits               `json:"pdf_limits,omitempty"`
+	SignalPrivacyVersion    int                      `json:"signal_privacy_version,omitempty"`
 	Warnings                []string                 `json:"warnings,omitempty"`
 	FormatVersion           int                      `json:"format_version"`
 	ToolVersion             string                   `json:"tool_version"`
@@ -106,22 +107,23 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
-	priorDecisions   []archiveRecord
-	rebuilding       bool
-	ctx              context.Context
-	client           *Client
-	opts             Options
-	stage            string
-	manifest         Manifest
-	meta             map[string]*Meta
-	coverage         map[string]*Coverage
-	inventory        map[string][]string
-	people           map[string]*PersonFacts
-	userPersonIDs    map[string]bool
-	derivedEdges     map[Edge]bool
-	cachedEdges      map[Edge]CacheEvidence
-	progress         *Progress
-	documentMetadata map[string]*DocumentMetadata
+	priorDecisions      []archiveRecord
+	legacySignalPrivacy bool
+	rebuilding          bool
+	ctx                 context.Context
+	client              *Client
+	opts                Options
+	stage               string
+	manifest            Manifest
+	meta                map[string]*Meta
+	coverage            map[string]*Coverage
+	inventory           map[string][]string
+	people              map[string]*PersonFacts
+	userPersonIDs       map[string]bool
+	derivedEdges        map[Edge]bool
+	cachedEdges         map[Edge]CacheEvidence
+	progress            *Progress
+	documentMetadata    map[string]*DocumentMetadata
 }
 
 func opaque(t, id string) string {
@@ -411,7 +413,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if err = r.recoverSDKCacheRelationships(); err != nil {
 		return r.manifest, err
 	}
-	r.reconcileSummaryAnnotations()
+	r.reconcileAnnotationAttachments()
 	if err = r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
@@ -831,8 +833,22 @@ func extractEdges(t, id string, v map[string]any) []Edge {
 }
 
 func (r *run) filterGraph() error {
+	r.manifest.SignalPrivacyVersion = 1
 	if r.opts.Mode != "filtered" {
 		return nil
+	}
+	if r.legacySignalPrivacy {
+		withheld := 0
+		for _, m := range r.meta {
+			if m.State == "included" && (m.Type == "SIGNALS" || m.Type == "ANNOTATIONS" && m.AnnotationType == "SIGNAL_DESCRIPTION") {
+				m.State = "withheld"
+				withheld++
+			}
+		}
+		if withheld > 0 {
+			r.issue("SIGNALS", "", "legacy_signal_privacy_unverified")
+			r.manifest.Warnings = append(r.manifest.Warnings, "Signal and signal-description records were conservatively withheld: the source archive predates signal dependency filtering, used domain/source rules, and may have removed the links needed to prove their origins. Offline rebuilding cannot recover those missing dependencies.")
+		}
 	}
 	if r.opts.Scanner.Policy.StrictDerived && r.opts.Scanner.SourceFiltering() {
 		for _, m := range r.meta {
@@ -853,7 +869,9 @@ func (r *run) filterGraph() error {
 					continue
 				}
 				dependent := m.Type == "WORKSTREAM_SUMMARIES" && (e.Relation == "events" || e.Relation == "children" || e.Relation == "summaries" || e.Relation == "annotations")
+				dependent = dependent || m.Type == "SIGNALS" && e.Relation == "annotations"
 				dependent = dependent || generated(m) && (e.Relation == "workstream_events" || e.Relation == "summaries" || e.Relation == "summaryRoot")
+				dependent = dependent || m.Type == "ANNOTATIONS" && e.Relation == "signals"
 				dependent = dependent || e.Relation == "websites" || e.Relation == "source_windows" || e.Relation == "sources" || e.Relation == "embedded_markdown"
 				if dependent {
 					m.State = "withheld"
@@ -862,9 +880,9 @@ func (r *run) filterGraph() error {
 				}
 			}
 		}
-		// An annotation body must not survive merely because its excluded summary is another node.
+		// An annotation body must not survive merely because its excluded owner is another node.
 		for _, m := range r.meta {
-			if m.Type == "WORKSTREAM_SUMMARIES" && m.State != "included" {
+			if (m.Type == "WORKSTREAM_SUMMARIES" || m.Type == "SIGNALS") && m.State != "included" {
 				for _, e := range m.Edges {
 					if e.Relation == "annotations" {
 						if target := r.meta[e.Target]; target != nil && target.State == "included" {
@@ -886,7 +904,7 @@ func (r *run) filterGraph() error {
 	return nil
 }
 func generated(m *Meta) bool {
-	return m.Type == "WORKSTREAM_SUMMARIES" || m.Type == "CONVERSATION_MESSAGES" || m.Type == "ANNOTATIONS" && (strings.Contains(m.AnnotationType, "SUMMARY") || m.AnnotationType == "COMPACTION")
+	return m.Type == "WORKSTREAM_SUMMARIES" || m.Type == "SIGNALS" || m.Type == "CONVERSATION_MESSAGES" || m.Type == "ANNOTATIONS" && (strings.Contains(m.AnnotationType, "SUMMARY") || m.AnnotationType == "COMPACTION" || m.AnnotationType == "SIGNAL_DESCRIPTION")
 }
 
 // Credentials found late in a profile or Sensitive record may also occur in earlier prose.

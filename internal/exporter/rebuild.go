@@ -201,6 +201,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
 	r.manifest = original
+	r.legacySignalPrivacy = original.SignalPrivacyVersion < 1 && o.Mode == "filtered" && o.Scanner.SourceFiltering()
 	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.
 	digest := sha256.Sum256(manifestBytes)
 	r.manifest.Rebuild = &RebuildInfo{SourceManifestSHA256: hex.EncodeToString(digest[:]), SourceToolVersion: original.ToolVersion, SourceStarted: original.Started, SourceFinished: original.Finished, SourceStatus: original.Status, SourceCoverage: original.Coverage, SourcePeople: original.People, SourcePerformance: original.Performance, LegacyEvidence: original.ArchiveState == nil}
@@ -359,7 +360,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := r.recoverSDKCacheRelationships(); err != nil {
 		return r.manifest, err
 	}
-	r.reconcileSummaryAnnotations()
+	r.reconcileAnnotationAttachments()
 	if err := r.filterGraph(); err != nil {
 		return r.manifest, err
 	}

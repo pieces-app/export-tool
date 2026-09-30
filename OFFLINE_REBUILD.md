@@ -63,3 +63,7 @@ An offline rebuild cannot repair missing canonical records, restore the summarie
 ## Verification
 
 Synthetic tests exercise source immutability, input checksums, swapped path mappings, graph/state corruption, unsafe paths and symlinks, destination aliases, policy mismatch, existing outputs, cancellation, legacy fallback, verified user folders, person narrowing without restoration, privacy propagation from unavailable cached dependencies, historical provenance across repeated rebuilds, PDFs, and local links after moving the result. Native packaged acceptance runs with its fixture OS already shut down. See [TODO.md](TODO.md) for executed platform evidence and remaining live acceptance.
+
+### Older signal privacy evidence
+
+Archives without `signal_privacy_version: 1` predate signal dependency filtering. If their original policy had domain/source rules, the prior exporter may have removed blocked event/website/annotation relationships while leaving a derived signal or its description. Rebuild cannot reconstruct those deleted links from the finalized archive. It conservatively withholds included signals and `SIGNAL_DESCRIPTION` annotations, returns partial status with `legacy_signal_privacy_unverified`, and leaves the source untouched. Recovering safe signal descriptions then requires a fresh export with the corrected CLI. This extra guard does not apply to credential-only filtering or preserve mode. Current archives still disclose absent projections separately; version 1 is a capability marker, not proof of full provenance.

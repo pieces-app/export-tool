@@ -1,9 +1,9 @@
 package exporter
 
-// Either the annotation or summary can expose an attachment. Materialize its
+// Either the annotation or its summary/signal can expose an attachment. Materialize its
 // inverse for body rendering and privacy propagation, recording provenance.
 // This never attaches records by matching title, text, timestamp, or enum alone.
-func (r *run) reconcileSummaryAnnotations() {
+func (r *run) reconcileAnnotationAttachments() {
 	if r.derivedEdges == nil {
 		r.derivedEdges = map[Edge]bool{}
 	}
@@ -18,6 +18,10 @@ func (r *run) reconcileSummaryAnnotations() {
 				inverse = "annotations"
 			} else if m.Type == "WORKSTREAM_SUMMARIES" && target.Type == "ANNOTATIONS" && e.Relation == "annotations" {
 				inverse = "summaries"
+			} else if m.Type == "ANNOTATIONS" && target.Type == "SIGNALS" && e.Relation == "signals" {
+				inverse = "annotations"
+			} else if m.Type == "SIGNALS" && target.Type == "ANNOTATIONS" && e.Relation == "annotations" {
+				inverse = "signals"
 			}
 			if inverse != "" && r.addEdge(target.Key, m.Key, inverse) {
 				r.derivedEdges[Edge{target.Key, m.Key, inverse}] = true
