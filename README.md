@@ -77,6 +77,8 @@ Adaptive pacing is on by default: one outstanding data request, batches starting
 
 `--file-workers 2` is the default for local record Markdown writes; use `1` for serial writes or up to `4` for more parallelism. Each file is still synced, large documents run alone, and OS reads stay serialized. [Bounds and failure behavior](EXPORT_SPEC.md#bounded-local-markdown-writes-0130-dev) apply to export and offline rebuild.
 
+Final privacy auditing reuses one raw-text read buffer per traversal while keeping file boundaries, JSON decoding and semantic PDF checks intact. JSON reads also use bounded buffering with fresh per-file decoders, and truncated JSON containers fail validation. This reduces allocation overhead; it does not skip scans or establish full-history performance.
+
 `--people all` preserves all included identities by default. `profiles` selects persona/profile-bearing people and stored account identities; `connected` additionally keeps summary-linked/high-connectivity people. Missing evidence is retained conservatively. Selection does not remove summaries/events or merge names/emails. In the live pre-privacy preview, `profiles` retained **1,373 of 4,291 persons**, omitting **2,918 (68.0%)**. That is meaningful for person documents and navigation, not a 68% reduction in the entire export. The current OS omits person-to-summary projections, so `connected` conservatively retains all 4,291. Twelve same-name candidate groups were identified for review; no automatic identity merges occurred.
 
 ## What this version implements
@@ -114,7 +116,7 @@ Every configured list is a deny list; `category` is its report label. The import
 ./pieces-export export --related-order relevance --related-limit 25 --related-since 2026-01-01 --output ./exports/ranked
 ```
 
-Open [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete archive-format-4 tree. `workstream_summaries/` contains `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/daily_standups/` plus the other descriptor-based folders. Person folders have `profile.md`, `profile_summaries/`, and `related_workstream_summaries/index.md`. Exact user-to-person endpoint mappings establish user folders. Other explicit hierarchy types have `hierarchical_summaries/<type>/` folders. Shared documents keep one canonical file with links from each relevant index.
+Open [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete archive-format-5 tree. `workstream_summaries/` contains `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/daily_standups/` plus the other descriptor-based folders. Person folders have `profile.md`, `profile_summaries/`, and `related_workstream_summaries/index.md`. Exact user-to-person endpoint mappings establish user folders. Other explicit hierarchy types have `hierarchical_summaries/<type>/` folders. Shared documents keep one canonical file with links from each relevant index.
 
 Summary filenames are `000000.safe_title.YYYY-MM-DD.uuid.md`, starting with the newest creation timestamp globally across summary folders. Gaps within an individual folder are expected. Six-digit minimum padding keeps ascending filename order chronological from newest to oldest. Titles are sanitized before naming; `--naming opaque` hides titles in filenames. Relationship siblings use the same basename plus `.relationships_graph.md`; `--relationships inline|sidecar|both` controls placement.
 
@@ -135,10 +137,10 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.13.0-dev --output dist/0.13.0-dev
+go run ./cmd/release --version 0.13.1-dev --output dist/0.13.1-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.6.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.13.1-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 

@@ -94,3 +94,7 @@ Actual-package complete/remove, complete/keep, and partial/remove cases passed a
 ## Bounded Markdown writers (`0.13.0-dev`)
 
 The actual release ZIPs passed the existing Bash local-HTTPS complete/remove, complete/keep and partial/remove cases on macOS ARM64 and isolated Linux ARM64; PowerShell 7 cases passed on macOS with substituted file transport. Source scripts and the published Gist are unchanged. Broader actual-package export/rebuild/privacy/PDF/link tests passed on macOS ARM64 (84.894 seconds including installers), Rosetta AMD64 (66.307 seconds), and Linux ARM64, with the default two writers and an explicit four-writer rebuild. Actual four-writer Markdown disk exhaustion passed in the isolated Linux mount. Windows compilation and these fixtures do not close native Windows, real OS lifecycle, public hosting, clean-machine installation or full live migration gates.
+
+## Final audit buffering (`0.13.1-dev`)
+
+The actual ZIP installer cases passed on macOS ARM64 (Bash local HTTPS; PowerShell 7 substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). Complete/remove, complete/keep and partial/remove retained exports and preserved exit status. Broader packaged export/rebuild/privacy/PDF/link cases passed on macOS ARM64 (66.855 seconds including installers), Rosetta AMD64 (47.485 seconds), and Linux ARM64. The executable now reuses bounded audit buffers and rejects unfinished JSON containers; scripts and the published Gist are unchanged. These fixtures do not close native Windows, real migration or public-hosting acceptance.

@@ -78,3 +78,31 @@ go test ./internal/exporter -run '^$' \
 Focused race checks passed for serial/parallel content equivalence, file-sync accounting, bounded workers, oversized documents, cancellation, persistence failures and report settings. Actual packaged parallel Markdown exhaustion on a dedicated Linux tmpfs also passed: exit 1, incomplete staging retained, no PDF phase, no success/final directory. Full release evidence is recorded in TODO. No change affects the running original executable.
 
 Release verification completed for the bounded-writer change: full race suite passed (exporter 488.442 seconds), along with static checks, six ZIP/hash checks, macOS ARM64/Rosetta/Linux ARM64 packaged acceptance and the actual Linux exhaustion cases. Windows binaries/test executables compile; native Windows is still unverified. At the final live checkpoint, the original export was still active after about 22 h 29 min, rendering 189,211/1,907,456 records (9.9%) at about 70.3 records/second. Its rendering-only ETA was about 6 h 48 min, excluding later phases; no archive completion is claimed.
+
+## Final privacy-audit allocations (`0.13.1-dev`)
+
+The previous plain-text audit allocated a new 1 MiB read buffer for each file. A bounded fixture of small Markdown documents measured the following medians over three runs of three audit iterations each, before and after reusing one lazy buffer per traversal:
+
+| Fixture | Before allocation per audit | After allocation per audit | Before time | After time |
+| --- | ---: | ---: | ---: | ---: |
+| 64 text documents | 68.90 MB | 2.77 MB | 20.98 ms | 19.96 ms |
+| 512 text documents | 551.18 MB | 14.75 MB | 168.15 ms | 159.11 ms |
+
+The 512-document case reduced allocated bytes by about **97.3%**, while elapsed time improved only about **5.4%**. Allocation totals are not peak resident memory. Repeated warm synthetic documents on the development Mac do not establish cold-disk or complete-history performance; the original export was active on the same filesystem. Fixture creation, scanner initialization and cleanup are excluded; pathname/content checks and directory traversal are included. All privacy checks still execute.
+
+The implementation keeps 1 MiB reads and a 4 KiB overlap with fresh state for every file. It scans only the bytes actually returned by each read, including after a longer or rejected file. JSON and JSONL still scan decoded strings/numbers; PDFs still receive semantic validation. Empty/directory-only traversals now observe cancellation. Regression tests cover chunk-boundary credentials, email and denied hosts, separate fragments in adjacent files, stale buffer bytes, empty files, escaped JSON credentials, numeric financial values, later JSONL records, malformed JSON/PDF, PDF text leakage, private filenames and symlinks.
+
+```sh
+go test ./internal/exporter -run '^$' \
+  -bench '^BenchmarkFinalAuditSmallDocuments$' -benchtime=3x -count=3 -benchmem
+```
+
+Source privacy rules, disk sync, output layout and resume support are unchanged. Remaining scanner, decoded-token, directory-walk and graph costs need separate measurements; this is not a promise that the original running export will finish sooner.
+
+The decoded-JSON path now reuses a separate 32 KiB buffered reader with a fresh decoder for each file. A file-backed token-only fixture reduced underlying read calls, including EOF probes, from 4 to 2 for one row and from 24 to 3 for 512 rows. This isolates reader behavior, not policy scanning. The 512-record full JSON audit stayed around 76–78 ms; no material full-audit speedup is established. The production reader buffer is reused across files; the isolated comparison allocates one for each iteration.
+
+New reset/boundary tests also exposed an existing integrity bug: `Decoder.Token` can return EOF inside an unfinished container. The audit now rejects EOF with an open object/array. Regressions cover truncated keys/values/containers, malformed trailing input, incomplete later JSONL values, complete multi-value streams, duplicate-key secrets, fresh reader/decoder state after rejection, and secrets crossing the 32 KiB refill boundary. These changes retain all decoded-token privacy checks.
+
+Package verification for `0.13.1-dev` passed on macOS ARM64 (66.855 seconds including installers), Rosetta AMD64 (47.485 seconds), and isolated Linux ARM64, which also passed the new audit regressions and actual disk-exhaustion tests. All six ZIP checksums and four-file layouts were checked. Windows binaries and test executables compile; native Windows and real-history measurements remain open. Full combined-source `go test -race ./...` passed (exporter 477.861 seconds), along with vet, actionlint and zero reachable vulnerability findings. No binary upload or Actions job occurred.
+
+Latest live checkpoint: after about 23 h 02 min, the original executable was rendering 325,892/1,907,456 records (17.1%), at about 69.7 records/second. The rendering-only estimate was 6 h 18 min; later phases are excluded. Its roughly 4.92 GiB RSS and unchanged HTTP counters are observations, not source health or whole-run resource guarantees. The final directory is absent and staging remains active.
