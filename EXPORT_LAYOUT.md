@@ -182,6 +182,10 @@ The exporter queries projected persons directly with `POST /person/<person>/anno
 
 ### Measured reduction
 
+Refreshed read-only preview, 2026-09-30: **4,406 people → 1,373 retained, 3,033 omitted (68.8%)**, with six account identities already included. It completed in about 21 seconds with zero retries and one pacing backoff. All projected-person event counts were deliberately unqueried in profiles mode; unknown connectivity is reported explicitly. These are pre-privacy eligibility counts, not the final export outcome or identity merges.
+
+Historical comparison:
+
 Read-only preview, 2026-09-29, staging `12.6.29-staging`:
 
 | Measure | Count |

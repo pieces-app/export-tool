@@ -22,21 +22,22 @@ type PersonFacts struct {
 	Connections                                     int
 }
 type PeopleStats struct {
-	NameReviewGroups int    `json:"shared_name_review_groups"`
-	Total            int    `json:"total_persons"`
-	Personas         int    `json:"persons_with_personas"`
-	Profiles         int    `json:"persons_with_profiles"`
-	Summaries        int    `json:"persons_with_summaries"`
-	Connected        int    `json:"persons_above_connection_threshold"`
-	Account          int    `json:"account_persons"`
-	Unknown          int    `json:"persons_with_incomplete_selection_evidence"`
-	UnknownSummaries int    `json:"persons_with_unknown_summary_connectivity"`
-	Selected         int    `json:"selected_persons"`
-	Omitted          int    `json:"intentionally_omitted_persons"`
-	PlatformGroups   int    `json:"shared_platform_identity_groups"`
-	ReviewGroups     int    `json:"shared_email_review_groups"`
-	Mode             string `json:"mode"`
-	MinConnections   int    `json:"min_connections"`
+	NameReviewGroups        int    `json:"shared_name_review_groups"`
+	Total                   int    `json:"total_persons"`
+	Personas                int    `json:"persons_with_personas"`
+	Profiles                int    `json:"persons_with_profiles"`
+	Summaries               int    `json:"persons_with_summaries"`
+	Connected               int    `json:"persons_above_connection_threshold"`
+	Account                 int    `json:"account_persons"`
+	Unknown                 int    `json:"persons_with_incomplete_selection_evidence"`
+	UnknownSummaries        int    `json:"persons_with_unknown_summary_connectivity"`
+	UnknownEventConnections int    `json:"persons_with_unknown_event_connectivity"`
+	Selected                int    `json:"selected_persons"`
+	Omitted                 int    `json:"intentionally_omitted_persons"`
+	PlatformGroups          int    `json:"shared_platform_identity_groups"`
+	ReviewGroups            int    `json:"shared_email_review_groups"`
+	Mode                    string `json:"mode"`
+	MinConnections          int    `json:"min_connections"`
 }
 
 func object(v map[string]any, key string) map[string]any { m, _ := v[key].(map[string]any); return m }
@@ -120,6 +121,9 @@ func peopleStats(facts map[string]*PersonFacts, mode string, minConnections int)
 		if p.UnknownSummaries {
 			s.UnknownSummaries++
 		}
+		if p.UnknownConnections {
+			s.UnknownEventConnections++
+		}
 		if selectedPerson(p, mode, minConnections) {
 			s.Selected++
 		} else {
@@ -160,7 +164,7 @@ func nameCandidate(name string) string {
 	return strings.Join(parts, " ")
 }
 func (s PeopleStats) Print(w io.Writer) {
-	fmt.Fprintf(w, "People: %d read | persona %d | profile %d | known summary links %d (%d unknown) | ≥%d content connections %d | account identities %d\n", s.Total, s.Personas, s.Profiles, s.Summaries, s.UnknownSummaries, s.MinConnections, s.Connected, s.Account)
+	fmt.Fprintf(w, "People: %d read | persona %d | profile %d | known summary links %d (%d unknown) | ≥%d known content connections %d | source event counts unavailable/not queried %d | account identities %d\n", s.Total, s.Personas, s.Profiles, s.Summaries, s.UnknownSummaries, s.MinConnections, s.Connected, s.UnknownEventConnections, s.Account)
 	fmt.Fprintf(w, "People mode %s: retain %d, omit %d; incomplete selection evidence on %d people is retained conservatively.\n", s.Mode, s.Selected, s.Omitted, s.Unknown)
 	fmt.Fprintf(w, "Identity grouping across evaluated people: %d shared platform-ID groups; %d shared-email groups and %d shared-name groups need review (no automatic email/name merges).\n", s.PlatformGroups, s.ReviewGroups, s.NameReviewGroups)
 }
@@ -251,7 +255,7 @@ func PeopleReport(ctx context.Context, c *Client, mode string, threshold int, w 
 		p := facts[id]
 		classifyPerson(p, types)
 		if p.Projected {
-			records, e := personEvidence(ctx, c, p, false)
+			records, e := personEvidence(ctx, c, p, false, mode != "profiles")
 			if e != nil {
 				return PeopleStats{}, e
 			}
@@ -268,7 +272,7 @@ func PeopleReport(ctx context.Context, c *Client, mode string, threshold int, w 
 	}
 	fmt.Fprintln(w, "Missing person-to-summary projections remain unknown. Connected mode retains those people; profiles mode can explicitly select only persona/profile/account evidence.")
 	stats := peopleStats(facts, mode, threshold)
-	fmt.Fprintln(w, "People preview uses person-side retained references before privacy filtering; reverse-only links are reconciled during export. Direct persona/profile and event-count queries supplement projected records. No person names or bodies are printed.")
+	fmt.Fprintln(w, "People preview uses person-side retained references before privacy filtering; reverse-only links are reconciled during export. Direct persona/profile queries supplement projected records; profiles mode skips source event-count queries. No person names or bodies are printed.")
 	stats.Print(w)
 	if mode != "profiles" {
 		fmt.Fprintln(w, "Alternative explicit profile-only selection:")

@@ -71,7 +71,7 @@ func (s Selection) Print(w io.Writer) {
 	if s.Name == "summaries" {
 		fmt.Fprintln(w, "Inventory summaries, annotations, persons, and pipelines. Fetch tags, websites, sources, applications, ranges, and anchors only when referenced.")
 		fmt.Fprintln(w, "Event bodies, signals, hints, source-window history, and other unselected collections are skipped. Graph and website-origin coverage are reduced; secret and visible-URL filtering still apply.")
-		fmt.Fprintln(w, "Estimates cover the four inventoried collections; referenced supporting records and direct persona-history reads add work. Person connectivity can use a bounded association-count query, without reading event bodies.")
+		fmt.Fprintln(w, "Estimates cover the four inventoried collections; referenced supporting records and direct persona-history reads add work. Profiles mode skips event-count queries; all/connected people modes can query association totals without reading event bodies.")
 	}
 }
 

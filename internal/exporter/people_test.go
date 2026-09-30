@@ -115,7 +115,7 @@ func TestProjectedPeopleUseDirectProfileQueriesAndPreserveUnknownConnectivity(t 
 	if !facts.Projected || !selectedPerson(facts, "connected", 10) {
 		t.Fatal("missing embedded relationships treated as empty")
 	}
-	values, err = personEvidence(context.Background(), c, facts, false)
+	values, err = personEvidence(context.Background(), c, facts, false, true)
 	if err != nil || len(values) != 1 || facts.UnknownAnnotations {
 		t.Fatal("direct profile evidence unavailable")
 	}

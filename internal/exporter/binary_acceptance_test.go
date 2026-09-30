@@ -107,14 +107,18 @@ func TestPackagedCLI(t *testing.T) {
 }
 
 func TestPackagedSummaryCLI(t *testing.T) {
-	testPackagedSummaryCLI(t, []string{"--scope", "summaries"})
+	testPackagedSummaryCLI(t, []string{"--scope", "summaries"}, false)
 }
 
 func TestPackagedDefaultSummaryCLI(t *testing.T) {
-	testPackagedSummaryCLI(t, nil)
+	testPackagedSummaryCLI(t, nil, false)
 }
 
-func testPackagedSummaryCLI(t *testing.T, scopeFlags []string) {
+func TestPackagedProjectedSummaryCLI(t *testing.T) {
+	testPackagedSummaryCLI(t, nil, true)
+}
+
+func testPackagedSummaryCLI(t *testing.T, scopeFlags []string, projected bool) {
 	t.Helper()
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {
@@ -125,6 +129,12 @@ func testPackagedSummaryCLI(t *testing.T, scopeFlags []string) {
 		t.Fatal(err)
 	}
 	f := summaryScopeFixture()
+	if projected {
+		// Match the installed OS projection: recover persona history through
+		// the direct query rather than relying on embedded person relations.
+		delete(f.data["PERSONS"][0], "annotations")
+		delete(f.data["PERSONS"][0], "summaries")
+	}
 	unprofiled := record("unprofiled-person", "")
 	unprofiled["name"], unprofiled["annotations"], unprofiled["summaries"] = "Unprofiled person", refs(), refs()
 	f.data["PERSONS"] = append(f.data["PERSONS"], unprofiled)
@@ -149,17 +159,35 @@ func testPackagedSummaryCLI(t *testing.T, scopeFlags []string) {
 	out := filepath.Join(t.TempDir(), "summaries only")
 	args := append([]string{"export"}, common...)
 	args = append(args, "--output", out, "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
-	if b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput(); err != nil {
+	b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput()
+	wantStatus := "complete_for_implemented_scope"
+	if projected {
+		wantStatus = "partial"
+		if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 {
+			t.Fatalf("projected summary export must report partial coverage: %v\n%s", err, b)
+		}
+	} else if err != nil {
 		t.Fatalf("packaged summaries export failed: %v\n%s", err, b)
 	}
 	assertSummaryScopeRequests(t, f)
+	for _, call := range f.calls {
+		if strings.Contains(call, "/workstream_event_to_person_associations/") {
+			t.Fatal("profile-focused binary queried unnecessary event counts")
+		}
+	}
 	var manifest Manifest
-	b, err := os.ReadFile(filepath.Join(out, "manifest.json"))
-	if err != nil || json.Unmarshal(b, &manifest) != nil || manifest.Scope.Name != "summaries" || manifest.Status != "complete_for_implemented_scope" {
+	b, err = os.ReadFile(filepath.Join(out, "manifest.json"))
+	if err != nil || json.Unmarshal(b, &manifest) != nil || manifest.Scope.Name != "summaries" || manifest.Status != wantStatus {
 		t.Fatal("packaged summary scope manifest missing or incomplete")
+	}
+	if projected && (len(manifest.Issues) != 1 || manifest.Issues[0].Material != "PERSONS" || manifest.Issues[0].Code != "unverified_summaries_projection") {
+		t.Fatalf("projected export did not preserve the original coverage gap: %+v", manifest.Issues)
 	}
 	if manifest.People.Mode != "profiles" || manifest.People.Selected != 1 || manifest.People.Omitted != 1 {
 		t.Fatalf("default people selection did not retain only the profile: %+v", manifest.People)
+	}
+	if projected && manifest.People.UnknownEventConnections != 1 {
+		t.Fatal("binary did not preserve unqueried event-count evidence")
 	}
 	var paths map[string]string
 	b, _ = os.ReadFile(filepath.Join(out, "link-map.json"))
