@@ -108,6 +108,7 @@ Pieces-Export/
     annotations/                            # ordinary annotations and shared profile versions
     pipelines/                              # pipeline definitions
     signals/                                # individual signals, currently implemented
+    associations/<family>/<opaque-key>.md   # source metadata linked to both canonical endpoints
     events/...
     tags/...
     websites/...
@@ -259,3 +260,5 @@ PDF mode mirrors these documents under `pdf/signals/`, with the independent PDF 
 `rebuild --source <finalized-folder> --output <new-folder>` regenerates this layout offline and can add PDFs or narrow an all-people archive. Source files remain unchanged; original coverage gaps and privacy omissions persist. New format 5 state/graph/link-map checksums allow original user/projection evidence to survive rendering. Legacy format 4 imports remain partial. See [OFFLINE_REBUILD.md](OFFLINE_REBUILD.md).
 
 The `0.10.1-dev` cache reader also accepts canonical annotations embedded in the SDK's summary-body and description views. Their explicit OS fields use the same annotation paths and historical provenance as other recovered records. Provider keys never create file links. Candidate recovery and unresolved UI-only bindings are detailed in [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md#canonical-annotation-records-in-sdk-views).
+
+Association metadata starts with `0.11.0-dev`: observed typed pairs are looked up by default (`--associations linked`), with `--associations off` available to skip those extra reads. Canonical records use `data/associations/<family>/` or `raw/associations/<family>/`, with Markdown under `markdown/associations/<family>/` and mirrored PDFs under `pdf/associations/<family>/`. They appear in all-record chronology and backlink sections. Both endpoints must survive selection and privacy processing. Coverage is limited to observed pairs, not all possible associations; absent projection fields and failed lookups remain explicit gaps. See [association export behavior](EXPORT_SPEC.md#typed-association-metadata-export).

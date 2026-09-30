@@ -381,6 +381,9 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := r.preparePeople(); err != nil {
 		return r.manifest, err
 	}
+	if err := r.filterAssociationRecords(); err != nil {
+		return r.manifest, err
+	}
 	for _, m := range r.meta {
 		if m.ArchivePlaceholder {
 			continue

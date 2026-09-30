@@ -223,7 +223,9 @@ func verifySignalPrivacyCLI(t *testing.T, binary string, legacy bool) {
 		signal["workstream_events"] = refs()
 		event["signals"] = refs("signal")
 	}
-	f := &fakeOS{data: map[string][]map[string]any{"SIGNALS": {signal}, "ANNOTATIONS": {body}, "WORKSTREAM_EVENTS": {event}}}
+	association := record("signal-body-association", "2026-09-30T00:00:00Z")
+	association["signal"], association["annotation"], association["explanation"] = "signal", "body", "Private signal narrative sentinel"
+	f := &fakeOS{data: map[string][]map[string]any{"SIGNALS": {signal}, "ANNOTATIONS": {body}, "WORKSTREAM_EVENTS": {event}, "SIGNAL_TO_ANNOTATION_ASSOCIATIONS": {association}}}
 	srv := f.server(t)
 	defer srv.Close()
 	policy := DefaultPolicy()

@@ -150,3 +150,10 @@ func TestCLIExportExitCodesAndPrivateErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestAssociationValidationBeforeConnection(t *testing.T) {
+	var out, errs bytes.Buffer
+	if code := Run(context.Background(), []string{"export", "--associations", "invalid", "--launch-os=false", "--base-url", "http://127.0.0.1:1"}, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "associations must") {
+		t.Fatalf("association validation did not precede source access: %d %s", code, errs.String())
+	}
+}

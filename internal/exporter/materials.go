@@ -67,6 +67,9 @@ func SelectMaterials(selection string) ([]Material, error) {
 }
 
 func materialByType(t string) (Material, bool) {
+	if family, ok := associationFamilyByType(t); ok {
+		return family.material(), true
+	}
 	for _, m := range Materials {
 		if m.Type == t {
 			return m, true

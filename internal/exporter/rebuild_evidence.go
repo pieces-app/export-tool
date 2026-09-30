@@ -163,6 +163,11 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 			}
 		}
 		m.Edges = out
+		for _, expected := range m.AssociationEndpoints {
+			if !seen[expected] {
+				return errConfig("archive association graph omits a canonical endpoint")
+			}
+		}
 		sort.Slice(m.Edges, func(i, j int) bool {
 			if m.Edges[i].Relation != m.Edges[j].Relation {
 				return m.Edges[i].Relation < m.Edges[j].Relation

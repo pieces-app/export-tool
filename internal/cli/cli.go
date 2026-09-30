@@ -102,6 +102,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		mode := fs.String("mode", "filtered", "filtered or preserve; preserve includes original sensitive content")
 		policyPath := fs.String("policy", "", "JSON privacy policy; defaults to embedded secret and basic financial detection")
 		scope := fs.String("scope", "", "all (default) or summaries; summaries skips events and reads supporting labels only when referenced")
+		associations := fs.String("associations", "linked", "linked (default) reads metadata for observed typed pairs; off skips these extra reads")
 		materials := fs.String("materials", "", "custom comma-separated material types or all; cannot combine with --scope")
 		batch := fs.Int("batch-size", 50, "maximum IDs per batch (1–50); pacing starts smaller")
 		window := fs.Int("window-ids", 5000, "target ID count per adaptive time window")
@@ -232,6 +233,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if err != nil {
 			return fail(err)
 		}
+		if err := exporter.ValidateAssociations(*associations); err != nil {
+			return fail(err)
+		}
 		selection, err := exporter.SelectScope(*scope, *materials)
 		if err != nil {
 			return fail(err)
@@ -320,6 +324,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 		}
 		preflight.Print(stdout, *format)
+		fmt.Fprintf(stdout, "Association metadata: %s. Observed-pair lookups add work not included in the inventory estimate; they do not enumerate all associations. Scan/dry-run does not fetch this metadata.\n", *associations)
 		for _, material := range selected {
 			if material.Type == "SIGNALS" {
 				fmt.Fprintf(stdout, "Signals digest: %s; up to %d signals per split document and %d MiB per document. Approved sizes are measured after privacy filtering; PDF budgets apply separately.\n", signalDigest.Mode, signalDigest.RecordsPerPart, signalDigest.MaxPartMiB)
@@ -367,7 +372,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{Associations: *associations, Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)

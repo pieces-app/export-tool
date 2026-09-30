@@ -17,6 +17,7 @@ import (
 )
 
 type Options struct {
+	Associations                            string
 	Scope                                   string
 	ReferenceOnly                           map[string]bool
 	SDKCaches                               []string
@@ -54,6 +55,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	Associations            *AssociationCoverage     `json:"associations,omitempty"`
 	Naming                  string                   `json:"naming"`
 	Relationships           string                   `json:"relationships"`
 	Metadata                string                   `json:"metadata"`
@@ -93,6 +95,7 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	AssociationEndpoints                                           []Edge
 	ArchivePlaceholder                                             bool
 	ArchiveDataSHA256                                              string
 	SupplementableFields                                           map[string]bool
@@ -201,6 +204,9 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	if err := ValidateAssociations(o.Associations); err != nil {
+		return Manifest{}, err
+	}
 	o.SignalDigest = o.SignalDigest.defaults()
 	if err := o.SignalDigest.Validate(); err != nil {
 		return Manifest{}, err
@@ -303,7 +309,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 
 	r.manifest = Manifest{Naming: o.Naming, Relationships: o.Relationships, Metadata: o.Metadata, Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 5, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
 		"Retained local HTTP data only; not an atomic database backup or deleted history.",
-		"Association record metadata, supplementary analysis/settings views, and fingerprint audio downloads are not implemented in this version.",
+		"Association metadata covers observed pairs with included endpoints only, not a complete association inventory. Missing projections can hide pairs. Supplementary analysis/settings views and fingerprint audio downloads are not implemented.",
 		"Server projections can omit vectors and internal data. Binary attachments are not extracted; preserve mode retains exposed byte/encoded fields in JSON.",
 		"The dedicated summary-hierarchy endpoints recover direct parent/child edges when available. Summary annotation bodies and person/pipeline memberships still require relationship projections or an enumerable association API. A person association can mean authorship or involvement, not exclusive subject matter.",
 		"Selected scope controls which collections are read. Unselected relationships have no local links; event-derived source/person/website connections cannot be recovered when events are omitted. Domain filtering checks exposed URLs and known dependencies, not unseen origins.",
@@ -407,20 +413,26 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if ctx.Err() != nil {
 		return r.manifest, ctx.Err()
 	}
+	if err = r.recoverSDKCacheRelationships(); err != nil {
+		return r.manifest, err
+	}
+	r.reconcileAnnotationAttachments()
+	if err = r.exportAssociations(); err != nil {
+		return r.manifest, err
+	}
 	if o.Mode == "filtered" {
 		if err = r.rescanKnownCredentials(); err != nil {
 			return r.manifest, err
 		}
 	}
-	if err = r.recoverSDKCacheRelationships(); err != nil {
-		return r.manifest, err
-	}
-	r.reconcileAnnotationAttachments()
 	if err = r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
 	r.progress.Stage("Select people and build persona navigation", 0)
 	if err = r.preparePeople(); err != nil {
+		return r.manifest, err
+	}
+	if err = r.filterAssociationRecords(); err != nil {
 		return r.manifest, err
 	}
 	for _, meta := range r.meta {
@@ -648,6 +660,17 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 		meta.DataPath = "raw/" + m.Folder + "/" + name + ".json"
 	}
 	meta.Edges = extractEdges(m.Type, id, v)
+	if family, ok := associationFamilyByType(m.Type); ok {
+		ref := associationReference{id: id, left: fieldString(v, family.leftField), right: fieldString(v, family.rightField)}
+		if !validAssociationIdentity(ref.left) || !validAssociationIdentity(ref.right) {
+			return errConfig("association has invalid endpoint identities")
+		}
+		if err := validateAssociationRecord(family, v, ref); err != nil {
+			return err
+		}
+		meta.AssociationEndpoints = associationEndpoints(family, v)
+		meta.Edges = append(meta.Edges, meta.AssociationEndpoints...)
+	}
 	meta.ProjectionStates = projectionStates(m.Type, v)
 	if fields := cacheFields(m.Type); len(fields) > 0 {
 		meta.SupplementableFields = map[string]bool{}
@@ -692,6 +715,12 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 		}
 	}
 	meta.Title = title(v, m)
+	if family, ok := associationFamilyByType(m.Type); ok && meta.State == "included" {
+		if !reflect.DeepEqual(associationEndpoints(family, v), meta.AssociationEndpoints) {
+			meta.State = "withheld"
+			r.issue(m.Type, id, "sensitive_association_binding")
+		}
+	}
 	meta.Created = timestamp(v, "created")
 	meta.Updated = timestamp(v, "updated")
 	meta.AnnotationType = fieldString(v, "type")
@@ -869,6 +898,12 @@ func (r *run) filterGraph() error {
 			}
 			for _, e := range m.Edges {
 				target := r.meta[e.Target]
+				_, association := associationFamilyByType(m.Type)
+				if association && (target == nil || target.State != "included") {
+					m.State = "withheld"
+					changed = true
+					break
+				}
 				if target == nil || target.State == "included" {
 					continue
 				}
@@ -930,6 +965,11 @@ func (r *run) rescanKnownCredentials() error {
 		if err != nil || fieldString(clean, "id") != m.ID {
 			m.State = "withheld"
 			r.issue(m.Type, m.ID, "final_record_scan_failed")
+			continue
+		}
+		if family, ok := associationFamilyByType(m.Type); ok && !reflect.DeepEqual(associationEndpoints(family, clean), m.AssociationEndpoints) {
+			m.State = "withheld"
+			r.issue(m.Type, m.ID, "sensitive_association_binding")
 			continue
 		}
 		if stats.Denied {

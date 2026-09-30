@@ -256,6 +256,7 @@ func (r *run) render() error {
 		for _, block := range content(v) {
 			fmt.Fprintf(&b, "## %s\n\n%s\n\n", md(block.Path), rewriteMarkdown(block.Text, m.Path, r.meta))
 		}
+		renderAssociationMetadata(&b, m, v, r.meta)
 		// Summaries expose their narrative through annotation records, not a body field.
 		if m.Type == "WORKSTREAM_SUMMARIES" {
 			for _, e := range m.Edges {

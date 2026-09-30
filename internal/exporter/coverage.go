@@ -143,6 +143,14 @@ func (r *run) renderCoverage() error {
 	var b strings.Builder
 	scope := r.manifest.Scope
 	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\n## Selected export scope\n\n")
+	if a := r.manifest.Associations; a != nil {
+		fmt.Fprintf(&b, "Association metadata mode: `%s`. Reads cover observed typed pairs with two included, selected endpoints. Global enumeration is unknown; zero observed pairs does not prove an empty collection. A 404 can mean a missing record or an unavailable route. Offline rebuild retains original lookup coverage without contacting OS.\n\n", a.Mode)
+		b.WriteString("| Association family | Observed pairs | Lookups | 404/unknown | Unsupported | Failed | Not attempted |\n|---|---:|---:|---:|---:|---:|---:|\n")
+		for _, row := range a.Families {
+			fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %d | %d |\n", md(row.Family), row.Pairs, row.Lookups, row.Unavailable, row.Unsupported, row.Failed, row.Skipped)
+		}
+		b.WriteString("\n")
+	}
 	if info := r.manifest.Rebuild; info != nil {
 		fmt.Fprintf(&b, "This archive was rebuilt offline. No OS connection or new source reconciliation occurred. The original read interval was %s through %s. Initial, inventoried, fetched, and final counts describe that source read; included/excluded/withheld/omitted counts include subsequent rebuild decisions. Original coverage and people statistics remain in the manifest's rebuild section.\n\n", info.OriginalReadStarted.UTC().Format(time.RFC3339), info.OriginalReadFinished.UTC().Format(time.RFC3339))
 		if info.LegacyEvidence {

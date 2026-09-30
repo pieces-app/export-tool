@@ -58,6 +58,19 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 		f.calls = append(f.calls, r.Method+" "+r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		write := func(v any) { _ = json.NewEncoder(w).Encode(v) }
+		associationParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(associationParts) == 5 && r.Method == "GET" {
+			if family, ok := associationFamilyByName(associationParts[0]); ok && associationParts[1] == family.leftRoute && associationParts[3] == family.rightRoute {
+				for _, v := range f.data[family.material().Type] {
+					if fieldString(v, family.leftField) == associationParts[2] && fieldString(v, family.rightField) == associationParts[4] {
+						write(v)
+						return
+					}
+				}
+				http.NotFound(w, r)
+				return
+			}
+		}
 		if r.URL.Path == "/.well-known/health" || r.URL.Path == "/.well-known/version" {
 			if r.URL.Path == "/.well-known/health" {
 				write("ok:macos")

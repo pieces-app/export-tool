@@ -122,6 +122,9 @@ func TestSignalProjectionCoverage(t *testing.T) {
 			private := record("private-signal", "")
 			private["url"] = "https://bank.example/private"
 			f := &fakeOS{data: map[string][]map[string]any{"SIGNALS": {signal, private}, "ANNOTATIONS": {annotation}}}
+			association := record("signal-description-association", "2026-09-30T00:00:00Z")
+			association["signal"], association["annotation"] = "signal", "description"
+			f.data["SIGNAL_TO_ANNOTATION_ASSOCIATIONS"] = []map[string]any{association}
 			srv := f.server(t)
 			defer srv.Close()
 			client, _ := NewClient(srv.URL, time.Second, 8<<20)

@@ -37,6 +37,11 @@ func TestOrganizedCanonicalPathsSharedMembershipAndPrivacy(t *testing.T) {
 	both := record("shared-history", "2026-09-29T00:00:00Z")
 	both["type"], both["text"], both["persons"] = "PROFILE_DESCRIPTION", "Shared profile evidence.", refs("person-a", "person-b")
 	f := &fakeOS{data: map[string][]map[string]any{"WORKSTREAM_SUMMARIES": {temporal, unknown, study, shared}, "PIPELINES": {pa, pb, private}, "PERSONS": {personA, personB}, "ANNOTATIONS": {one, both}}, currentUserID: "user-a", userPersons: map[string]string{"user-a": "person-a"}}
+	for _, binding := range [][3]string{{"association-one", "pipeline-a", "shared"}, {"association-two", "pipeline-b", "shared"}, {"association-three", "pipeline-b", "study"}} {
+		v := record(binding[0], "2026-09-29T12:00:00Z")
+		v["pipeline"], v["workstreamSummary"] = binding[1], binding[2]
+		f.data["PIPELINE_TO_WORKSTREAM_SUMMARY_ASSOCIATIONS"] = append(f.data["PIPELINE_TO_WORKSTREAM_SUMMARY_ASSOCIATIONS"], v)
+	}
 	srv := f.server(t)
 	defer srv.Close()
 	c, _ := NewClient(srv.URL, time.Second, 8<<20)
