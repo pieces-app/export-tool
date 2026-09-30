@@ -226,9 +226,10 @@ func (r *run) render() error {
 			return err
 		}
 		if r.opts.Mode == "filtered" {
-			pruneReferences(v, r.meta)
-			if err = rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
-				return err
+			if pruneReferences(v, r.meta) {
+				if err = rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
+					return err
+				}
 			}
 		}
 		var b strings.Builder
@@ -480,7 +481,8 @@ func content(v map[string]any) []textBlock {
 	walk("", "", v)
 	return result
 }
-func pruneReferences(v map[string]any, metas map[string]*Meta) {
+func pruneReferences(v map[string]any, metas map[string]*Meta) bool {
+	changed := false
 	for field, t := range referenceTypes {
 		value, ok := v[field].(map[string]any)
 		if !ok {
@@ -489,12 +491,14 @@ func pruneReferences(v map[string]any, metas map[string]*Meta) {
 		denied := func(id string) bool { m := metas[t+"\x00"+id]; return m != nil && m.State != "included" }
 		if denied(fieldString(value, "id")) {
 			delete(v, field)
+			changed = true
 			continue
 		}
 		if indices, ok := value["indices"].(map[string]any); ok {
 			for id := range indices {
 				if denied(id) {
 					delete(indices, id)
+					changed = true
 				}
 			}
 		}
@@ -512,9 +516,13 @@ func pruneReferences(v map[string]any, metas map[string]*Meta) {
 					kept = append(kept, item)
 				}
 			}
-			value["iterable"] = kept
+			if len(kept) != len(items) {
+				value["iterable"] = kept
+				changed = true
+			}
 		}
 	}
+	return changed
 }
 func (r *run) transcript(b *strings.Builder, m *Meta) error {
 	type message struct {

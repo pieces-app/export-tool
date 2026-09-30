@@ -190,6 +190,14 @@ The person event-association endpoint supplies a source-side count without hydra
 
 This option reduces person documents and navigation clutter. It does not eliminate the selected events, hints, tags, annotations, or summaries, nor avoid fetching people to determine eligibility. A future personas-only material/closure preset is a separate task, not implied by `--people profiles`.
 
+## Local processing cost and unchanged records
+
+HTTP pacing does not measure local disk work. Privacy reconciliation still reads and sanitizes every retained record after late credential discovery. The implementation compares the original and sanitized values exactly and rewrites only changed values; a zero redaction count alone is insufficient because structural privacy transformations can also change a record. Changed files retain the existing temporary-file, sync, and rename behavior. Final output audits remain mandatory.
+
+During Markdown rendering, reference pruning reports whether it actually removed a private/non-included target. Canonical JSON is rewritten only in that case. Unchanged files retain their existing bytes and do not incur another flush. Privacy reconciliation now reports its examined-record count, rate, and phase estimate in both exports and offline rebuilds; this is not an estimate for all later rendering/validation work.
+
+A macOS ARM64 microbenchmark on this machine measured the old unconditional rewrite at approximately 11.1–11.3 ms per roughly 1 KiB synthetic record, versus 0.35–0.42 microseconds for exact comparison and retention. This isolates an avoided disk operation; it excludes reading, secret scanning, graph work, and Markdown/PDF rendering and must not be advertised as whole-export speedup. The already running `0.4.1-dev` process is unchanged and cannot acquire this optimization in place.
+
 ## Coverage reporting
 
 Every new export includes `coverage.md`, linked from its root index, and a `relationship_coverage` manifest array. For included workstream summaries, count the `annotations`, `persons`, and `pipelines` fields; for included persons and pipelines, count `summaries`. Preserve the original HTTP field-shape evidence before filtering references. Distinguish absent/null, malformed, explicit empty, and active-reference collections. An absent or malformed core projection makes the export partial with exit 2, even when initial/final material IDs match. Reverse edges may recover individual bodies and memberships without proving a complete projection. These are aggregate counts; no excluded titles, identifiers, or URLs enter the report. Preflight warns when its bounded samples encounter these gaps. Existing `0.4.1-dev` archives predate this stricter status rule.

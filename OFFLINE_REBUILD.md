@@ -18,6 +18,8 @@
 
 On Windows use `.\pieces-export.exe` with the same arguments. The command shows the number of included source records, original privacy mode, original coverage-issue count, destination, and cache warning before the usual `[Y/n]` confirmation. `--yes`/`-y` supports unattended use; EOF declines without creating a folder. Progress reports local stages and record counts, with no invented OS request metrics or network ETA.
 
+Privacy reconciliation reports examined records, throughput, and a phase estimate. It still scans every retained record, but avoids rewriting already-synced JSON when the sanitized value is exactly unchanged. Rendering similarly avoids rewriting JSON unless private references were removed. These checks reduce local disk work; they do not skip scanning, restore omitted data, or predict the duration of later stages.
+
 ## Input and output contract
 
 Only finalized archive formats 4 and 5 are supported. A finalized archive whose coverage status is `partial` is a valid input; an active or interrupted `.partial` directory is not. Missing/unfinalized manifests are rejected. The destination and its staging sibling must be new and outside the source, including when a parent is a symlink or a filesystem alias. Reads are rooted under the source directory; symbolic links, nonregular inputs, unsafe graph paths, duplicate mappings, invalid record identities, and mismatched counts fail without finalizing the output.

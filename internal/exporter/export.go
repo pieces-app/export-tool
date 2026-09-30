@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -397,7 +398,6 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		return r.manifest, ctx.Err()
 	}
 	if o.Mode == "filtered" {
-		r.progress.Stage("Privacy reconciliation", 0)
 		if err = r.rescanKnownCredentials(); err != nil {
 			return r.manifest, err
 		}
@@ -885,7 +885,12 @@ func generated(m *Meta) bool {
 
 // Credentials found late in a profile or Sensitive record may also occur in earlier prose.
 func (r *run) rescanKnownCredentials() error {
+	r.progress.Stage("Privacy reconciliation", len(r.meta))
 	for _, m := range r.sortedMeta() {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
+		r.progress.Add(1)
 		if m.State != "included" {
 			continue
 		}
@@ -910,8 +915,13 @@ func (r *run) rescanKnownCredentials() error {
 		m.SummaryDescriptor = fieldString(clean, "parentHierarchicalTypeDescriptor")
 		m.Created = timestamp(clean, "created")
 		m.Updated = timestamp(clean, "updated")
-		if err := rewriteJSON(filepath.Join(r.stage, m.DataPath), clean); err != nil {
-			return err
+		// Sanitize builds a separate value. Always run the full late-credential
+		// and domain checks, but retain the already-synced file when its value
+		// is identical. Redaction counts alone cannot establish equivalence.
+		if !reflect.DeepEqual(v, clean) {
+			if err := rewriteJSON(filepath.Join(r.stage, m.DataPath), clean); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
