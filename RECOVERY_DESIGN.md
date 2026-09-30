@@ -1,0 +1,144 @@
+# Resumable export and durable staging
+
+Updated 2026-09-30. **Design and storage experiment; not a shipped resume command.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+
+## Decision and implementation order
+
+Pursue a private, encrypted, batched SQLite workspace as the authoritative recovery input. SQLite is already a compiled dependency for SDK-cache recovery; users would not install another runtime. Keep the final archive as ordinary Markdown/PDF/JSON files. A database workspace is internal recovery state, not a replacement for the requested files and folders.
+
+Start with a tested store/key/ownership layer, then persist and restore actual exporter state. Integrate local rendering recovery before enabling interrupted source-fetch recovery: the latter additionally needs verified source identity and persisted inventory boundaries. These are implementation milestones toward full resume, not a change to the release objective. Do not advertise either milestone until its end-to-end tests pass.
+
+The current file writer still calls `File.Sync`. Keep that behavior until a separate replay and durability test proves a replacement. Adding a checkpoint database beside every unchanged file write will add overhead; it is not itself a performance fix. The eventual capture adapter must avoid duplicating authoritative persistence, then materialize ordinary output files from committed records. Measure both phases together.
+
+## Why existing files are insufficient
+
+Current source evidence:
+
+| State | Current location | Required recovery behavior |
+| --- | --- | --- |
+| Canonical records and record decisions | `run.store` in `internal/exporter/export.go` | Commit a record, its included/excluded/withheld decision, counters and source progress together. A missing file cannot be interpreted as intentional exclusion. |
+| Original projection shapes and cache eligibility | `Meta.ProjectionStates`, `SupplementableFields`, `RelationshipProjectionUnknown`, `PersonProjection` | Preserve before sanitization or reference pruning. An absent projection differs from a known empty relationship. |
+| Relationships and their provenance | `Meta.Edges`, `AssociationEndpoints`, `run.derivedEdges`, `associationEdges`, `cachedEdges` | Preserve typed endpoints and proofs, including dependencies needed to withhold derived content. Do not infer missing associations from names or timestamps. |
+| Person selection and account ownership | `PersonEvidence`, `run.people`, `userPersonIDs` | Preserve unknown evidence and verified user mappings. Recompute counts deterministically without merging identities. |
+| Credentials discovered during scanning | `Scanner.known`, `ObserveCredentials`, `remember` in `internal/exporter/policy.go` | Restore the complete accumulated matcher state before any replay, scan, render or final audit. Sanitized JSON no longer contains all values needed to reconstruct it. |
+| Inventory and association pagination | `run.inventory`, per-material windows and association-page state | Persist acknowledged work, stable boundaries and outstanding IDs. Replaying an unfinished batch must not double-count or skip records. |
+| Output paths and metadata | `assignPaths`, `run.documentMetadata` | Freeze naming only after privacy/person selection. Track dependent documents, sidecars and indexes together. |
+| Archive reconstruction evidence | `writeArchiveState` and `rebuild-state.jsonl` | This is produced near finalization and lacks the full live scanner/cursor state. It is not an interrupted-run checkpoint. |
+
+In particular, `store` can retain the original title and edges in `Meta` for an excluded/withheld record. Dumping the in-memory `run` or `Meta` structs as plaintext would expose information intentionally absent from the final filtered archive. The public rebuild evidence already handles excluded identities as opaque references; it must stay that way.
+
+## Workspace, keys, and ownership
+
+Planned layout, separate from the shareable archive:
+
+```text
+chosen-parent/
+  Pieces-Export.work/          # private recovery workspace; encrypted payloads
+    state.sqlite
+    state.sqlite-journal      # present only as required by SQLite
+    owner.lock
+  Pieces-Export.partial/       # generated output, still unfinished
+  Pieces-Export/               # appears only after final validation/rename
+
+per-user persistent state/
+  pieces-export/keys/<random-workspace-id>.key
+```
+
+The key must not be inside `.work`, `.partial`, the completed archive, a log, a manifest, a ZIP, or an environment variable. Create a random per-workspace key with exclusive creation in a private persistent user-state directory. Use restrictive permissions on POSIX and verified user-only ACLs on Windows. Resolve the platform state directory deliberately; a temporary/cache directory that the OS may purge is unsuitable for the only recovery key. Filesystem confinement, symlinks/reparse points, key-file replacement and ownership checks are implementation gates.
+
+Encrypt record payloads, scanner state, private IDs/relationships, configuration containing private paths, and metadata before passing them to SQLite. Journals and temporary tables must therefore receive ciphertext. Authenticate workspace ID, schema version, item kind, opaque identity and generation as associated data. Use a fresh nonce for every encryption with the standard library's authenticated-encryption API. Bound decoded and encrypted sizes before allocation. The storage experiment uses AES-GCM with a random 32-byte key; it does not implement production key management.
+
+This protects against exposing plaintext through a copied workspace alone. It does not protect against a process running as the same user that can read both the key and workspace, nor promise forensic erasure from backups, swap or storage snapshots. Missing/wrong keys and authentication failures stop recovery without modifying the workspace. Never generate a replacement key for existing encrypted state.
+
+Hold an OS-backed exclusive lock for the entire resume/export operation. A PID, timestamp, stale file, or elapsed timeout is not sufficient evidence that another writer stopped. Verify lock release after an abrupt process exit on each platform. Resume must refuse active ownership; it must never stop the owner. Relative paths must resolve inside their intended roots, and destination creation/final rename remain exclusive.
+
+## Transaction contract
+
+Use one controlled database connection initially. A capture transaction contains:
+
+1. Included canonical payloads or explicit non-inclusion decisions for the batch.
+2. Original relationship/projection evidence and privacy dependencies.
+3. Newly discovered credentials plus an authenticated complete scanner generation, with no plaintext credential columns.
+4. Inventory/page cursor, exact completed IDs and counter changes.
+5. The new checkpoint generation and its phase prerequisites.
+
+Commit before reporting records as durably captured. A failed/uncommitted transaction advances none of these items. An acknowledged transaction cannot leave the scanner or cursor behind its records. Deduplicate by stable material/ID within the workspace, and retain the distinction between initial fetch, replacement, reference hydration and omitted records.
+
+Bound transactions by both record count and encoded bytes; an HTTP batch of 50 can contain a very large record. Start performance experiments at 16 and 50 ordinary records, with large records committed alone under explicit size limits. Flush a partial batch on ordinary cancellation only when it is internally complete; otherwise roll it back. Never respond to a storage failure by fetching more source batches.
+
+The experiment uses `journal_mode=DELETE`, `synchronous=EXTRA`, `fullfsync=ON`, and verifies the values by reading them back. SQLite documents that EXTRA adds a directory sync after rollback-journal deletion, while `fullfsync` requests the macOS full-flush operation; unknown PRAGMAs can otherwise be silently ignored. The installed driver's Darwin implementation calls `fcntl(F_FULLFSYNC)` with an `fsync` fallback. These settings are a candidate baseline, not proof of power-loss durability on every filesystem. [SQLite PRAGMA reference](https://www.sqlite.org/pragma.html#pragma_synchronous), [fullfsync reference](https://www.sqlite.org/pragma.html#pragma_fullfsync).
+
+A process-exit test cannot certify hardware or OS power-loss behavior. Keep separate acceptance for disk-full, commit I/O errors, directory durability, unsupported filesystems and actual platform flush behavior. [SQLite's atomic-commit assumptions](https://www.sqlite.org/atomiccommit.html#hardware_assumptions).
+
+## Phase transitions and replay
+
+| Phase | Conditions for a committed boundary | Resume behavior |
+| --- | --- | --- |
+| Source capture | Exact initial inventory/window/page work, record decisions, scanner state and evidence committed together | Retry only unacknowledged work after verifying source continuity. Final source reconciliation remains required. |
+| Capture complete | Hierarchy, account/person evidence, reference closure, cache provenance, selected associations and final ID reads completed or explicitly reported unavailable | Later local phases make no new OS reads. Missing source evidence remains a coverage limitation. |
+| Privacy reconciliation | Full captured credential set frozen; every retained record evaluated for that generation | Restart or resume a proven per-record scan for the same generation. A newer credential generation invalidates earlier scan completion. |
+| Graph/person selection | Dependency propagation, association filtering and person choices complete | Restore all decisions; replay must not turn unknown evidence into an empty relationship or revive excluded nodes. |
+| Path assignment | Included identity set and naming/ranking settings frozen | Reuse verified paths; never renumber summaries partway through replay. |
+| Markdown, PDF, metadata | Each artifact group records expected bytes/hash, dependencies and completed persistence | Verify completed files before skipping. Recreate only owned, incomplete artifacts; never overwrite unrelated files. Native metadata needs its own readback/reapply policy. |
+| Validation | Full link and privacy audits run against the current final artifact generation | Re-run validation after any replayed/changed artifact. A previous audit marker alone is insufficient. |
+| Finalization | Final manifest, reconstruction evidence and destination checks pass | Preserve exclusive rename. A crash after rename must be distinguished from an unfinished archive before cleanup. |
+
+SQLite commits cannot atomically commit arbitrary output files. Artifact persistence therefore precedes the transaction marking those files complete. A crash between these operations may leave an unacknowledged file: verify its expected hash and ownership before adopting it, or regenerate it safely. A completion row without a matching file/hash is not success. Initial integration keeps existing file sync barriers. Reducing those barriers is a later, separately tested durability change.
+
+Authenticate and reconcile the expected item set/counts as well as individual blobs; authenticated ciphertext alone does not detect a deleted row or certify whole-workspace completeness. Detect mixed generations and conflicting output ownership. State rollback/replay must be explicit; encryption does not make a checkpoint an atomic snapshot of Pieces OS.
+
+During source-fetch recovery, a localhost port is not an identity. Establish a supported stable source/database identity and environment binding before enabling automatic continuation. Account IDs or a matching version alone do not prove the same database. If source continuity cannot be established, refuse automatic fetch resume; retain the checkpoint for diagnosis instead of silently combining databases. Even with verified identity, report source additions/deletions and the limits on detecting in-place edits across the interruption.
+
+Freeze scope, materials, policy/category hashes, privacy capabilities, SDK-cache evidence, people selection, timezone, naming, related-summary settings, digest/PDF options and schema compatibility. A resume is continuation of the same export. Changed selection/layout belongs in a later offline rebuild of a finalized archive. Define explicitly tested compatibility IDs; do not trust a generic development version string as schema compatibility.
+
+## Planned CLI and failure UX
+
+These commands are proposed and **do not exist yet**:
+
+```text
+pieces-export resume --work <workspace>
+pieces-export resume --work <workspace> --inspect
+```
+
+Inspection should report phase, committed/remaining aggregate counts, last successful checkpoint, source requirements, output destination, compatibility and key availability without reading source data or exposing private record fields. Resume acquires ownership before mutation, explains the verified restart point, and asks for confirmation unless `--yes` is given. Show current invocation elapsed time separately from cumulative export work and time spent stopped. Avoid whole-export ETAs while later stages remain unmeasured.
+
+Ordinary failures retain recoverable state and print a usable command only after a valid checkpoint is established. Key/config/source mismatches stop before source calls or file changes. Successful finalization cleans up the owned private workspace and key; a cleanup failure is reported without deleting the completed export. Installer cleanup removes its own utility files, not unfinished recovery inputs. Specify explicit discard behavior separately; do not implicitly discard a workspace when retrying.
+
+## Storage experiment and evidence
+
+`internal/exporter/recovery_storage_test.go` is test-only. The child receives an ephemeral key through stdin, commits 16 encrypted synthetic records, then writes another 512 records and updated cumulative scanner/cursor state in one transaction. A 64 KiB SQLite page cache forces the larger transaction to spill pages. The child calls `os.Exit` before or after commit, bypassing rollback/close/deferred cleanup. The parent checks the actual hot journal before reopening, database integrity, recovered row counts, matching scanner/cursor generation, payload authentication, wrong-key rejection and record-binding/tamper rejection. It inspects database/journal bytes for the synthetic credential markers and key. This is evidence for these fixtures, not a universal absence-of-plaintext or recovery guarantee.
+
+On macOS ARM64, focused race tests passed (3.696 seconds). The isolated Linux ARM64 executable also passed both cases (0.04 seconds): no network, source, OS cache, or real export mounted. Process-crash recovery kept 16 records before the second commit, and all 528 after it. Windows AMD64/ARM64 test executables compile, and vet/diff checks pass. Production checkpoint integration and native Windows acceptance remain open.
+
+The bounded benchmark stores 128 synthetic payloads of roughly 4 KiB, with three one-iteration samples on the development Mac while the original export remains active:
+
+| Storage path | Median time | Median records/second | Transactions per iteration |
+| --- | ---: | ---: | ---: |
+| Existing exclusive per-file write and sync | 1.188 s | 107.7 | Not applicable |
+| Encrypted SQLite, one record per commit | 3.493 s | 36.65 | 128 |
+| Encrypted SQLite, 16 records per commit | 0.364 s | 352.1 | 8 |
+| Encrypted SQLite, up to 50 records per commit | 0.142 s | 900.5 | 3 |
+
+Batching is essential: the one-record transactional case is slower. The 50-record case is about 8.4 times the isolated record-storage throughput, with synchronization enabled. It includes encryption, payload construction and scanner/cursor updates; setup and cleanup are excluded. It excludes HTTP reads, actual privacy scanning, full graph state, archive materialization, Markdown/PDF, metadata and validation. It is **not** an 8.4-times faster export claim or a reason to weaken file persistence.
+
+```sh
+go test -race ./internal/exporter -run '^TestRecoveryStorageAbruptExit$' -count=1 -v
+go test ./internal/exporter -run '^$' -bench '^BenchmarkRecoveryStorage$' \
+  -benchtime=1x -count=3 -benchmem
+```
+
+## Acceptance checklist
+
+- [x] Inventory in-memory recovery state and its privacy hazards from current source.
+- [x] Measure batched encrypted storage with synchronization enabled, including a one-record control.
+- [x] Test abrupt child-process exit with real spilled transactions, atomic record/scanner/cursor recovery, and ciphertext rejection on macOS and Linux ARM64.
+- [ ] Implement versioned production workspace schema, bounded reads, encrypted fields and authenticated completion evidence.
+- [ ] Implement persistent private key storage, ownership locks, path confinement, key-loss/config-mismatch behavior and safe cleanup on every target OS.
+- [ ] Add round-trip fixtures for every `Meta`, projection, association, person, cache and omission state; test credentials discovered before and after a checkpoint.
+- [ ] Integrate capture commits with counters/cursors and eliminate duplicate authoritative persistence; benchmark combined capture/materialization rather than the database alone.
+- [ ] Integrate privacy, graph, path and artifact phases; verify final content/decisions against an uninterrupted export after interruption at every boundary.
+- [ ] Establish stable source identity and interrupted pagination semantics before enabling source-fetch resume.
+- [ ] Test multiple resume attempts, active ownership, moved/tampered workspaces, missing keys, corrupted/truncated rows, disk-full/commit failures, cancellation and crash after final rename.
+- [ ] Validate crash/power-loss durability and any proposed file-sync reduction independently on supported filesystems.
+- [ ] Exercise the actual CLI and installer retention/cleanup on macOS/Linux/Windows; measure large-history CPU, memory, disk and whole-export time.
+- [ ] Validate a new real export/resume against the user's OS after the existing run finishes. Never convert the running old `.partial` folder by guessing missing evidence.

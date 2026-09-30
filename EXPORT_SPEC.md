@@ -321,6 +321,8 @@ Legacy profile-selection supplement: an explicit all-people report may recover a
 
 ## Failed output and finalization
 
+The planned replacement is specified in [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md), including encrypted scanner/relationship state, transactional progress, ownership, source continuity and artifact replay. Its storage experiment is verified separately; production resume is not implemented.
+
 A `.partial` folder remains unfinished even if it contains a provisional manifest. The CLI exits 1 on output failure; exit 2 applies only to a finalized archive with recorded coverage limitations. Late export/rebuild failures return `failed` status with no completion timestamp, and filesystem errors omit generated private paths while preserving their underlying causes. Resume is not implemented.
 
 Finalization must refuse an existing destination atomically, including an empty directory created after preflight. The implementation uses exclusive native rename operations and fails closed on unsupported filesystems; no overwrite fallback is permitted. Windows uses extended-length local/UNC paths, but native verification remains outstanding. See [failure tests and recovery limits](FAILURE_TESTING.md) for the actual Linux ENOSPC cases, portable cancellation/collision checks, and reproduction commands. A completed rename is not a claim of crash/power-loss durability.
