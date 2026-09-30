@@ -26,7 +26,7 @@ PDF limits and failure behavior are described in the [specification](EXPORT_SPEC
 
 ## Optional event history
 
-`--scope summaries` keeps this summary/persona/pipeline folder structure while omitting event bodies and other activity collections. Summary bodies are annotation records. Summaries, annotations, persons, and pipeline definitions are inventoried; supporting tags, websites, source applications, applications, ranges, and anchors are fetched only when referenced. `--scope all` retains the full export behavior and remains the default. `--people profiles` is an independent person-selection option.
+`--scope summaries` keeps this summary/persona/pipeline folder structure while omitting event bodies and other activity collections. Summary bodies are annotation records. Summaries, annotations, persons, and pipeline definitions are inventoried; supporting tags, websites, source applications, applications, ranges, and anchors are fetched only when referenced. New exports default to `--scope summaries --people profiles`. Use `--scope all` to select all supported collections, with all people by default. Explicit `--people` overrides either scope default; custom material selections retain all people unless overridden.
 
 `manifest.json` and `coverage.md` record scope and intentional omissions. Local links point only to included files. Suggestions can be less connected without event-derived source/person/website evidence. Domain rules still inspect exported URLs, but cannot recognize origins available only in skipped activity. See [the scope contract](EXPORT_SPEC.md#optional-event-history-and-summaries-scope).
 
@@ -174,8 +174,8 @@ The exporter queries projected persons directly with `POST /person/<person>/anno
 
 | Option | Selection |
 | --- | --- |
-| `--people all` (default) | Every readable, privacy-approved person |
-| `--people profiles` | Verified user mappings, explicit platform identities, retained persona/profile evidence, and conservatively retained unknown annotation evidence |
+| `--people all` (default for all/custom scope) | Every readable, privacy-approved person |
+| `--people profiles` (default for summaries scope) | Verified user mappings, explicit platform identities, retained persona/profile evidence, and conservatively retained unknown annotation evidence |
 | `--people connected` | Profile selection plus known summary associations, sufficient content connections, or unknown connectivity evidence |
 
 `--min-person-connections 10` controls the connected threshold. Counts use distinct included content IDs where available, supplemented by source event-association totals for projected persons. Source totals precede privacy filtering and do not mean every associated event survives. Ghost persons do not qualify solely by the connection threshold. `--people profiles` is a person selection option; it does not restrict all other material exports to personas.

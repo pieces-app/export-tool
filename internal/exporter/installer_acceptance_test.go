@@ -90,6 +90,9 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 				t.Fatal(err)
 			}
 			f := summaryScopeFixture()
+			unprofiled := record("unprofiled-person", "")
+			unprofiled["annotations"], unprofiled["summaries"] = refs(), refs()
+			f.data["PERSONS"] = append(f.data["PERSONS"], unprofiled)
 			secret := fakeSecret()
 			f.data["ANNOTATIONS"][0]["text"] = "Actual summary narrative with [a person](pieces://persons/person). Synthetic credential: " + secret
 			partial := scenario == "partial-remove"
@@ -111,7 +114,7 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 				}
 				args = append(args, cleanup)
 			}
-			args = append(args, "--", "--base-url", osServer.URL, "--scope", "summaries", "--launch-os=false", "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
+			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", args...)
@@ -173,6 +176,9 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 			b, err := os.ReadFile(filepath.Join(out, "manifest.json"))
 			if err != nil || json.Unmarshal(b, &manifest) != nil || manifest.Status != wantStatus || manifest.Scope.Name != "summaries" {
 				t.Fatal("cleanup lost or changed the finalized archive or its coverage status")
+			}
+			if manifest.People.Mode != "profiles" || manifest.People.Selected != 1 || manifest.People.Omitted != 1 {
+				t.Fatal("installed default export lost profile selection")
 			}
 			paths := map[string]string{}
 			b, err = os.ReadFile(filepath.Join(out, "link-map.json"))
@@ -237,7 +243,7 @@ function Get-PiecesReleaseFile {
  if ((Get-Item -LiteralPath $source).Length -gt $MaxBytes) { throw 'Fixture exceeds download limit.' }
  Copy-Item -LiteralPath $source -Destination $Destination
 }
-$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--scope','summaries','--launch-os=false','--close-desktop=false','--yes','--format','both','--metadata','off')}
+$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--format','both','--metadata','off')}
 exit (Invoke-PiecesBootstrap @options)
 `
 	path := filepath.Join(t.TempDir(), "bootstrap-test.ps1")

@@ -31,14 +31,14 @@ The default `filtered` mode removes detected secrets and basic financial identif
 
 `--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. There is no resume yet; choose a new path after a failed run. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
 
-## Export summaries without event history
+## Summaries and personas by default
 
-Use `--scope summaries` for summaries and persona/profile documents:
+New builds default to `--scope summaries --people profiles` for summaries and persona/profile documents:
 
 ```sh
-./pieces-export export --scope summaries --people profiles --output ./exports/summaries
-./pieces-export export --scope summaries --dry-run --launch-os=false
-# The existing all-data behavior remains available and is the default.
+./pieces-export export --output ./exports/summaries
+./pieces-export export --dry-run --launch-os=false
+# Explicitly request all supported collections, including activity history.
 ./pieces-export export --scope all --output ./exports/all-data
 ```
 
@@ -79,7 +79,7 @@ Adaptive pacing is on by default: one outstanding data request, batches starting
 
 Final privacy auditing reuses one raw-text read buffer per traversal while keeping file boundaries, JSON decoding and semantic PDF checks intact. JSON reads also use bounded buffering with fresh per-file decoders, and truncated JSON containers fail validation. This reduces allocation overhead; it does not skip scans or establish full-history performance.
 
-`--people all` preserves all included identities by default. `profiles` selects persona/profile-bearing people and stored account identities; `connected` additionally keeps summary-linked/high-connectivity people. Missing evidence is retained conservatively. Selection does not remove summaries/events or merge names/emails. In the live pre-privacy preview, `profiles` retained **1,373 of 4,291 persons**, omitting **2,918 (68.0%)**. That is meaningful for person documents and navigation, not a 68% reduction in the entire export. The current OS omits person-to-summary projections, so `connected` conservatively retains all 4,291. Twelve same-name candidate groups were identified for review; no automatic identity merges occurred.
+`--people profiles` is the default for summaries scope. Explicit `--scope all` and custom `--materials` default to `--people all`; an explicit `--people` always overrides the scope default. `profiles` selects persona/profile-bearing people and stored account identities; `connected` additionally keeps summary-linked/high-connectivity people. Missing evidence is retained conservatively. Selection does not remove summaries/events or merge names/emails. In the live pre-privacy preview, `profiles` retained **1,373 of 4,291 persons**, omitting **2,918 (68.0%)**. That is meaningful for person documents and navigation, not a 68% reduction in the entire export. The current OS omits person-to-summary projections, so `connected` conservatively retains all 4,291. Twelve same-name candidate groups were identified for review; no automatic identity merges occurred.
 
 ## What this version implements
 

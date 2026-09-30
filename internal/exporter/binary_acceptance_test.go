@@ -107,6 +107,15 @@ func TestPackagedCLI(t *testing.T) {
 }
 
 func TestPackagedSummaryCLI(t *testing.T) {
+	testPackagedSummaryCLI(t, []string{"--scope", "summaries"})
+}
+
+func TestPackagedDefaultSummaryCLI(t *testing.T) {
+	testPackagedSummaryCLI(t, nil)
+}
+
+func testPackagedSummaryCLI(t *testing.T, scopeFlags []string) {
+	t.Helper()
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {
 		t.Skip("set PIECES_EXPORT_TEST_BINARY to the native release executable")
@@ -116,15 +125,21 @@ func TestPackagedSummaryCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	f := summaryScopeFixture()
+	unprofiled := record("unprofiled-person", "")
+	unprofiled["name"], unprofiled["annotations"], unprofiled["summaries"] = "Unprofiled person", refs(), refs()
+	f.data["PERSONS"] = append(f.data["PERSONS"], unprofiled)
 	srv := f.server(t)
 	defer srv.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	common := []string{"--scope", "summaries", "--base-url", srv.URL, "--launch-os=false"}
-	for _, command := range []string{"scan", "benchmark"} {
+	common := append([]string{"--base-url", srv.URL, "--launch-os=false"}, scopeFlags...)
+	for _, command := range []string{"scan", "benchmark", "export"} {
 		args := append([]string{command}, common...)
 		if command == "benchmark" {
 			args = append(args, "--benchmark-reads", "1", "--benchmark-duration", "5s")
+		}
+		if command == "export" {
+			args = append(args, "--dry-run", "--benchmark-reads", "1", "--benchmark-duration", "5s")
 		}
 		b, err := exec.CommandContext(ctx, binary, args...).CombinedOutput()
 		if err != nil || !strings.Contains(string(b), "Export scope: summaries") {
@@ -143,10 +158,16 @@ func TestPackagedSummaryCLI(t *testing.T) {
 	if err != nil || json.Unmarshal(b, &manifest) != nil || manifest.Scope.Name != "summaries" || manifest.Status != "complete_for_implemented_scope" {
 		t.Fatal("packaged summary scope manifest missing or incomplete")
 	}
+	if manifest.People.Mode != "profiles" || manifest.People.Selected != 1 || manifest.People.Omitted != 1 {
+		t.Fatalf("default people selection did not retain only the profile: %+v", manifest.People)
+	}
 	var paths map[string]string
 	b, _ = os.ReadFile(filepath.Join(out, "link-map.json"))
 	if err := json.Unmarshal(b, &paths); err != nil {
 		t.Fatal(err)
+	}
+	if paths[opaque("PERSONS", "unprofiled-person")] != "" || !strings.HasPrefix(paths[opaque("ANNOTATIONS", "profile")], "workstream_summaries/personas/users/") {
+		t.Fatal("profile selection or verified user history paths incorrect")
 	}
 	b, err = os.ReadFile(filepath.Join(out, paths[opaque("WORKSTREAM_SUMMARIES", "summary")]))
 	if err != nil || !strings.Contains(string(b), "Actual summary narrative") {

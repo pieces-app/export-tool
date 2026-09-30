@@ -101,7 +101,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		out := fs.String("output", "pieces-export-"+time.Now().Format("20060102-150405"), "new output directory (must not exist)")
 		mode := fs.String("mode", "filtered", "filtered or preserve; preserve includes original sensitive content")
 		policyPath := fs.String("policy", "", "JSON privacy policy; defaults to embedded secret and basic financial detection")
-		scope := fs.String("scope", "", "all (default) or summaries; summaries skips events and reads supporting labels only when referenced")
+		scope := fs.String("scope", "", "summaries (default) or all; summaries skips events and reads supporting labels only when referenced")
 		associations := fs.String("associations", "linked", "linked (default) reads observed-pair metadata and selected person/event pages; off skips these extra reads")
 		materials := fs.String("materials", "", "custom comma-separated material types or all; cannot combine with --scope")
 		batch := fs.Int("batch-size", 50, "maximum IDs per batch (1–50); pacing starts smaller")
@@ -129,7 +129,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		dryRun := fs.Bool("dry-run", false, "scan plus bounded read calibration; no export files or Desktop closure")
 		benchmarkDuration := fs.Duration("benchmark-duration", 30*time.Second, "maximum time for bounded read calibration (up to 2m)")
 		benchmarkReads := fs.Int("benchmark-reads", 40, "maximum calibration batch reads (1–100)")
-		people := fs.String("people", "all", "all, profiles, or connected; focused selection does not merge identities")
+		people := fs.String("people", "", "profiles (default for summaries), all (default for all/custom scope), or connected; does not merge identities")
 		minConnections := fs.Int("min-person-connections", 10, "distinct content connections to qualify in connected mode; profiles and summary-linked people always qualify")
 		peopleReport := fs.Bool("people-report", false, "read persons and referenced annotation types for an aggregate selection preview")
 		metadata := fs.String("metadata", "auto", "auto native attributes or off; portable sidecars always included")
@@ -157,7 +157,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if (*performance != "adaptive" && *performance != "conservative") || *targetLatency < 50*time.Millisecond || *targetLatency > 5*time.Second || *benchmarkDuration <= 0 || *benchmarkDuration > 2*time.Minute || *benchmarkReads < 1 || *benchmarkReads > 100 {
 			return fail(fmt.Errorf("invalid performance mode, target-latency (50ms–5s), or benchmark budget"))
 		}
-		if (*people != "all" && *people != "profiles" && *people != "connected") || *minConnections < 1 {
+		if (*people != "" && *people != "all" && *people != "profiles" && *people != "connected") || *minConnections < 1 {
 			return fail(fmt.Errorf("people must be all, profiles, or connected; min-person-connections must be positive"))
 		}
 
@@ -243,6 +243,12 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		selection, err := exporter.SelectScope(*scope, *materials)
 		if err != nil {
 			return fail(err)
+		}
+		if *people == "" {
+			*people = "all"
+			if selection.Name == "summaries" {
+				*people = "profiles"
+			}
 		}
 		selected := selection.Materials
 		inventoried := selection.InventoryMaterials()
@@ -409,7 +415,7 @@ Usage:
   pieces-export scan [--environment production|staging] [--launch-os=false]
   pieces-export benchmark [--benchmark-duration 30s] [--people-report]
   pieces-export export --dry-run [--people connected --people-report]
-  pieces-export export --scope summaries --output ./my-summaries [--yes]
+  pieces-export export --output ./my-summaries [--yes]
   pieces-export export --scope all --output ./my-export [--format markdown|pdf|both] [--yes]
   pieces-export export --output ./private-originals --mode preserve
   pieces-export rebuild --source ./finished-export --output ./rebuilt --format both
@@ -419,6 +425,7 @@ Usage:
   pieces-export version
 
 Use a command followed by -h for flags. Export reads only loopback OS APIs.
+Default: summaries and persona profiles. Use --scope all for activity history.
 Filtered mode embeds secret detection; no Python or separate scanner is required.
 Website categories require local domain lists; they are not enabled by default.
 Exit codes: 0 completed within implemented scope, 1 failed, 2 partial export.

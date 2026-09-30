@@ -17,10 +17,10 @@ func TestSelectScope(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if name != "summaries" && len(s.Materials) != len(Materials) {
-			t.Fatal("all-data default changed")
+		if name == "all" && (s.Name != "all" || len(s.Materials) != len(Materials)) {
+			t.Fatal("explicit all-data selection changed")
 		}
-		if name == "summaries" && (len(s.InventoryMaterials()) != 4 || len(s.ReferenceOnly) != 6) {
+		if name != "all" && (s.Name != "summaries" || len(s.InventoryMaterials()) != 4 || len(s.ReferenceOnly) != 6) {
 			t.Fatal("unexpected summary roots/supporting types")
 		}
 	}

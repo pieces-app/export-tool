@@ -4,7 +4,11 @@ Observed 2026-09-30 against the original running `0.4.1-dev` export. The user re
 
 ## What is taking time
 
-The current bottleneck is local record processing, with repeated durable file rewrites a major cost. This is not an acceptable production-throughput result.
+The export selected the wrong default workload for a summary-focused product, then multiplied it with inefficient persistence. The current bottleneck is local record processing, with repeated durable file rewrites a major cost. This is not an acceptable production-throughput result or an inherent requirement of exporting summaries.
+
+“Render Markdown” means generating document text, relative links, relationship pages, and navigation indexes and writing them to disk. It is not a UI renderer. The original run creates a Markdown document for every included material record, including events, hints, and tags. It requested Markdown only, so PDF conversion does not explain its rendering time.
+
+On 2026-09-30 the development CLI default changed to `--scope summaries --people profiles`. All-data export now requires explicit selection. Supporting annotations still require inventory because the installed OS omits some summary-body associations; this is more work than 11,732 summary JSON reads. It does not require event/hint history. End-to-end speed on the real database remains unmeasured. The native compiled CLI passed synthetic default scan/dry-run/export, retained body/profile, privacy and moved Markdown/PDF-link checks. The correction is now packaged in `0.14.0-dev`; actual ZIP/default-command and installer acceptance passed on available macOS/Linux runtimes. The original running binary and older release ZIPs retain their previous defaults.
 
 - At the checkpoint the process had run about **21 h 40 min**, including more than **4 h 15 min** in privacy reconciliation. Collection fetching/writing and final identity reads occupied roughly the preceding **17 h 24 min**. That earlier interval includes local work; it is not 17 hours of measured server latency.
 - Initial preflight counted approximately **1,906,002 records**, not just summary documents. Staged counts included 689,546 events, 681,479 hints, 284,287 tags and 11,732 summaries. These are pre-final-privacy counts, not accepted archive totals.
@@ -43,8 +47,10 @@ These changes do **not** remove the per-file flush from first writes or every ge
 ## Next work and acceptance
 
 - [ ] Finish and validate the existing run; do not treat its staged files as a resumable or finalized archive.
+- [x] Make summaries/profile documents the default, with all supported collections explicit. Verify the actual compiled CLI skips event bodies and full supporting inventories, retains bodies/persona history, and preserves valid moved Markdown/PDF links. Explicit people overrides and custom selections remain supported.
 - [x] Add aggregate local diagnostics for new exports/rebuilds: phase timing/counts, canonical JSON reads, scans, writes, syncs and unchanged-rewrite skips. Terminal counters distinguish last HTTP latency from current local work. Reports at finalization or ordinary failure contain no record-derived values. See [measurement boundaries and exclusions](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev); operation timing overlaps and is not an exclusive CPU/I/O breakdown.
 - [ ] Measure the newer summaries-focused path and a representative complete-history path with the actual OS, without concurrent readers. Compare final eligible record/body/graph counts as well as time and resources.
+- [ ] After measuring summary scope, reduce unrelated annotation/supporting-document work only where authoritative associations prove it safe. Keep canonical data, coverage and local link destinations consistent; do not drop files while leaving graph links to them. Evaluate consolidated/indexed presentation of optional all-data history separately from summary documents.
 - [ ] Replace excessive per-file flush work with a reviewed checkpoint/durability design. Keep cancellation, disk-full handling and exclusive finalization; validate crash recovery before weakening any existing persistence guarantee. Do not merely disable `Sync` to obtain a benchmark win.
 - [ ] Add resumable, checksummed staging and disk-backed inventory/graph storage. The current old run has no supported resume path; switching binaries would require a new run and separate validation.
 - [ ] Profile the later graph/rendering/audit stages at actual scale. No reliable remaining-time estimate exists for the old run, and the active rendering phase is not the last phase.

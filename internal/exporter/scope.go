@@ -34,7 +34,7 @@ func SelectScope(scope, materials string) (Selection, error) {
 		return s, err
 	}
 	if scope == "" {
-		scope = "all"
+		scope = "summaries"
 	}
 	s.Name = scope
 	switch scope {

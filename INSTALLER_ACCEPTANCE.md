@@ -4,7 +4,7 @@ Recorded 2026-09-29–30 using the existing, unmodified `0.8.6-dev` release ZIPs
 
 ## Verified behavior
 
-`internal/exporter/installer_acceptance_test.go` supplies a synthetic OS with a summary, its annotation body, a user persona/profile, and referenced tags/source. The actual bootstrap verifies and extracts the actual release package, then invokes `export --scope summaries --format both --yes --launch-os=false --close-desktop=false --metadata off` against that fixture.
+`internal/exporter/installer_acceptance_test.go` supplies a synthetic OS with a summary, its annotation body, a user persona/profile, and referenced tags/source. The actual bootstrap verifies and extracts the actual release package, then invokes `export --format both --yes --launch-os=false --close-desktop=false --metadata off` against that fixture. Starting with the `0.14.0-dev` acceptance run, the test omits scope and people flags and asserts summaries/profile defaults; earlier runs explicitly selected summaries.
 
 Every case checks the finalized manifest, summary scope, output retention, PDF index, credential filtering, and Markdown/PDF link audits after relocating the archive. Complete cases also check summary text and inventory reconciliation. The source fixture records requests so the test can reject event-body reads and unexpected inventories.
 
@@ -98,3 +98,7 @@ The actual release ZIPs passed the existing Bash local-HTTPS complete/remove, co
 ## Final audit buffering (`0.13.1-dev`)
 
 The actual ZIP installer cases passed on macOS ARM64 (Bash local HTTPS; PowerShell 7 substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). Complete/remove, complete/keep and partial/remove retained exports and preserved exit status. Broader packaged export/rebuild/privacy/PDF/link cases passed on macOS ARM64 (66.855 seconds including installers), Rosetta AMD64 (47.485 seconds), and Linux ARM64. The executable now reuses bounded audit buffers and rejects unfinished JSON containers; scripts and the published Gist are unchanged. These fixtures do not close native Windows, real migration or public-hosting acceptance.
+
+## Summaries/profile default (`0.14.0-dev`)
+
+The actual ZIP default-command tests passed on macOS ARM64 (Bash local HTTPS; PowerShell 7 substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). They omit scope/people flags, retain the fixture profile, and omit a person with explicit empty profile/summary evidence. Complete/remove, complete/keep and partial/remove still preserve export folders and return the CLI status. Default scan, dry run and export also passed direct-binary tests on macOS ARM64, Rosetta AMD64 and Linux ARM64, with no event bodies or whole supporting-collection inventories read. These checks do not establish large-database runtime, native Windows, real OS lifecycle, public hosting or clean-machine trust behavior. Bootstrap scripts and the published Gist did not change.

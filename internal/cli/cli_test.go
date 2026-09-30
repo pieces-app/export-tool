@@ -69,6 +69,58 @@ func TestScopeValidationBeforeConnection(t *testing.T) {
 	}
 }
 
+func TestScopeAndPeopleDefaultsBeforeConfirmation(t *testing.T) {
+	for _, test := range []struct {
+		name, scope, people string
+		flags               []string
+	}{
+		{"default", "summaries", "profiles", nil},
+		{"explicit_summaries", "summaries", "profiles", []string{"--scope", "summaries"}},
+		{"all", "all", "all", []string{"--scope", "all"}},
+		{"custom", "custom", "all", []string{"--materials", "USERS"}},
+		{"custom_all", "custom", "all", []string{"--materials", "all"}},
+		{"people_override", "summaries", "all", []string{"--people", "all"}},
+		{"connected_override", "summaries", "connected", []string{"--people", "connected"}},
+		{"all_profiles_override", "all", "profiles", []string{"--scope", "all", "--people", "profiles"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				var value any
+				switch r.URL.Path {
+				case "/.well-known/health":
+					value = "ok:macos"
+				case "/.well-known/version":
+					value = "12.3.108"
+				case "/materials/metrics":
+					value = map[string]any{"total_count": 0}
+				default:
+					value = map[string]any{"iterable": []any{}}
+				}
+				_ = json.NewEncoder(w).Encode(value)
+			}))
+			defer srv.Close()
+			path := filepath.Join(t.TempDir(), "archive")
+			args := []string{"export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--format", "markdown", "--output", path}
+			args = append(args, test.flags...)
+			var out, errs bytes.Buffer
+			if code := RunWithInput(context.Background(), args, strings.NewReader("n\n"), &out, &errs, "test"); code != 0 {
+				t.Fatalf("preflight failed: %d %s", code, errs.String())
+			}
+			for _, expected := range []string{"Export scope: " + test.scope, "People: " + test.people, "Canceled; no export created."} {
+				if !strings.Contains(out.String(), expected) {
+					t.Fatalf("preflight omitted %q: %s", expected, out.String())
+				}
+			}
+			for _, candidate := range []string{path, path + ".partial"} {
+				if _, err := os.Lstat(candidate); !os.IsNotExist(err) {
+					t.Fatal("canceled preflight created an output directory")
+				}
+			}
+		})
+	}
+}
+
 func TestPDFLimitsValidatedBeforeConnectionOrArchiveReads(t *testing.T) {
 	for _, command := range []string{"export", "rebuild"} {
 		for _, flags := range [][]string{{"--pdf-max-pages", "0"}, {"--pdf-max-pages", "10001"}, {"--pdf-max-input-mib", "129"}, {"--pdf-max-output-mib", "-1"}} {
