@@ -88,7 +88,7 @@ func assertAssociationArchive(t *testing.T, root string, m Manifest, policy Poli
 	if strings.Contains(fieldString(v, "explanation"), secret) {
 		t.Fatal("association credential was not redacted")
 	}
-	if m.Associations == nil || m.Associations.Mode != "linked" || m.Associations.Enumeration != "observed_pairs_only" {
+	if m.Associations == nil || m.Associations.Mode != "linked" || m.Associations.Enumeration != "observed_pairs_and_person_pages" {
 		t.Fatal("association read scope was not recorded")
 	}
 	for _, row := range m.Associations.Families {

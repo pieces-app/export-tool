@@ -94,6 +94,13 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 }
 
 func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map[string]*Meta) error {
+	associationProofs := map[string]*Meta{}
+	r.associationEdges = map[Edge]string{}
+	for _, m := range byPath {
+		if m.Type == "WORKSTREAM_EVENT_TO_PERSON_ASSOCIATIONS" {
+			associationProofs[opaque(m.Type, m.ID)] = m
+		}
+	}
 	expected := ""
 	if state != nil {
 		expected = state.GraphSHA256
@@ -104,8 +111,24 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 			return errConfig("archive graph has an unresolved or invalid edge")
 		}
 		e := Edge{source.Key, target.Key, row.Relation}
+		if row.Provenance != "association_record" && row.AssociationRef != "" {
+			return errConfig("archive edge has an unexpected association proof")
+		}
 		source.Edges = append(source.Edges, e)
 		switch row.Provenance {
+		case "association_record":
+			proof := associationProofs[row.AssociationRef]
+			if proof == nil || row.CacheEvidence != nil {
+				return errConfig("archive association edge proof is missing or contradictory")
+			}
+			valid := false
+			for _, expected := range eventPersonEvidenceEdges(proof) {
+				valid = valid || expected == e
+			}
+			if !valid {
+				return errConfig("archive association edge contradicts its canonical endpoint bindings")
+			}
+			r.associationEdges[e] = proof.Key
 		case "":
 		case "derived_inverse":
 			r.derivedEdges[e] = true

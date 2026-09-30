@@ -144,12 +144,17 @@ func (r *run) renderCoverage() error {
 	scope := r.manifest.Scope
 	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\n## Selected export scope\n\n")
 	if a := r.manifest.Associations; a != nil {
-		fmt.Fprintf(&b, "Association metadata mode: `%s`. Reads cover observed typed pairs with two included, selected endpoints. Global enumeration is unknown; zero observed pairs does not prove an empty collection. A 404 can mean a missing record or an unavailable route. Offline rebuild retains original lookup coverage without contacting OS.\n\n", a.Mode)
+		fmt.Fprintf(&b, "Association metadata mode: `%s`. Reads cover observed typed pairs and bounded event/person pages when both material types are selected. Both endpoints must survive filtering. Global enumeration is unknown; zero observed pairs does not prove an empty collection. A 404 can mean a missing record or an unavailable route. Offline rebuild retains original lookup coverage without contacting OS.\n\n", a.Mode)
 		b.WriteString("| Association family | Observed pairs | Lookups | 404/unknown | Unsupported | Failed | Not attempted |\n|---|---:|---:|---:|---:|---:|---:|\n")
 		for _, row := range a.Families {
 			fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %d | %d |\n", md(row.Family), row.Pairs, row.Lookups, row.Unavailable, row.Unsupported, row.Failed, row.Skipped)
 		}
 		b.WriteString("\n")
+		for _, row := range a.Families {
+			if p := row.Pagination; p != nil {
+				fmt.Fprintf(&b, "Event/person pagination: %d selected persons; %d attempted, %d reconciled, %d page reads and %d returned rows. Unavailable/unsupported persons: %d; explicit unsupported: %d; unsupported pagination schema: %d; failed: %d; unstable: %d; not attempted: %d; unavailable event endpoints: %d. Pages include terminal/head verification reads. Reconciliation checks totals, duplicates, and boundary/head changes, but cannot prove a snapshot or detect every in-place edit in middle pages. Ordinary endpoint projections are left unchanged. New graph edges cite their retained canonical association records.\n\n", p.Persons, p.Attempted, p.Reconciled, p.Pages, p.Rows, p.Unavailable, p.Unsupported, p.SchemaUnsupported, p.Failed, p.Drift, p.NotAttempted, p.UnavailableEndpoints)
+			}
+		}
 	}
 	if info := r.manifest.Rebuild; info != nil {
 		fmt.Fprintf(&b, "This archive was rebuilt offline. No OS connection or new source reconciliation occurred. The original read interval was %s through %s. Initial, inventoried, fetched, and final counts describe that source read; included/excluded/withheld/omitted counts include subsequent rebuild decisions. Original coverage and people statistics remain in the manifest's rebuild section.\n\n", info.OriginalReadStarted.UTC().Format(time.RFC3339), info.OriginalReadFinished.UTC().Format(time.RFC3339))

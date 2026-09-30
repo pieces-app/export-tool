@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -199,6 +200,21 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 			return
 		}
 		if len(parts) == 3 && parts[0] == "workstream_event_to_person_associations" && parts[1] == "person" {
+			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+			offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+			if limit != 1 {
+				rows := []map[string]any{}
+				for _, v := range f.data["WORKSTREAM_EVENT_TO_PERSON_ASSOCIATIONS"] {
+					if fieldString(v, "person") == parts[2] {
+						rows = append(rows, v)
+					}
+				}
+				sort.Slice(rows, func(i, j int) bool { return fieldString(rows[i], "id") < fieldString(rows[j], "id") })
+				total := len(rows)
+				start, end := min(max(0, offset), total), min(max(0, offset)+max(1, limit), total)
+				write(map[string]any{"iterable": rows[start:end], "total": total, "limit": limit, "offset": offset})
+				return
+			}
 			ids := map[string]bool{}
 			for _, p := range f.data["PERSONS"] {
 				if fieldString(p, "id") == parts[2] {

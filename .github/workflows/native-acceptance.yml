@@ -78,7 +78,7 @@ jobs:
         shell: bash
         env:
           PIECES_EXPORT_TEST_BINARY: ${{ github.workspace }}/dist/pieces-export_${{ env.RELEASE_VERSION }}_${{ matrix.label }}/${{ matrix.executable }}
-        run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI|RebuildCLI|LegacyRebuildCLI|PDFLimitsCLI|SignalPrivacyCLI|SignalDigestCLI|WrappedCacheCLI|AssociationCLI)$' -count=1 -v
+        run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI|RebuildCLI|LegacyRebuildCLI|PDFLimitsCLI|SignalPrivacyCLI|SignalDigestCLI|WrappedCacheCLI|AssociationCLI|PagedAssociationCLI)$' -count=1 -v
       - name: Install actual release through local HTTPS
         if: runner.os != 'Windows'
         shell: bash

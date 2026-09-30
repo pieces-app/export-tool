@@ -12,8 +12,8 @@ import (
 
 // Each family is processed independently. Exceeding either bound stops the
 // export rather than silently accepting a truncated metadata collection.
-const maxAssociationPairs = 250000
-const maxAssociationPairBytes = 64 << 20
+const maxAssociationPairs = 2000000
+const maxAssociationPairBytes = 256 << 20
 
 type AssociationCoverage struct {
 	Mode        string                      `json:"mode"`
@@ -22,13 +22,14 @@ type AssociationCoverage struct {
 }
 
 type AssociationFamilyCoverage struct {
-	Family      string `json:"family"`
-	Pairs       int    `json:"observed_pairs"`
-	Lookups     int    `json:"lookups"`
-	Unavailable int    `json:"unavailable_or_unsupported"`
-	Unsupported int    `json:"unsupported"`
-	Failed      int    `json:"failed"`
-	Skipped     int    `json:"not_attempted"`
+	Pagination  *AssociationPageCoverage `json:"person_pagination,omitempty"`
+	Family      string                   `json:"family"`
+	Pairs       int                      `json:"observed_pairs"`
+	Lookups     int                      `json:"lookups"`
+	Unavailable int                      `json:"unavailable_or_unsupported"`
+	Unsupported int                      `json:"unsupported"`
+	Failed      int                      `json:"failed"`
+	Skipped     int                      `json:"not_attempted"`
 }
 
 func ValidateAssociations(mode string) error {
@@ -153,7 +154,16 @@ func (r *run) exportAssociations() error {
 	if mode == "off" {
 		return nil
 	}
+	// Page event/person evidence first so newly reached event references can
+	// participate in the other families' observed-pair lookups.
+	eventPerson, _ := associationFamilyByName(eventPersonFamily)
+	families := []associationFamily{eventPerson}
 	for _, family := range associationFamilies {
+		if family.name != eventPersonFamily {
+			families = append(families, family)
+		}
+	}
+	for _, family := range families {
 		// Scope never expands to obtain metadata for an unselected endpoint.
 		if r.coverage[family.leftType] == nil || r.coverage[family.rightType] == nil {
 			continue
@@ -163,12 +173,25 @@ func (r *run) exportAssociations() error {
 			return err
 		}
 		row := AssociationFamilyCoverage{Family: family.name, Pairs: len(pairs)}
+		material := family.material()
+		cov := &Coverage{Material: material.Type, InventoryMode: "observed_pairs", InitialCount: -1, FinalCount: -1, Inventoried: len(pairs)}
+		if family.name == eventPersonFamily {
+			r.manifest.Associations.Enumeration = "observed_pairs_and_person_pages"
+			cov.InventoryMode = "person_pages_and_observed_pairs"
+			var err error
+			pairs, err = r.exportPersonAssociationPages(family, pairs, cov, &row)
+			if err != nil {
+				return err
+			}
+			if err := r.resolveReferences(); err != nil {
+				return err
+			}
+			r.reconcileAnnotationAttachments()
+		}
 		if len(pairs) == 0 {
 			r.manifest.Associations.Families = append(r.manifest.Associations.Families, row)
 			continue
 		}
-		material := family.material()
-		cov := &Coverage{Material: material.Type, InventoryMode: "observed_pairs", InitialCount: -1, FinalCount: -1, Inventoried: len(pairs)}
 		r.progress.Stage("Read association metadata "+family.name, len(pairs))
 		for i, pair := range pairs {
 			if err := r.ctx.Err(); err != nil {
@@ -194,23 +217,12 @@ func (r *run) exportAssociations() error {
 				}
 				continue
 			}
-			key := material.Type + "\x00" + fieldString(v, "id")
-			if r.meta[key] != nil {
-				// Conflicting bindings disqualify the earlier response too.
-				prior := r.meta[key]
-				prior.State = "withheld"
-				if err := os.Remove(filepath.Join(r.stage, prior.DataPath)); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-				row.Failed++
-				continue
-			}
-			if r.coverage[material.Type] == nil {
-				r.coverage[material.Type] = cov
-				r.manifest.Coverage = append(r.manifest.Coverage, cov)
-			}
-			if err := r.store(material, v, false); err != nil {
+			stored, err := r.storeAssociationValue(family, v, cov)
+			if err != nil {
 				return err
+			}
+			if !stored {
+				row.Failed++
 			}
 		}
 		if row.Unavailable > 0 {
@@ -223,6 +235,34 @@ func (r *run) exportAssociations() error {
 			r.issue(material.Type, "", "association_read_failed")
 		}
 		r.manifest.Associations.Families = append(r.manifest.Associations.Families, row)
+	}
+	return nil
+}
+
+func (r *run) storeAssociationValue(family associationFamily, v map[string]any, cov *Coverage) (bool, error) {
+	material := family.material()
+	key := material.Type + "\x00" + fieldString(v, "id")
+	if r.meta[key] != nil {
+		if err := r.withholdAssociation(key); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if r.coverage[material.Type] == nil {
+		r.coverage[material.Type] = cov
+		r.manifest.Coverage = append(r.manifest.Coverage, cov)
+	}
+	return true, r.store(material, v, false)
+}
+
+func (r *run) withholdAssociation(key string) error {
+	if prior := r.meta[key]; prior != nil {
+		prior.State = "withheld"
+		if prior.DataPath != "" {
+			if err := os.Remove(filepath.Join(r.stage, prior.DataPath)); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
 	}
 	return nil
 }

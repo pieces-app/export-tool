@@ -378,6 +378,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
+	r.reconcileEventPersonAssociationEdges()
 	if err := r.preparePeople(); err != nil {
 		return r.manifest, err
 	}

@@ -126,6 +126,7 @@ type run struct {
 	people              map[string]*PersonFacts
 	userPersonIDs       map[string]bool
 	derivedEdges        map[Edge]bool
+	associationEdges    map[Edge]string
 	cachedEdges         map[Edge]CacheEvidence
 	progress            *Progress
 	documentMetadata    map[string]*DocumentMetadata
@@ -309,7 +310,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 
 	r.manifest = Manifest{Naming: o.Naming, Relationships: o.Relationships, Metadata: o.Metadata, Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 5, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
 		"Retained local HTTP data only; not an atomic database backup or deleted history.",
-		"Association metadata covers observed pairs with included endpoints only, not a complete association inventory. Missing projections can hide pairs. Supplementary analysis/settings views and fingerprint audio downloads are not implemented.",
+		"Association metadata covers observed pairs and bounded event/person pages for selected persons/events. This is not a global association inventory or atomic snapshot; missing endpoint inventories and projections can still hide records. Supplementary analysis/settings views and fingerprint audio downloads are not implemented.",
 		"Server projections can omit vectors and internal data. Binary attachments are not extracted; preserve mode retains exposed byte/encoded fields in JSON.",
 		"The dedicated summary-hierarchy endpoints recover direct parent/child edges when available. Summary annotation bodies and person/pipeline memberships still require relationship projections or an enumerable association API. A person association can mean authorship or involvement, not exclusive subject matter.",
 		"Selected scope controls which collections are read. Unselected relationships have no local links; event-derived source/person/website connections cannot be recovered when events are omitted. Domain filtering checks exposed URLs and known dependencies, not unseen origins.",
@@ -387,6 +388,19 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if err := r.resolveReferences(); err != nil {
 		return r.manifest, err
 	}
+	if ctx.Err() != nil {
+		return r.manifest, ctx.Err()
+	}
+	if err = r.recoverSDKCacheRelationships(); err != nil {
+		return r.manifest, err
+	}
+	r.reconcileAnnotationAttachments()
+	if err = r.exportAssociations(); err != nil {
+		return r.manifest, err
+	}
+	if err = r.resolveReferences(); err != nil {
+		return r.manifest, err
+	}
 	r.progress.Stage("Reconcile inventories", 0)
 	// A second identity pass makes concurrent additions/deletions explicit; no snapshot claim.
 	for _, m := range o.Materials {
@@ -410,16 +424,6 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			r.issue(m.Type, "", "inventory_changed_during_export")
 		}
 	}
-	if ctx.Err() != nil {
-		return r.manifest, ctx.Err()
-	}
-	if err = r.recoverSDKCacheRelationships(); err != nil {
-		return r.manifest, err
-	}
-	r.reconcileAnnotationAttachments()
-	if err = r.exportAssociations(); err != nil {
-		return r.manifest, err
-	}
 	if o.Mode == "filtered" {
 		if err = r.rescanKnownCredentials(); err != nil {
 			return r.manifest, err
@@ -428,6 +432,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	if err = r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
+	r.reconcileEventPersonAssociationEdges()
 	r.progress.Stage("Select people and build persona navigation", 0)
 	if err = r.preparePeople(); err != nil {
 		return r.manifest, err

@@ -148,6 +148,7 @@ type TimelineEntry struct {
 	TimeBasis string `json:"time_basis"`
 }
 type PublicEdge struct {
+	AssociationRef           string `json:"association_ref,omitempty"`
 	Source, Target, Relation string
 	Provenance               string         `json:"provenance,omitempty"`
 	CacheEvidence            *CacheEvidence `json:"cache_evidence,omitempty"`
@@ -193,7 +194,11 @@ func (r *run) render() error {
 				}
 				r.manifest.SDKCache.RetainedEdges++
 			}
-			edges = append(edges, PublicEdge{Source: m.Path, Target: target.Path, Relation: e.Relation, Provenance: provenance, CacheEvidence: cached})
+			associationRef := ""
+			if proof := r.meta[r.associationEdges[e]]; proof != nil && proof.State == "included" {
+				provenance, associationRef = "association_record", opaque(proof.Type, proof.ID)
+			}
+			edges = append(edges, PublicEdge{Source: m.Path, Target: target.Path, Relation: e.Relation, Provenance: provenance, CacheEvidence: cached, AssociationRef: associationRef})
 		}
 		if created, err := time.Parse(time.RFC3339Nano, m.Created); err == nil {
 			entries = append(entries, TimelineEntry{m.Type, m.ID, m.Path, m.Title, created.UTC().Format(time.RFC3339Nano), m.Updated, "record_created"})
@@ -287,6 +292,9 @@ func (r *run) render() error {
 				label := e.Relation
 				if r.derivedEdges[e] {
 					label += " (derived inverse)"
+				}
+				if r.associationEdges[e] != "" {
+					label += " (source association record)"
 				}
 				if _, ok := r.cachedEdges[e]; ok {
 					label += " (historical client cache)"
