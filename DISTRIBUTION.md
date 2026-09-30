@@ -86,6 +86,7 @@ The synthetic binary test verifies doctor/scan/export, Markdown/PDF output, summ
 Local evidence so far:
 
 - Bash installer: HTTPS download against a temporary trusted test server, real SHA/ZIP validation, native fixture execution, exit statuses, literal arguments, and cleanup/retention passed.
+- Actual `0.8.6-dev` ZIP: Bash HTTPS → scoped Markdown/PDF export → cleanup/retention passed on macOS ARM64 and isolated Linux ARM64. PowerShell 7 on macOS passed the same actual-package/export cases with file transport substituted for HTTPS. Genuine terminal cleanup prompts were also exercised on macOS. See [installer acceptance and reproduction](INSTALLER_ACCEPTANCE.md), including the executable-temporary-directory requirement and open GCP/Windows gates.
 - PowerShell 7 on macOS: same package/execution/cleanup tests passed with transport mocked; the actual HTTPS download helper separately retrieved a pinned public README with certificate validation enabled. This is not Windows runtime evidence.
 - Both scripts reject corrupted hashes, duplicate checksum entries, and ZIP path traversal before executing any binary.
 - Native macOS ARM64 and a local Linux ARM64 Docker VM: packaged synthetic end-to-end acceptance passed. The Linux container had no Go, no network, and no private export/source mounts; exporter, CLI, and fake-lifecycle tests also passed. macOS AMD64 passed under Rosetta, which is not Intel hardware acceptance. GUI metadata and installed-OS lifecycle remain separate tests.

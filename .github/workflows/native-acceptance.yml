@@ -79,6 +79,25 @@ jobs:
         env:
           PIECES_EXPORT_TEST_BINARY: ${{ github.workspace }}/dist/pieces-export_${{ env.RELEASE_VERSION }}_${{ matrix.label }}/${{ matrix.executable }}
         run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI|RebuildCLI|LegacyRebuildCLI)$' -count=1 -v
+      - name: Install actual release through local HTTPS
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          PIECES_EXPORT_TEST_RELEASE: ${{ github.workspace }}/dist
+          PIECES_EXPORT_TEST_VERSION: ${{ env.RELEASE_VERSION }}
+        run: go test -race ./internal/exporter -run '^TestPackagedBashInstaller$' -count=1 -v
+      - name: Install actual release with PowerShell 5.1 and 7
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          PIECES_EXPORT_TEST_RELEASE: ${{ github.workspace }}/dist
+          PIECES_EXPORT_TEST_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          foreach ($shell in @('powershell.exe', 'pwsh')) {
+            $env:PIECES_EXPORT_TEST_POWERSHELL = $shell
+            go test ./internal/exporter -run '^TestPackagedPowerShellInstaller$' -count=1 -v
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Linux isolated disk-full acceptance
         if: runner.os == 'Linux'
         shell: bash
