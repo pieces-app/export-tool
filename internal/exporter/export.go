@@ -216,12 +216,8 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		return Manifest{}, err
 	}
 	if len(o.SDKCaches) > 0 {
-		selected := false
-		for _, m := range o.Materials {
-			selected = selected || m.Type == "WORKSTREAM_SUMMARIES"
-		}
-		if !selected {
-			return Manifest{}, errConfig("SDK cache recovery requires WORKSTREAM_SUMMARIES in selected materials")
+		if err := ValidateSDKCacheMaterials(o.Materials); err != nil {
+			return Manifest{}, err
 		}
 	}
 	if o.PeopleMode == "" {
@@ -653,11 +649,13 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 	}
 	meta.Edges = extractEdges(m.Type, id, v)
 	meta.ProjectionStates = projectionStates(m.Type, v)
-	if m.Type == "WORKSTREAM_SUMMARIES" {
+	if fields := cacheFields(m.Type); len(fields) > 0 {
 		meta.SupplementableFields = map[string]bool{}
-		for _, field := range cacheRelations {
+		for _, field := range fields {
 			meta.SupplementableFields[field] = v[field] == nil
 		}
+	}
+	if m.Type == "WORKSTREAM_SUMMARIES" {
 		for _, field := range []string{"annotations", "persons", "pipelines"} {
 			if object(v, field) == nil {
 				meta.RelationshipProjectionUnknown = true

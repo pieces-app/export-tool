@@ -128,7 +128,7 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 
 ## Historical SDK-cache recovery
 
-`--sdk-cache /path/to/pieces_client_sqlite.db` optionally recovers historical summary relationships to records fetched from the current OS. Repeat the flag for multiple caches. Current fields take precedence, cached text is never imported, conflicting/tombstoned links are handled conservatively, and the archive remains partial. [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md) documents selection, bounds, privacy, provenance, and the 87.9% candidate body-link coverage measured on this machine. Candidate coverage is not a completed live recovery.
+`--sdk-cache /path/to/pieces_client_sqlite.db` optionally recovers historical summary, annotation, person, and signal relationships to records fetched from the current OS. Repeat the flag for multiple caches. Current fields take precedence, cached text is never imported, conflicting/tombstoned links are handled conservatively, and the archive remains partial. [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md) documents selection, bounds, privacy, provenance, and the 87.9% candidate body-link coverage measured on this machine. Candidate coverage is not a completed live recovery.
 
 ## Build binary-only downloads
 

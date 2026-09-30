@@ -204,6 +204,12 @@ func (r *run) signalDigestEntry(root *os.Root, m *Meta, rank int, path string, l
 		if r.derivedEdges[Edge{m.Key, a.Key, "annotations"}] {
 			provenance = "derived inverse of annotation.signals"
 		}
+		if evidence, ok := r.cachedEdges[Edge{m.Key, a.Key, "annotations"}]; ok {
+			provenance = evidence.description()
+			if r.derivedEdges[Edge{m.Key, a.Key, "annotations"}] {
+				provenance += " Derived inverse of annotation.signals."
+			}
+		}
 		fmt.Fprintf(b, "[Description annotation](%s); created %s; updated %s; %s.\n\n", relative(path, a.Path), md(a.Created), md(a.Updated), provenance)
 		// Do not parse a huge body after the document budget has already failed.
 		if b.err != nil {

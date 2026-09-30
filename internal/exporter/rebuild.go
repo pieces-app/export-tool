@@ -252,8 +252,10 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		r.opts.ReferenceOnly[c.Material] = c.InventoryMode == "references"
 		expected += cov.Included
 	}
-	if len(o.SDKCaches) > 0 && r.coverage["WORKSTREAM_SUMMARIES"] == nil {
-		return Manifest{}, errConfig("cache recovery requires summaries in the source archive")
+	if len(o.SDKCaches) > 0 {
+		if err := ValidateSDKCacheMaterials(r.opts.Materials); err != nil {
+			return Manifest{}, err
+		}
 	}
 	if r.manifest.Scope.Name == "" {
 		r.manifest.Scope = scopeFor(r.opts)
@@ -344,6 +346,11 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	} else {
 		r.issue("ARCHIVE", "", "legacy_reconstruction_evidence_incomplete")
 		for _, m := range byRef {
+			// Legacy archives did not retain original eligibility for the newly
+			// supported wrapped types. Pruned JSON cannot safely establish it.
+			if m.Type != "WORKSTREAM_SUMMARIES" {
+				m.SupplementableFields = nil
+			}
 			for field, state := range m.ProjectionStates {
 				if state != "linked" {
 					m.ProjectionStates[field] = "absent"

@@ -239,12 +239,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		selected := selection.Materials
 		inventoried := selection.InventoryMaterials()
 		if len(sdkCaches) > 0 {
-			hasSummaries := false
-			for _, m := range selected {
-				hasSummaries = hasSummaries || m.Type == "WORKSTREAM_SUMMARIES"
-			}
-			if !hasSummaries {
-				return fail(fmt.Errorf("SDK cache recovery requires WORKSTREAM_SUMMARIES in selected materials"))
+			if err := exporter.ValidateSDKCacheMaterials(selected); err != nil {
+				return fail(err)
 			}
 		}
 		if args[0] == "export" && !*dryRun && *people != "all" {

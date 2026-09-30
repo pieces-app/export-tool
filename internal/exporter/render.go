@@ -269,7 +269,7 @@ func (r *run) render() error {
 				}
 				if text := fieldString(av, "text"); text != "" {
 					if evidence, ok := r.cachedEdges[e]; ok {
-						fmt.Fprintf(&b, "Historical attachment: cache %d, summary updated %s; current OS summary updated %s. The annotation text below comes from the current OS record.\n\n", evidence.Cache, evidence.CachedUpdated, evidence.OSUpdated)
+						fmt.Fprintf(&b, "%s\n\n", evidence.description())
 					}
 					fmt.Fprintf(&b, "## Annotation: %s\n\n[Canonical annotation](%s)\n\n%s\n\n", md(fieldString(av, "type")), relative(m.Path, a.Path), rewriteMarkdown(text, m.Path, r.meta))
 				}

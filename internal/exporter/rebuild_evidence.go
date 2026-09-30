@@ -32,6 +32,7 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 		// Pruned canonical JSON cannot tell us whether an empty field was
 		// originally empty. Accept the old row but keep all seven fields unknown.
 		// A partially populated evidence map is still invalid, as for other types.
+		originalProjections := row.ProjectionStates
 		if m.Type == "SIGNALS" && row.ProjectionStates == nil {
 			row.ProjectionStates = map[string]string{}
 			for _, field := range projectionFields(m.Type) {
@@ -48,6 +49,23 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 		m.Redactions += row.Redactions
 		m.ProjectionStates = row.ProjectionStates
 		m.SupplementableFields = row.SupplementableFields
+		// Missing eligibility stays unknown, including on repeated rebuilds.
+		// Older rebuilders also wrote synthetic "absent" projection states;
+		// those alone cannot authorize new historical attachments.
+		allowed := map[string]bool{}
+		for _, field := range cacheFields(m.Type) {
+			allowed[field] = true
+		}
+		for field, eligible := range m.SupplementableFields {
+			if !allowed[field] {
+				return errConfig("archive cache eligibility contains an unsupported field")
+			}
+			// False remains valid for legacy unknown projections. It narrows
+			// recovery; only an affirmative eligibility conflicts with presence.
+			if state, known := originalProjections[field]; known && eligible && state != "absent" {
+				return errConfig("archive cache eligibility conflicts with original projection evidence")
+			}
+		}
 		m.RelationshipProjectionUnknown = row.RelationshipProjectionUnknown
 		m.PersonProjection = row.PersonProjection
 		if row.PersonEvidence != nil {
@@ -96,10 +114,23 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 			if p == nil || p.Cache < 1 || p.Cache > r.manifest.SDKCache.Selected {
 				return errConfig("archive cache-edge provenance is incomplete")
 			}
-			cached, ce := time.Parse(time.RFC3339Nano, p.CachedUpdated)
-			current, ue := time.Parse(time.RFC3339Nano, p.OSUpdated)
+			cachedText, currentText := p.timestamps()
+			cached, ce := time.Parse(time.RFC3339Nano, cachedText)
+			current, ue := time.Parse(time.RFC3339Nano, currentText)
 			if ce != nil || ue != nil || cached.After(current) {
 				return errConfig("archive cache-edge timestamps are invalid")
+			}
+			owner := source
+			if row.Provenance == "historical_client_cache_derived_inverse" {
+				owner = target
+			}
+			if p.Material != "" {
+				updated, err := time.Parse(time.RFC3339Nano, owner.Updated)
+				if len(cacheFields(p.Material)) == 0 || p.Material != owner.Type || p.RecordRef != opaque(owner.Type, owner.ID) || p.CachedUpdated != "" || p.OSUpdated != "" || err != nil || !updated.Equal(current) {
+					return errConfig("archive cache-edge record provenance is invalid")
+				}
+			} else if owner.Type != "WORKSTREAM_SUMMARIES" || p.RecordRef != "" || p.CachedRecordUpdated != "" || p.OSRecordUpdated != "" {
+				return errConfig("archive legacy cache-edge owner is invalid")
 			}
 			if prior, exists := r.cachedEdges[e]; exists && prior != *p {
 				return errConfig("archive graph has conflicting cache-edge evidence")
@@ -166,26 +197,38 @@ func (r *run) archiveDependency(key string) *Meta {
 	return m
 }
 
-// A cached summary absent from the archived inclusion set could have been
-// excluded. Its already-archived annotation bodies must not be newly exposed
-// through another cached attachment. Conservatively withhold these bodies.
-func (r *run) blockUnavailableCachedSummary(v map[string]any, budget *cacheReadBudget) error {
-	if !r.rebuilding || r.opts.Mode != "filtered" || r.coverage["WORKSTREAM_SUMMARIES"] == nil {
+// An unavailable cached owner or body could have been excluded. Its retained
+// generated counterparts must not become newly exposed through another link.
+func (r *run) blockUnavailableCachedRecord(material string, v map[string]any, budget *cacheReadBudget) error {
+	if !r.rebuilding || r.opts.Mode != "filtered" || r.coverage[material] == nil {
 		return nil
 	}
-	ids := references(v["annotations"])
-	budget.edges += len(ids)
-	for _, id := range ids {
-		budget.bytes += len(id)
+	var relations []string
+	switch material {
+	case "WORKSTREAM_SUMMARIES", "SIGNALS":
+		relations = []string{"annotations"}
+	case "ANNOTATIONS":
+		relations = []string{"summaries", "signals"}
 	}
-	if budget.edges > maxCacheEdges || budget.bytes > maxCacheReferenceBytes {
-		return errConfig("SDK cache exceeds the relationship read bound; no archive was finalized")
-	}
-	for _, id := range ids {
-		if m := r.meta["ANNOTATIONS\x00"+id]; m != nil && m.State == "included" {
-			m.State = "withheld"
-			r.issue(m.Type, m.ID, "unavailable_cached_summary_dependency")
-			r.manifest.Rebuild.BlockedCacheBodies++
+	for _, relation := range relations {
+		ids := references(v[relation])
+		budget.edges += len(ids)
+		for _, id := range ids {
+			budget.bytes += len(id)
+		}
+		if budget.edges > maxCacheEdges || budget.bytes > maxCacheReferenceBytes {
+			return errConfig("SDK cache exceeds the relationship read bound; no archive was finalized")
+		}
+		for _, id := range ids {
+			if m := r.meta[referenceTypes[relation]+"\x00"+id]; m != nil && m.State == "included" {
+				m.State = "withheld"
+				reason := "unavailable_cached_record_dependency"
+				if material == "WORKSTREAM_SUMMARIES" {
+					reason = "unavailable_cached_summary_dependency"
+				}
+				r.issue(m.Type, m.ID, reason)
+				r.manifest.Rebuild.BlockedCacheBodies++
+			}
 		}
 	}
 	return nil

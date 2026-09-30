@@ -76,3 +76,5 @@ The unattended actual-package cases passed again for `0.8.10-dev` on macOS ARM64
 The `0.9.0-dev` actual-package cases also passed on macOS ARM64 and isolated Linux ARM64, covering successful removal, requested retention, and cleanup after a partial-status export. Bash used local HTTPS; PowerShell 7 on macOS used substituted file transport. Native Windows and public GCP-hosted downloads remain unverified. The published Gist/scripts are unchanged.
 
 The same actual-package cleanup cases passed with `0.9.1-dev` on macOS ARM64 and isolated Linux ARM64. The PDF link correction changes the downloaded executable, not the Bash/PowerShell bootstrap or published Gist. PowerShell transport substitution and native Windows/public-host limitations remain.
+
+The actual-package cleanup cases passed again for `0.10.0-dev` on macOS ARM64 (Bash local HTTPS and PowerShell 7 with substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). This release adds wrapped SDK-cache recovery to the executable. Bootstrap scripts and the Gist remain unchanged; native Windows, public hosting and clean-machine download behavior remain open.

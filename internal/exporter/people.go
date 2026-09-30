@@ -451,6 +451,9 @@ func (r *run) renderPersonas() error {
 			profilePath := folder + "/profile.md"
 			var body strings.Builder
 			fmt.Fprintf(&body, "# %s\n\n[Personas index](%s) · [Category index](%s) · [Profile summaries](profile_summaries/index.md) · [Related workstream summaries](related_workstream_summaries/index.md)\n\n## Identity records\n\n", md(personaDisplayName(people[0])), relative(profilePath, indexPath), relative(profilePath, categoryPath))
+			if len(r.cachedEdges) > 0 {
+				fmt.Fprintf(&body, "Historical cache links may contribute to the associations below. Text comes from retained OS annotations; a recent text date does not prove that a historical attachment is current. See [coverage](%s) and the [relationship provenance](%s) for source evidence.\n\n", relative(profilePath, "coverage.md"), relative(profilePath, "relationships.jsonl"))
+			}
 			persona, profile, summaries, profileSummaries := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 			for _, p := range people {
 				m := r.meta["PERSONS\x00"+p.ID]

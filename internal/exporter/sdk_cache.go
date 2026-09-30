@@ -16,9 +16,41 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Only typed summary relationships are recovered. Cached prose, credentials,
+// Only typed relationships are recovered. Cached prose, credentials,
 // embedded projections and source records never replace current OS records.
 var cacheRelations = []string{"annotations", "persons", "pipelines", "tags", "events", "sources", "websites", "ranges", "hints", "summaries"}
+
+type cacheTable struct {
+	table, material string
+	wrapped         bool
+	relations       []string
+}
+
+// Identifiers below are a fixed SQL allowlist, never supplied by a cache or flag.
+var cacheTables = []cacheTable{
+	{"workstream_summaries", "WORKSTREAM_SUMMARIES", false, cacheRelations},
+	{"annotations", "ANNOTATIONS", true, []string{"summaries", "persons", "signals"}},
+	{"persons", "PERSONS", true, []string{"annotations", "summaries"}},
+	{"signals", "SIGNALS", true, []string{"annotations", "persons", "pipelines", "summaries", "workstream_events", "websites", "ranges"}},
+}
+
+func cacheFields(material string) []string {
+	for _, table := range cacheTables {
+		if table.material == material {
+			return table.relations
+		}
+	}
+	return nil
+}
+
+func ValidateSDKCacheMaterials(materials []Material) error {
+	for _, material := range materials {
+		if len(cacheFields(material.Type)) > 0 {
+			return nil
+		}
+	}
+	return errConfig("SDK cache recovery requires summaries, annotations, persons, or signals in selected materials")
+}
 
 const maxCacheRows = 200000
 const maxCacheEdges = 2000000
@@ -28,9 +60,29 @@ const maxCacheReferenceBytes = 256 << 20
 type cacheReadBudget struct{ edges, bytes int }
 
 type CacheEvidence struct {
-	Cache         int    `json:"cache_number"`
-	CachedUpdated string `json:"cached_summary_updated"`
-	OSUpdated     string `json:"os_summary_updated"`
+	Cache               int    `json:"cache_number"`
+	CachedUpdated       string `json:"cached_summary_updated,omitempty"` // legacy summary evidence
+	OSUpdated           string `json:"os_summary_updated,omitempty"`
+	Material            string `json:"record_material,omitempty"`
+	RecordRef           string `json:"record_ref,omitempty"`
+	CachedRecordUpdated string `json:"cached_record_updated,omitempty"`
+	OSRecordUpdated     string `json:"os_record_updated,omitempty"`
+}
+
+func (e CacheEvidence) timestamps() (string, string) {
+	if e.Material != "" {
+		return e.CachedRecordUpdated, e.OSRecordUpdated
+	}
+	return e.CachedUpdated, e.OSUpdated
+}
+
+func (e CacheEvidence) description() string {
+	kind := "summary"
+	if e.Material != "" {
+		kind = e.Material + " record"
+	}
+	cached, current := e.timestamps()
+	return fmt.Sprintf("Historical attachment: cache %d, %s updated %s; current OS record updated %s. Attachment evidence may be stale; text comes from the retained OS annotation.", e.Cache, kind, cached, current)
 }
 
 type CacheCoverage struct {
@@ -39,6 +91,8 @@ type CacheCoverage struct {
 	Invalid          int `json:"invalid_or_oversized_rows"`
 	Expired          int `json:"expired_rows"`
 	Matching         int `json:"matching_summary_rows"`
+	MatchingRecords  int `json:"matching_record_rows"`
+	UnknownFields    int `json:"unknown_original_field_eligibility"`
 	IdentityMismatch int `json:"creation_time_mismatch_rows"`
 	UnusableTime     int `json:"invalid_or_future_update_rows"`
 	Conflicts        int `json:"conflicting_fields"`
@@ -89,18 +143,29 @@ func openSDKCache(ctx context.Context, path string) (*sql.DB, error) {
 	db.SetMaxOpenConns(1)
 	// Do not use immutable=1: it can ignore a live cache's WAL. No SDK startup,
 	// schema migration, cache expiry deletion, or writable fallback is allowed.
-	var kind string
-	err = db.QueryRowContext(ctx, "SELECT type FROM sqlite_master WHERE name = 'workstream_summaries'").Scan(&kind)
-	if err != nil || kind != "table" {
-		db.Close()
-		return nil, errConfig("SDK cache has no workstream_summaries table")
+	found := false
+	for _, table := range cacheTables {
+		var kind string
+		err = db.QueryRowContext(ctx, "SELECT type FROM sqlite_master WHERE name = ?", table.table).Scan(&kind)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil || kind != "table" {
+			db.Close()
+			return nil, errConfig("SDK cache relationship storage must be a table")
+		}
+		rows, err := db.QueryContext(ctx, "SELECT json, expireAt FROM "+table.table+" LIMIT 0")
+		if err != nil {
+			db.Close()
+			return nil, errConfig("SDK cache has an unsupported relationship-table schema")
+		}
+		rows.Close()
+		found = true
 	}
-	rows, err := db.QueryContext(ctx, "SELECT json, expireAt FROM workstream_summaries LIMIT 0")
-	if err != nil {
+	if !found {
 		db.Close()
-		return nil, errConfig("SDK cache has an unsupported summary-table schema")
+		return nil, errConfig("SDK cache has no supported relationship tables")
 	}
-	rows.Close()
 	return db, nil
 }
 
@@ -163,10 +228,8 @@ func (r *run) recoverSDKCacheRelationships() error {
 	seenEdges := map[Edge]bool{}
 	changed := map[string]bool{}
 	for _, m := range r.meta {
-		if m.Type == "WORKSTREAM_SUMMARIES" {
-			for _, e := range m.Edges {
-				seenEdges[e] = true
-			}
+		for _, e := range m.Edges {
+			seenEdges[e] = true
 		}
 	}
 	for _, key := range keys {
@@ -225,23 +288,41 @@ func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*
 		return errConfig("SDK cache read transaction failed")
 	}
 	defer tx.Rollback()
-	// Bound returned strings before allocation; one transaction supplies a
-	// consistent view including the WAL. Never dump cached rows to a log/file.
-	rows, err := tx.QueryContext(ctx, "SELECT CASE WHEN length(CAST(json AS BLOB)) <= ? THEN json ELSE NULL END, expireAt FROM workstream_summaries LIMIT ?", maxCacheRecordBytes, maxCacheRows+1)
-	if err != nil {
-		return errConfig("SDK cache summaries could not be read")
-	}
-	defer rows.Close()
+	// One transaction supplies a consistent view of every selected table,
+	// including WAL data. Row/reference bounds are shared across table types.
 	count := 0
 	r.progress.Stage(fmt.Sprintf("Read historical SDK cache %d", ordinal), 0)
+	for _, table := range cacheTables {
+		var kind string
+		err := tx.QueryRowContext(ctx, "SELECT type FROM sqlite_master WHERE name = ?", table.table).Scan(&kind)
+		if err == sql.ErrNoRows {
+			continue
+		}
+		if err != nil || kind != "table" {
+			return errConfig("SDK cache relationship table changed or is unreadable")
+		}
+		if err := r.readSDKCacheTable(ctx, tx, table, ordinal, &count, candidates, budget); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *run) readSDKCacheTable(ctx context.Context, tx *sql.Tx, table cacheTable, ordinal int, count *int, candidates map[cacheField]*cacheCandidate, budget *cacheReadBudget) error {
+	// Bound returned strings before allocation; SQL table names are constants.
+	rows, err := tx.QueryContext(ctx, "SELECT CASE WHEN length(CAST(json AS BLOB)) <= ? THEN json ELSE NULL END, expireAt FROM "+table.table+" LIMIT ?", maxCacheRecordBytes, maxCacheRows-*count+1)
+	if err != nil {
+		return errConfig("SDK cache relationships could not be read")
+	}
+	defer rows.Close()
 	for rows.Next() {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		count++
+		*count++
 		r.manifest.SDKCache.Rows++
-		if count > maxCacheRows {
-			return errConfig("SDK cache exceeds the summary row bound; no archive was finalized")
+		if *count > maxCacheRows {
+			return errConfig("SDK cache exceeds the shared row bound; no archive was finalized")
 		}
 		var raw sql.NullString
 		var expiry sql.NullInt64
@@ -268,15 +349,25 @@ func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*
 			r.manifest.SDKCache.Invalid++
 			continue
 		}
-		key := "WORKSTREAM_SUMMARIES\x00" + fieldString(v, "id")
+		if table.wrapped {
+			v = object(v, "os")
+		}
+		if fieldString(v, "id") == "" {
+			r.manifest.SDKCache.Invalid++
+			continue
+		}
+		key := table.material + "\x00" + fieldString(v, "id")
 		m := r.meta[key]
 		if m == nil || m.State == "missing" || m.ArchivePlaceholder {
-			if err := r.blockUnavailableCachedSummary(v, budget); err != nil {
+			if err := r.blockUnavailableCachedRecord(table.material, v, budget); err != nil {
 				return err
 			}
 			continue
 		}
-		r.manifest.SDKCache.Matching++
+		r.manifest.SDKCache.MatchingRecords++
+		if table.material == "WORKSTREAM_SUMMARIES" {
+			r.manifest.SDKCache.Matching++
+		}
 		created, ce := time.Parse(time.RFC3339Nano, timestamp(v, "created"))
 		currentCreated, cce := time.Parse(time.RFC3339Nano, m.Created)
 		if ce != nil || cce != nil || !created.Equal(currentCreated) {
@@ -289,12 +380,16 @@ func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*
 			r.manifest.SDKCache.UnusableTime++
 			continue
 		}
-		for _, relation := range cacheRelations {
-			if !m.SupplementableFields[relation] {
-				continue
-			}
+		for _, relation := range table.relations {
 			state := projectionState(v[relation])
 			if state != "empty" && state != "linked" {
+				continue
+			}
+			eligible, known := m.SupplementableFields[relation]
+			if !known {
+				r.manifest.SDKCache.UnknownFields++
+			}
+			if !eligible {
 				continue
 			}
 			ids := references(v[relation])
@@ -317,7 +412,16 @@ func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*
 				}
 				continue
 			}
-			candidates[field] = &cacheCandidate{ids: ids, updated: updated, evidence: CacheEvidence{ordinal, updated.UTC().Format(time.RFC3339Nano), currentUpdated.UTC().Format(time.RFC3339Nano)}}
+			evidence := CacheEvidence{Cache: ordinal}
+			if table.material == "WORKSTREAM_SUMMARIES" {
+				evidence.CachedUpdated = updated.UTC().Format(time.RFC3339Nano)
+				evidence.OSUpdated = currentUpdated.UTC().Format(time.RFC3339Nano)
+			} else {
+				evidence.Material, evidence.RecordRef = table.material, opaque(table.material, m.ID)
+				evidence.CachedRecordUpdated = updated.UTC().Format(time.RFC3339Nano)
+				evidence.OSRecordUpdated = currentUpdated.UTC().Format(time.RFC3339Nano)
+			}
+			candidates[field] = &cacheCandidate{ids: ids, updated: updated, evidence: evidence}
 		}
 	}
 	if rows.Err() != nil {
