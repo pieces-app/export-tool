@@ -40,78 +40,94 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 	for _, dimension := range dimensions {
 		g.Index[dimension] = map[string][]*Meta{}
 	}
-	// Only these nodes provide labels/URL/description. Large event bodies stay on disk.
-	values := map[string]map[string]any{}
-	for _, m := range r.sortedMeta() {
+	// Sort only summary identities. Supporting canonical records stay on disk;
+	// keep extracted descriptions/hosts only when a summary needs them.
+	summaries := []*Meta{}
+	for _, m := range r.meta {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
 		}
-		if m.State != "included" {
-			continue
-		}
-		switch m.Type {
-		case "WORKSTREAM_SUMMARIES", "ANNOTATIONS", "WEBSITES", "WORKSTREAM_PATTERN_ENGINE_SOURCES":
-			v, err := readRecord(filepath.Join(r.stage, m.DataPath))
-			if err != nil {
-				return nil, err
-			}
-			values[m.Key] = v
+		if m.State == "included" && m.Type == "WORKSTREAM_SUMMARIES" {
+			summaries = append(summaries, m)
 		}
 	}
-	for _, m := range r.sortedMeta() {
+	sort.Slice(summaries, func(i, j int) bool { return summaries[i].Key < summaries[j].Key })
+	descriptions, hosts := map[string]string{}, map[string]string{}
+	r.progress.Stage("Build summary relationships", len(summaries))
+	for _, m := range summaries {
 		if err := r.ctx.Err(); err != nil {
 			return nil, err
-		}
-		if m.State != "included" || m.Type != "WORKSTREAM_SUMMARIES" {
-			continue
 		}
 		keys := map[string]map[string]string{}
 		for _, d := range dimensions {
 			keys[d] = map[string]string{}
 		}
-		v := values[m.Key]
+		v, err := readRecord(filepath.Join(r.stage, m.DataPath))
+		if err != nil {
+			return nil, err
+		}
 		description := fieldString(v, "description")
 		for _, e := range m.Edges {
+			if description != "" {
+				break
+			}
 			a := r.meta[e.Target]
 			if a != nil && a.State == "included" && a.Type == "ANNOTATIONS" && strings.Contains(a.AnnotationType, "DESCRIPTION") {
-				if description == "" {
-					description = fieldString(values[a.Key], "text")
+				text, loaded := descriptions[a.Key]
+				if !loaded {
+					value, err := readRecord(filepath.Join(r.stage, a.DataPath))
+					if err != nil {
+						return nil, err
+					}
+					text = fieldString(value, "text")
+					descriptions[a.Key] = text
 				}
+				description = text
 			}
 		}
 		visited := map[string]bool{}
-		var visit func(*Meta, int)
-		visit = func(node *Meta, depth int) {
+		var visit func(*Meta, int) error
+		visit = func(node *Meta, depth int) error {
+			if err := r.ctx.Err(); err != nil {
+				return err
+			}
 			if depth > 4 || node == nil || node.State != "included" || visited[node.Key] {
-				return
+				return nil
 			}
 			visited[node.Key] = true
 			switch node.Type {
 			case "TAGS":
 				keys["Tags"][node.Key] = node.Title
-				return
+				return nil
 			case "PERSONS":
 				keys["Person"][node.Key] = node.Title
-				return
+				return nil
 			case "WORKSTREAM_PATTERN_ENGINE_SOURCES", "APPLICATIONS":
 				keys["Source"][node.Key] = node.Title
-				return
+				return nil
 			case "WEBSITES":
-				website := values[node.Key]
-				raw := fieldString(website, "url")
-				if raw == "" {
-					raw = fieldString(website, "name")
-				}
-				if !strings.Contains(raw, "://") {
-					raw = "https://" + raw
-				}
-				u, err := url.Parse(raw)
-				if err == nil {
-					if host, err := normalizeHost(u.Hostname()); err == nil {
-						keys["Website"][host] = host
+				host, loaded := hosts[node.Key]
+				if !loaded {
+					website, err := readRecord(filepath.Join(r.stage, node.DataPath))
+					if err != nil {
+						return err
 					}
+					raw := fieldString(website, "url")
+					if raw == "" {
+						raw = fieldString(website, "name")
+					}
+					if !strings.Contains(raw, "://") {
+						raw = "https://" + raw
+					}
+					if u, err := url.Parse(raw); err == nil {
+						host, _ = normalizeHost(u.Hostname())
+					}
+					hosts[node.Key] = host
 				}
-				return
+				if host != "" {
+					keys["Website"][host] = host
+				}
+				return nil
 			}
 			for _, e := range node.Edges {
 				target := r.meta[e.Target]
@@ -120,11 +136,16 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 				}
 				switch e.Relation {
 				case "tags", "persons", "person", "sources", "websites", "applications", "events", "workstream_events", "source_windows":
-					visit(target, depth+1)
+					if err := visit(target, depth+1); err != nil {
+						return err
+					}
 				}
 			}
+			return nil
 		}
-		visit(m, 0)
+		if err := visit(m, 0); err != nil {
+			return nil, err
+		}
 		meta := &DocumentMetadata{ID: m.ID, Path: m.Path, Title: m.Title, Description: description, Tags: []string{}, Sources: []string{}, Persons: []string{}, Websites: []string{}, NativeTags: []string{}, NativeStatus: "off", DateBasis: "record_created"}
 		for _, d := range dimensions {
 			labels := []string{}
@@ -154,6 +175,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 		meta.NativeTags = unique(meta.NativeTags)
 		g.Metadata[m.Key] = meta
 		g.Keys[m.Key] = keys
+		r.progress.Add(1)
 	}
 	if err := g.prepareRanking(r.ctx); err != nil {
 		return nil, err

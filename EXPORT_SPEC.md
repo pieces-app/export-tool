@@ -208,6 +208,21 @@ During Markdown rendering, reference pruning reports whether it actually removed
 
 A macOS ARM64 microbenchmark on this machine measured the old unconditional rewrite at approximately 11.1–11.3 ms per roughly 1 KiB synthetic record, versus 0.35–0.42 microseconds for exact comparison and retention. This isolates an avoided disk operation; it excludes reading, secret scanning, graph work, and Markdown/PDF rendering and must not be advertised as whole-export speedup. The already running `0.4.1-dev` process is unchanged and cannot acquire this optimization in place.
 
+### Summary-relationship memory and local reads (`0.12.2-dev`)
+
+Graph construction sorts only included summary identities, reads each summary as it is processed, and loads description annotations and website records only when an included summary traverses them. It retains extracted description strings and normalized hosts rather than whole supporting JSON records. An explicit summary description takes precedence; otherwise the first nonempty included description annotation in existing edge order supplies it. Tags, persons, applications and source labels come from their already approved metadata. The same four relationship dimensions, included-state checks, depth limit, ranking, and canonical paths apply.
+
+This does not omit canonical content. Every included record, including unattached annotation bodies and unrelated websites, is still independently read and rendered later; unreadable or corrupt canonical records still fail the export. No HTTP requests are added. Cancellation is checked during graph traversal, and terminal progress distinguishes summary-relationship construction from graph/chronology indexing.
+
+An isolated Apple M4 Max benchmark used 50 summaries, one shared description/website, 250 unrelated websites, and either 200 or 2,000 unrelated annotation bodies of roughly 16 KiB. Three iterations per case measured:
+
+| Unrelated bodies | Earlier graph stage | Updated graph stage | Earlier allocated bytes/op | Updated allocated bytes/op |
+| --- | ---: | ---: | ---: | ---: |
+| 200 | 12.90 ms | 0.67 ms | 18,907,616 | 149,733 |
+| 2,000 | 84.02 ms | 0.92 ms | 172,572,050 | 148,925 |
+
+Run `go test ./internal/exporter -run '^$' -bench '^BenchmarkSummaryGraphStagedRecords$' -benchtime=3x -benchmem` to repeat. Allocation totals are not peak RSS. These synthetic measurements exclude source reads, privacy scanning, canonical rendering, fsync, PDF conversion and fixture setup; they do not predict full-export duration. Referenced descriptions and graph identities still consume memory, and disk-backed graph/resume work remains open. The running `0.4.1-dev` export is unaffected.
+
 ## Coverage reporting
 
 Every new export includes `coverage.md`, linked from its root index, and a `relationship_coverage` manifest array. For included workstream summaries, count the `annotations`, `persons`, and `pipelines` fields; for included persons and pipelines, count `summaries`. Preserve the original HTTP field-shape evidence before filtering references. Distinguish absent/null, malformed, explicit empty, and active-reference collections. An absent or malformed core projection makes the export partial with exit 2, even when initial/final material IDs match. Reverse edges may recover individual bodies and memberships without proving a complete projection. These are aggregate counts; no excluded titles, identifiers, or URLs enter the report. Preflight warns when its bounded samples encounter these gaps. Existing `0.4.1-dev` archives predate this stricter status rule.

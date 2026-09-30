@@ -165,10 +165,12 @@ func (r *run) render() error {
 	edges := []PublicEdge{}
 	entries := []TimelineEntry{}
 	undated := []*Meta{}
+	r.progress.Stage("Index graph and chronology", len(r.meta))
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err
 		}
+		r.progress.Add(1)
 		if m.State != "included" {
 			continue
 		}
