@@ -1,6 +1,6 @@
 # Pieces Export product and implementation specification
 
-Updated 2026-09-29. This document defines the requested product. [TODO.md](TODO.md) is the execution and acceptance checklist; checked items require implementation and evidence. [EXPORT_GUIDE.md](EXPORT_GUIDE.md) remains the source-backed API reference, and [PRIVACY_FILTERING.md](PRIVACY_FILTERING.md) explains privacy tradeoffs. The canonical folder map and naming contract are in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md). A requirement in this specification is not a claim that it already works.
+Updated 2026-09-30. This document defines the requested product. [TODO.md](TODO.md) is the execution and acceptance checklist; checked items require implementation and evidence. [EXPORT_GUIDE.md](EXPORT_GUIDE.md) remains the source-backed API reference, and [PRIVACY_FILTERING.md](PRIVACY_FILTERING.md) explains privacy tradeoffs. The canonical folder map and naming contract are in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md). A requirement in this specification is not a claim that it already works.
 
 ## Product outcome
 
@@ -152,6 +152,16 @@ Apply the same policy to content, filenames, headings, PDF metadata, xattrs, sid
 Never overwrite an existing export. Publish only after validation; interrupted work remains explicitly partial. Cancellation must propagate through discovery, scans, reading prompts, fetching, rendering, and child processes. Record unreadable types, denied reads, drift, unsupported metadata, and PDF failures distinctly. Operational privacy failures cannot become successful filtered exports. No broad process kills, OS shutdown API, source mutations, or hidden source uploads.
 
 Acceptance requires unit/fixture tests, live read-only preflight, a real filtered export with reconciled counts, moved-folder link checks, PDF text/visual checks, metadata readback plus file-manager UI checks, six cross-builds, native tests on each supported OS/architecture, and checksum-verified binary distribution. Binaries are intentionally unsigned and unnotarized per the release decision above. See TODO for reproducible procedures and evidence.
+
+### PDF resource limits and cancellation
+
+PDF conversion has per-document budgets on both `export` and `rebuild`: `--pdf-max-input-mib 16` (range 1–128), `--pdf-max-pages 1000` (1–10000), and `--pdf-max-output-mib 64` (1–512). Zero does not disable a limit. Successful PDF archives record the effective values in `manifest.json` under `pdf_limits`; Markdown-only archives omit that field. Rebuilding uses current defaults or explicitly supplied limits, rather than inheriting a previous renderer's limits. The input limit also bounds document metadata separately; accumulated link annotation payloads share the output budget as a conservative pre-serialization bound.
+
+An exceeded budget is a failure (exit 1), with an actionable option name and no private document name/content in the error. The exporter does not truncate a PDF, skip a target that other PDFs link to, or finalize the archive. Approved Markdown and any earlier generated files remain in the `.partial` folder; that folder is not resumable or accepted by `rebuild`. For large histories, finish a Markdown archive first, then run `rebuild --source <finalized-archive> --format both --output <new-folder>`. A failed PDF attempt can then be retried from the same finalized Markdown archive without reading OS again. Automatic splitting of oversized indexes/digests is still pending.
+
+Wrapping processes bounded UTF-8 chunks and retains only a short keep-together prefix. Cancellation is checked during code-block extraction, AST traversal, wrapping, line/page rendering, link processing, file reads, PDF output writes, and audits. Long documents print a content-free page count every 25 pages. Malformed/oversized glyph widths and unusually large unwrapped lines fail rather than loop indefinitely. The PDF writer latches cancellation/size errors even if the underlying library discards an individual write error. Code-block extraction uses a linear builder instead of repeatedly copying the whole block.
+
+These are input/output/page bounds, **not a hard process-memory or CPU deadline**. Markdown parsing, font parsing (maximum 32 MiB), PDF font serialization, and individual parser/library operations remain synchronous; context cancellation is checked around calls but cannot interrupt their internals. Strict isolation/deadlines, worst-case memory measurements, automatic document splitting, and broader font/layout coverage remain release work.
 
 ## Output destination, adaptive reads, and terminal progress
 

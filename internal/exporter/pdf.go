@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html"
 	"io/fs"
@@ -42,10 +43,13 @@ type pdfBlock struct {
 }
 
 // Extract displayed inline text, omitting Markdown punctuation and destinations.
-func inlineText(n ast.Node, data []byte) string {
+func inlineText(ctx context.Context, n ast.Node, data []byte) string {
 	var b strings.Builder
 	var visit func(ast.Node, bool)
 	visit = func(node ast.Node, code bool) {
+		if ctx.Err() != nil {
+			return
+		}
 		switch item := node.(type) {
 		case *ast.CodeSpan:
 			for c := item.FirstChild(); c != nil; c = c.NextSibling() {
@@ -71,6 +75,9 @@ func inlineText(n ast.Node, data []byte) string {
 			return
 		case *ast.RawHTML:
 			for i := 0; i < item.Segments.Len(); i++ {
+				if ctx.Err() != nil {
+					return
+				}
 				segment := item.Segments.At(i)
 				b.Write(segment.Value(data))
 			}
@@ -84,29 +91,56 @@ func inlineText(n ast.Node, data []byte) string {
 	return b.String()
 }
 
-func ValidatePDFFont(path string) error {
-	st, err := os.Stat(path)
-	if err != nil || !st.Mode().IsRegular() || st.Size() > 32<<20 {
-		return errConfig("PDF font unreadable or larger than 32 MiB")
-	}
-	font, err := os.ReadFile(path)
+func ValidatePDFFont(ctx context.Context, path string) error {
+	font, err := readPDFFont(ctx, path)
 	if err != nil {
-		return errConfig("PDF font could not be read")
+		return err
 	}
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
-	if err := pdf.AddTTFFontData("body", font); err != nil {
+	return addPDFFont(ctx, &pdf, font, gopdf.TtfOption{})
+}
+
+func readPDFFont(ctx context.Context, path string) ([]byte, error) {
+	font, err := readPDFBytes(ctx, path, 32<<20, errConfig("PDF font exceeds 32 MiB"))
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil {
+		return nil, errConfig("PDF font unreadable or larger than 32 MiB")
+	}
+	return font, nil
+}
+
+// Parsing is bounded by font bytes but the library is synchronous; cancellation
+// cannot preempt it mid-call. Recover malformed-font panics as ordinary errors.
+func addPDFFont(ctx context.Context, pdf *gopdf.GoPdf, data []byte, option gopdf.TtfOption) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	defer func() {
+		if recover() != nil {
+			err = errConfig("PDF font is not a supported TrueType font")
+		}
+	}()
+	if err := pdf.AddTTFFontDataWithOption("body", data, option); err != nil {
 		return errConfig("PDF font is not a supported TrueType font")
 	}
-	return nil
+	return ctx.Err()
 }
 
 // Only Markdown text and link destinations enter the PDF. No HTML execution,
 // remote images, filesystem image reads, or imported source PDFs are enabled.
-func markdownBlocks(data []byte) []pdfBlock {
+func markdownBlocks(ctx context.Context, data []byte) ([]pdfBlock, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	root := goldmark.New(goldmark.WithExtensions(extension.Table)).Parser().Parse(text.NewReader(data))
 	blocks := []pdfBlock{}
-	_ = ast.Walk(root, func(n ast.Node, enter bool) (ast.WalkStatus, error) {
+	err := ast.Walk(root, func(n ast.Node, enter bool) (ast.WalkStatus, error) {
+		if err := ctx.Err(); err != nil {
+			return ast.WalkStop, err
+		}
 		if !enter {
 			return ast.WalkContinue, nil
 		}
@@ -115,51 +149,58 @@ func markdownBlocks(data []byte) []pdfBlock {
 		case *ast.Heading:
 			block.Size = max(12, float64(24-node.Level*2))
 			block.Heading = true
-			block.Text = inlineText(node, data)
+			block.Text = inlineText(ctx, node, data)
 		case *ast.Paragraph:
-			block.Text = inlineText(node, data)
+			block.Text = inlineText(ctx, node, data)
 		case *ast.TextBlock:
-			block.Text = inlineText(node, data)
+			block.Text = inlineText(ctx, node, data)
 		case *ast.FencedCodeBlock:
 			block.Code = true
 			block.Size = 9
-			for i := 0; i < node.Lines().Len(); i++ {
-				line := node.Lines().At(i)
-				block.Text += string(line.Value(data))
-			}
 		case *ast.CodeBlock:
 			block.Code = true
 			block.Size = 9
-			for i := 0; i < node.Lines().Len(); i++ {
-				line := node.Lines().At(i)
-				block.Text += string(line.Value(data))
-			}
 		case *ast.HTMLBlock:
 			block.Code = true
 			block.Size = 9
-			for i := 0; i < node.Lines().Len(); i++ {
-				line := node.Lines().At(i)
-				block.Text += string(line.Value(data))
-			}
 		default:
 			if n.Kind().String() == "TableRow" || n.Kind().String() == "TableHeader" {
 				cells := []string{}
 				for cell := n.FirstChild(); cell != nil; cell = cell.NextSibling() {
-					cells = append(cells, inlineText(cell, data))
+					if err := ctx.Err(); err != nil {
+						return ast.WalkStop, err
+					}
+					cells = append(cells, inlineText(ctx, cell, data))
 				}
 				block.Text = strings.Join(cells, " | ")
 			} else {
 				return ast.WalkContinue, nil
 			}
 		}
-		_ = ast.Walk(n, func(child ast.Node, in bool) (ast.WalkStatus, error) {
+		if block.Code {
+			var b strings.Builder
+			for i := 0; i < n.Lines().Len(); i++ {
+				if err := ctx.Err(); err != nil {
+					return ast.WalkStop, err
+				}
+				line := n.Lines().At(i)
+				b.Write(line.Value(data))
+			}
+			block.Text = b.String()
+		}
+		if err := ast.Walk(n, func(child ast.Node, in bool) (ast.WalkStatus, error) {
+			if err := ctx.Err(); err != nil {
+				return ast.WalkStop, err
+			}
 			if in {
 				if link, ok := child.(*ast.Link); ok {
-					block.Links = append(block.Links, pdfLink{inlineText(link, data), string(link.Destination)})
+					block.Links = append(block.Links, pdfLink{inlineText(ctx, link, data), string(link.Destination)})
 				}
 			}
 			return ast.WalkContinue, nil
-		})
+		}); err != nil {
+			return ast.WalkStop, err
+		}
 		if n.Parent() != nil && n.Parent().Kind() == ast.KindListItem {
 			block.Text = "• " + block.Text
 		}
@@ -168,15 +209,23 @@ func markdownBlocks(data []byte) []pdfBlock {
 		}
 		return ast.WalkSkipChildren, nil
 	})
-	return blocks
+	return blocks, err
 }
 
 func (r *run) renderPDFs() error {
+	limits := r.opts.PDFLimits.defaults()
+	if err := limits.Validate(); err != nil {
+		return err
+	}
+	r.manifest.PDFLimits = &limits
 	if r.opts.Progress != nil {
 		fmt.Fprintln(r.opts.Progress, "Converting approved Markdown to PDFs...")
 	}
 	paths := []string{}
 	err := filepath.WalkDir(r.stage, func(path string, d fs.DirEntry, err error) error {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
 		if err != nil {
 			return err
 		}
@@ -195,11 +244,10 @@ func (r *run) renderPDFs() error {
 	sort.Strings(paths)
 	r.progress.Stage("Render PDFs", len(paths))
 	for _, path := range paths {
-		r.progress.Add(1)
 		if r.ctx.Err() != nil {
 			return r.ctx.Err()
 		}
-		data, err := os.ReadFile(filepath.Join(r.stage, path))
+		data, err := readPDFInput(r.ctx, filepath.Join(r.stage, path), int64(limits.InputMiB)<<20)
 		if err != nil {
 			return err
 		}
@@ -216,6 +264,7 @@ func (r *run) renderPDFs() error {
 		if meta != nil {
 			r.documentMetadata[target] = meta
 		}
+		r.progress.Add(1)
 	}
 	// Some destinations are rendered later in the loop. Check their existence
 	// after all PDFs have been written, including in unfiltered mode.
@@ -227,6 +276,25 @@ func (r *run) renderPDFs() error {
 	return nil
 }
 func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadata) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	limits := r.opts.PDFLimits.defaults()
+	if err := limits.Validate(); err != nil {
+		return 0, err
+	}
+	if len(data) > limits.InputMiB<<20 {
+		return 0, pdfLimitError("pdf-max-input-mib", limits.InputMiB)
+	}
+	if meta != nil {
+		size := len(meta.Title) + len(meta.Description)
+		for _, tag := range meta.NativeTags {
+			size += len(tag) + 2
+		}
+		if size > limits.InputMiB<<20 {
+			return 0, pdfLimitError("pdf-max-input-mib", limits.InputMiB)
+		}
+	}
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.SetMargins(44, 44, 44, 44)
@@ -236,16 +304,13 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 	option := gopdf.TtfOption{OnGlyphNotFound: func(c rune) { missing[c] = true }, OnGlyphNotFoundSubstitute: func(rune) rune { return '?' }}
 	font := goregular.TTF
 	if r.opts.PDFFont != "" {
-		st, err := os.Stat(r.opts.PDFFont)
-		if err != nil || st.Size() > 32<<20 {
-			return 0, errConfig("PDF font unreadable or larger than 32 MiB")
-		}
-		font, err = os.ReadFile(r.opts.PDFFont)
+		var err error
+		font, err = readPDFFont(r.ctx, r.opts.PDFFont)
 		if err != nil {
-			return 0, errConfig("PDF font could not be read")
+			return 0, err
 		}
 	}
-	if err := pdf.AddTTFFontDataWithOption("body", font, option); err != nil {
+	if err := addPDFFont(r.ctx, &pdf, font, option); err != nil {
 		return 0, err
 	}
 	info := gopdf.PdfInfo{Title: "Pieces export", Creator: "Pieces Export"}
@@ -255,11 +320,21 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 
 	}
 	pdf.SetInfo(info)
+	annotationBytes := 0
 	page := 0
 	y := float64(44)
 	newPage := func() error {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
+		if page >= limits.Pages {
+			return pdfLimitError("pdf-max-pages", limits.Pages)
+		}
 		pdf.AddPage()
 		page++
+		if page%25 == 0 && r.opts.Progress != nil {
+			fmt.Fprintf(r.opts.Progress, "PDF progress: current document %d pages\n", page)
+		}
 		y = 44
 		if err := pdf.SetFont("body", "", 9); err != nil {
 			return err
@@ -279,32 +354,10 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 		if err := pdf.SetFont("body", "", size); err != nil {
 			return err
 		}
-		lines := []string{}
-		for _, paragraph := range strings.Split(strings.ReplaceAll(value, "\t", "    "), "\n") {
-			if paragraph == "" {
-				lines = append(lines, "")
-				continue
-			}
-			wrapped, err := pdf.SplitTextWithWordWrap(paragraph, 507)
-			if err != nil {
+		writeLine := func(line string) error {
+			if err := r.ctx.Err(); err != nil {
 				return err
 			}
-			lines = append(lines, wrapped...)
-		}
-		height := float64(len(lines))*size*1.5 + 6
-		if heading {
-			height += 60
-		}
-		// Keep headings with following text and ordinary short blocks together.
-		if height < 741 && y+height > 785 && y > 44 {
-			if err := newPage(); err != nil {
-				return err
-			}
-			if err := pdf.SetFont("body", "", size); err != nil {
-				return err
-			}
-		}
-		for _, line := range lines {
 			if y+size*1.5 > 785 {
 				if err := newPage(); err != nil {
 					return err
@@ -327,6 +380,12 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 				if err != nil {
 					return err
 				}
+				// Budget annotation payloads before the library and action-slot
+				// map retain them, including repeated wrapped-link annotations.
+				annotationBytes += len(destination) + 256
+				if annotationBytes > limits.OutputMiB<<20 {
+					return pdfLimitError("pdf-max-output-mib", limits.OutputMiB)
+				}
 				annotation := destination
 				if strings.HasPrefix(destination, "/A <<") {
 					annotation = slots.reserve(destination)
@@ -334,16 +393,70 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 				pdf.AddExternalLink(annotation, 44, y, width, size*1.5)
 			}
 			y += size * 1.5
+			return nil
+		}
+		// Buffer only a page-sized prefix for keep-together layout. Large
+		// paragraphs/code blocks stream into the renderer and check context.
+		pending := []string{}
+		streaming := false
+		flush := func() error {
+			for _, line := range pending {
+				if err := writeLine(line); err != nil {
+					return err
+				}
+			}
+			pending = nil
+			return nil
+		}
+		height := func() float64 {
+			h := float64(len(pending))*size*1.5 + 6
+			if heading {
+				h += 60
+			}
+			return h
+		}
+		if err := walkPDFLines(r.ctx, &pdf, value, 507, func(line string) error {
+			if streaming {
+				return writeLine(line)
+			}
+			pending = append(pending, line)
+			if height() >= 741 {
+				streaming = true
+				return flush()
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		if !streaming {
+			if y+height() > 785 && y > 44 {
+				if err := newPage(); err != nil {
+					return err
+				}
+				if err := pdf.SetFont("body", "", size); err != nil {
+					return err
+				}
+			}
+			if err := flush(); err != nil {
+				return err
+			}
 		}
 		y += 6
 		return nil
 	}
-	for _, block := range markdownBlocks(data) {
+	blocks, err := markdownBlocks(r.ctx, data)
+	if err != nil {
+		return 0, err
+	}
+	for _, block := range blocks {
 		if r.ctx.Err() != nil {
 			return 0, r.ctx.Err()
 		}
 		links := []pdfLink{}
 		for _, link := range block.Links {
+			if err := r.ctx.Err(); err != nil {
+				return 0, err
+			}
 			u, err := url.Parse(link.Destination)
 			if err != nil {
 				continue
@@ -394,8 +507,14 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 			}
 		}
 	}
-	var output bytes.Buffer
+	output := pdfOutputBuffer{ctx: r.ctx, limit: limits.OutputMiB << 20}
 	if err := pdf.Write(&output); err != nil {
+		return 0, err
+	}
+	if output.err != nil {
+		return 0, output.err
+	}
+	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
 	pdfBytes, err := slots.apply(output.Bytes())
@@ -404,6 +523,12 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 	}
 	pdfBytes, err = pdfInformation(pdfBytes, meta)
 	if err != nil {
+		return 0, err
+	}
+	if len(pdfBytes) > limits.OutputMiB<<20 {
+		return 0, pdfLimitError("pdf-max-output-mib", limits.OutputMiB)
+	}
+	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
 	if err := writeFile(filepath.Join(r.stage, target), pdfBytes); err != nil {
@@ -426,6 +551,9 @@ func (r *run) auditPDF(path string) error {
 }
 
 func (r *run) auditPDFFile(path string, targetsExist, content bool) (err error) {
+	if err := r.ctx.Err(); err != nil {
+		return err
+	}
 	defer func() {
 		if recover() != nil {
 			err = errConfig("generated PDF could not be validated")
@@ -440,11 +568,21 @@ func (r *run) auditPDFFile(path string, targetsExist, content bool) (err error) 
 	if err != nil {
 		return err
 	}
+	limits := r.opts.PDFLimits.defaults()
+	if st.Size() > int64(limits.OutputMiB)<<20 {
+		return pdfLimitError("pdf-max-output-mib", limits.OutputMiB)
+	}
 	pdf, err := pdfread.NewReader(f, st.Size())
 	if err != nil {
 		return errConfig("generated PDF could not be parsed")
 	}
+	if pdf.NumPage() > limits.Pages {
+		return pdfLimitError("pdf-max-pages", limits.Pages)
+	}
 	check := func(s string) error {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
 		if content && r.opts.Mode == "filtered" {
 			return r.auditText(s)
 		}
@@ -471,6 +609,9 @@ func (r *run) auditPDFFile(path string, targetsExist, content bool) (err error) 
 		}
 		annotations := p.V.Key("Annots")
 		for i := 0; i < annotations.Len(); i++ {
+			if err := r.ctx.Err(); err != nil {
+				return err
+			}
 			action := annotations.Index(i).Key("A")
 			if !action.Key("Next").IsNull() {
 				return errConfig("PDF contains chained actions")

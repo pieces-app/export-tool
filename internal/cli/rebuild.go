@@ -28,6 +28,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	relationships := fs.String("relationships", "", "inline, sidecar, or both; default inherits the archive setting")
 	metadata := fs.String("metadata", "", "auto or off; default inherits the archive setting; sidecars always retained")
 	font := fs.String("pdf-font", "", "optional local TrueType font")
+	pdfLimits := pdfLimitFlags(fs)
 	people := fs.String("people", "", "inherit original selection, or narrow an all-people archive to profiles/connected")
 	relatedOrder := fs.String("related-order", "", "relevance or recent; default inherits the archive setting")
 	relatedLimit := fs.Int("related-limit", 0, "maximum suggestions per dimension (1–500); default inherits the archive setting")
@@ -44,6 +45,9 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	}
 	if fs.NArg() != 0 {
 		return fail(fmt.Errorf("unexpected positional arguments"))
+	}
+	if err := pdfLimits.Validate(); err != nil {
+		return fail(err)
 	}
 	m, err := exporter.InspectArchive(*source)
 	if err != nil {
@@ -82,7 +86,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 			return 0
 		}
 	}
-	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
+	m, err = exporter.Rebuild(ctx, exporter.RebuildOptions{Source: *source, Options: exporter.Options{Output: *out, Scanner: scanner, SDKCaches: caches, Format: *format, Timezone: *zone, Naming: *naming, Relationships: *relationships, Metadata: *metadata, PDFFont: *font, PDFLimits: *pdfLimits, PeopleMode: *people, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, Version: version, Progress: stderr}})
 	if err != nil {
 		return fail(err)
 	}

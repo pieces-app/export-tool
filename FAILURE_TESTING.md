@@ -58,4 +58,16 @@ docker --context desktop-linux run --rm --platform linux/arm64 \
 
 Only synthetic test executables and the release package are mounted. No source, private cache, or live export directories are exposed to the container. Its filesystem is removed on exit. GitHub Actions is not required and remains on the billing hold.
 
-Still required: native Windows runtime/long-path verification, wider filesystem coverage, crash/power-loss durability, cancellation during unusually large single-block/font rendering, and resume/recovery design. These tests do not certify those cases.
+Still required: native Windows runtime/long-path verification, wider filesystem coverage, crash/power-loss durability, strict cancellation during synchronous font/parser library calls, automatic splitting of oversized PDFs, and resume/recovery design. These tests do not certify those cases.
+
+## PDF limits and cancellation (2026-09-30)
+
+The PDF suite now covers exact input-file read bounds, oversized Markdown and metadata, page-limit failures, accumulated link payloads, actual writer-output limits, malformed/oversized fonts, invalid UTF-8, and glyphs wider than the page. A sticky writer error prevents the pinned PDF compiler's ignored write errors from producing a seemingly successful result. An export-level page-limit test verifies failed status, no final directory, retained untruncated Markdown, and rejection of the partial folder as rebuild input.
+
+A 13 MB paragraph is canceled after its third wrapped line. A separate actual renderer test cancels at the page-25 progress event inside one large paragraph; neither test relies on cancellation between documents. Wrapping is compared with the previous library output at three font sizes for normal text, long words, whitespace/tabs, empty lines, and UTF-8 chunk boundaries. Font parsing itself remains synchronous; cancellation before/after that call is not mid-parse interruption evidence.
+
+```sh
+go test -race ./internal/exporter ./internal/cli -run '^TestPDF' -count=1
+```
+
+Defaults/ranges and retry behavior are in [the PDF contract](EXPORT_SPEC.md#pdf-resource-limits-and-cancellation). Input/page/output caps are not a strict RSS/CPU ceiling. Library-internal cancellation, adversarial fonts, oversized-index splitting, and native Windows execution still require further work.

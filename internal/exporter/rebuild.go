@@ -79,6 +79,10 @@ func InspectArchive(source string) (Manifest, error) {
 // No Client is constructed: rebuilding cannot discover, launch, close, or query
 // Pieces OS. It writes a new archive and only imports canonical included JSON.
 func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
+	input.PDFLimits = input.PDFLimits.defaults()
+	if err := input.PDFLimits.Validate(); err != nil {
+		return Manifest{}, err
+	}
 	if err := ctx.Err(); err != nil {
 		return Manifest{}, err
 	}
@@ -154,7 +158,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		return Manifest{}, errConfig("invalid rebuild naming, relationship, or metadata option")
 	}
 	if o.PDFFont != "" {
-		if err := ValidatePDFFont(o.PDFFont); err != nil {
+		if err := ValidatePDFFont(ctx, o.PDFFont); err != nil {
 			return Manifest{}, err
 		}
 	}
@@ -197,6 +201,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
 	r.manifest = original
+	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.
 	digest := sha256.Sum256(manifestBytes)
 	r.manifest.Rebuild = &RebuildInfo{SourceManifestSHA256: hex.EncodeToString(digest[:]), SourceToolVersion: original.ToolVersion, SourceStarted: original.Started, SourceFinished: original.Finished, SourceStatus: original.Status, SourceCoverage: original.Coverage, SourcePeople: original.People, SourcePerformance: original.Performance, LegacyEvidence: original.ArchiveState == nil}
 	r.manifest.Rebuild.OriginalReadStarted, r.manifest.Rebuild.OriginalReadFinished = original.Started, original.Finished

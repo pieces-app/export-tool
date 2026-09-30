@@ -1,6 +1,6 @@
 # Export tool execution checklist
 
-Updated 2026-09-29. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+Updated 2026-09-30. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
 
 ## Current remaining work, in execution order
 
@@ -123,7 +123,9 @@ Implementation: render from canonical approved Markdown; retain it in PDF export
 - [x] Exercise Preview on a moved synthetic archive; fix relative-URI failure using PDF file actions and verify a summary/index round trip with an accented filename after both targets are opened directly.
 - [ ] Resolve/document first-use Preview file-access restrictions and test Acrobat/Edge plus a Linux viewer. Do not count parser/path checks as unrestricted viewer navigation.
 - [x] Test actual Linux tmpfs exhaustion during PDF writes and later metadata/archive-state output; verify the packaged CLI exits 1, removes its incomplete PDF, retains staging, and never finalizes. Test cancellation entering PDF/metadata stages and late destination collisions.
-- [ ] Test cancellation during unusually large single-block/font rendering, crash/power-loss durability, and native Windows/filesystem failure behavior. See [failure testing](FAILURE_TESTING.md).
+- [x] Bound PDF Markdown/metadata input, pages, annotation payloads, and serialized output; expose limits on export/rebuild and record them in the manifest. Stop without truncating/finalizing on limits. Test cancellation inside a large paragraph, exact wrap equivalence, malformed/oversized fonts, and actual writer errors.
+- [ ] Add automatic splitting for oversized indexes/digests and strict isolation/cancellation during font/parser library internals; measure worst-case memory. Input/page/output limits alone do not prove an RSS or time ceiling.
+- [ ] Test crash/power-loss durability and native Windows/filesystem failure behavior. See [failure testing](FAILURE_TESTING.md).
 
 ## 7. Completeness and privacy hardening
 
@@ -375,7 +377,23 @@ Live exports stay under ignored `exports/`. Record counts/timings/statuses in th
 - [x] Verify cancellation entering PDF/metadata stages and a late reconstruction-file collision. A provisional manifest inside `.partial` remains unfinalized and is rejected by offline rebuild.
 - [x] Full `go test -race ./...` passed (exporter 165.677 seconds); `go vet ./...`, final Linux exhaustion regressions, and actionlint passed. The workflow now includes the isolated Linux disk-full test for future native runners. GitHub Actions was neither dispatched nor retried.
 - [x] Build six `0.8.6-dev` binary-only packages; verify SHA-256 and exact four-file ZIP layouts including updated partial-output instructions. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild acceptance passed on macOS ARM64, macOS AMD64 under Rosetta, and isolated Linux ARM64. The Windows test executable also cross-compiled. No upload or publication occurred.
-- [ ] Run native Windows long-path/finalization tests and broaden filesystem failure coverage; verify crash/power-loss durability and cancellation during very large single-block/font rendering. Resume remains a separate unimplemented feature.
+- [ ] Run native Windows long-path/finalization tests and broaden filesystem failure coverage; verify crash/power-loss durability and strict cancellation during synchronous font/parser internals. Large single-block wrapping/rendering cancellation is now tested. Resume remains a separate unimplemented feature.
 
 Reproduction commands, behavior, and limits are in [FAILURE_TESTING.md](FAILURE_TESTING.md). These results do not close the live migration, authoritative relationship recovery, actual person reduction, viewer acceptance, or configured GCP installer/download gates.
 - Native dependency check: `GOTOOLCHAIN=go1.27.1 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...` passed with zero reachable findings. The tool also reported 3 imported-package and 18 required-module advisories outside detected called paths; this is not a universal security guarantee.
+
+## PDF resource hardening, 2026-09-30
+
+- [x] Add per-document input/metadata (16 MiB), page (1,000), and output/link payload (64 MiB) defaults, positive bounded CLI overrides, and `pdf_limits` manifest evidence. Rebuild gets current or explicitly selected budgets.
+- [x] Verify limits fail without silently truncating, removing Markdown, or finalizing; actual compiled CLI can retry PDF generation offline from a completed Markdown archive after the synthetic OS is closed.
+- [x] Check cancellation inside a single large paragraph (after line three and at page 25), not just between documents. Preserve the original wrapping for Unicode/whitespace/long-word fixtures at three sizes. Bound and validate font reads; synchronous library internals remain a documented gap.
+- [x] Replace quadratic code/HTML-block concatenation with a builder. The isolated parser benchmark processed 1,000 lines in about 91 µs and 10,000 in about 557 µs on this host; these are small synthetic parse timings, not full-export speed predictions.
+- [x] Package `0.8.9-dev` for all six targets, verify ZIP hashes/layouts, and pass actual packaged ordinary/cache/summaries/rebuild/legacy/PDF-limit tests on macOS ARM64, Rosetta AMD64, and isolated Linux ARM64. Bash installer cases and Linux actual disk-full cases pass; PowerShell still uses substituted file transport on macOS. Windows test executable cross-compiles.
+- [x] Strictly parse 30 synthetic PDFs (38 pages), verify 146 local destinations, and visually inspect all six long-document pages plus both summary pages. See NATIVE_GUI_ACCEPTANCE for the scope and retained viewer limitations.
+- [ ] Automatically split huge indexes/digests while preserving every local PDF destination; measure peak memory and isolate non-interruptible font/parser work. Input/page/output budgets are not a process RSS/CPU ceiling.
+
+No new OS requests were made for this work. The original `0.4.1-dev` live all-data export continues unchanged; these tests do not certify its eventual contents, body recovery, or person reduction. The native workflow includes the packaged PDF-limit test for later execution; GitHub Actions remains on hold.
+
+Live run check during this pass: the original process was confirmed active after about 18 hours. Collection fetching and inventory reconciliation had finished at 54,121 requests, zero retries, and 381 adaptive backoffs. Privacy reconciliation was still running after 40 minutes; no manifest/final directory exists yet. Client RSS was about 3.94 GiB and the host had about 205 GiB free. This is an in-progress observation, not a completion/throughput acceptance result; no competing live reader or lifecycle action was started.
+
+Final verification for this change: `go test -race ./...` passed (exporter 131.682 seconds); `go vet ./...`, actionlint, and `git diff --check` passed. The pinned Go 1.27.1 / govulncheck 1.8.0 scan reported zero reachable findings; the same three imported-package and 18 required-module advisories remain outside detected called paths. No universal security or platform-readiness claim follows from those checks.

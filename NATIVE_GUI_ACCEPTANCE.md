@@ -43,3 +43,9 @@ Use Markdown for the complete navigable archive. PDF mode remains subject to vie
 5. Run `go test ./internal/exporter -run 'TestPDF|TestReadableSummaryGraphPDFAndMetadata|TestOrganizedCanonicalPathsSharedMembershipAndPrivacy' -count=1`. Regressions cover moved folders, accents/spaces/parentheses/percent/hash characters, Unicode fallback, retained labels, missing targets, root escape, Windows absolute paths, unsupported actions, filename mismatch, and action-slot corruption.
 
 The CLI packages remain development builds until the live export, recovery/reconciliation, other native runtimes/viewers, and configured download/install path pass the broader checklist in [TODO.md](TODO.md).
+
+## PDF rendering regression, 2026-09-30 (`0.8.9-dev`)
+
+Local synthetic fixtures after the bounded wrapping change produced 28 PDFs/31 pages/144 local links in `exports/qa-pdf-limits-089` and two PDFs/seven pages/two local links in `exports/qa-pdf-long-layout-089`. Strict pypdf parsing and all local destinations passed. Poppler rendered the complete six-page long document and two-page summary; all eight images were visually inspected. Paragraph/code continuations, accented text, table fallback, headings, footers, and the related-summary link sections were readable with no clipping or overlap. Trailing text markers in paragraphs/code/tables survived extraction. Intermediate PNGs are under `exports/qa-pdf-preview/089`.
+
+This is a renderer regression check, not a new Preview/Finder/Windows/Linux GUI test. The previously documented Preview first-use access alerts, MacRoman filename limit, and Finder Comments limitation still apply.

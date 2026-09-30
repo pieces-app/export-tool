@@ -58,6 +58,18 @@ func TestScopeValidationBeforeConnection(t *testing.T) {
 	}
 }
 
+func TestPDFLimitsValidatedBeforeConnectionOrArchiveReads(t *testing.T) {
+	for _, command := range []string{"export", "rebuild"} {
+		for _, flags := range [][]string{{"--pdf-max-pages", "0"}, {"--pdf-max-pages", "10001"}, {"--pdf-max-input-mib", "129"}, {"--pdf-max-output-mib", "-1"}} {
+			var out, errs bytes.Buffer
+			args := append([]string{command}, flags...)
+			if code := Run(context.Background(), args, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "PDF limits") {
+				t.Fatalf("PDF validation did not precede source access: %d %s", code, errs.String())
+			}
+		}
+	}
+}
+
 func TestPolicyInitDoesNotOverwrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "policy.json")
 	var out, errs bytes.Buffer

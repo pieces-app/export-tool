@@ -96,7 +96,10 @@ func TestUnresolvableEmbeddedLinksBecomeText(t *testing.T) {
 }
 
 func TestPDFUsesDisplayedMarkdownText(t *testing.T) {
-	blocks := markdownBlocks([]byte("# A heading\n\n[Display **label**](../a%20b.md) and `snake_case`, escaped\\_text &amp; entities.\n"))
+	blocks, err := markdownBlocks(context.Background(), []byte("# A heading\n\n[Display **label**](../a%20b.md) and `snake_case`, escaped\\_text &amp; entities.\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(blocks) != 2 || blocks[1].Text != "Display label and snake_case, escaped_text & entities." || len(blocks[1].Links) != 1 || blocks[1].Links[0].Label != "Display label" {
 		t.Fatalf("PDF displayed Markdown syntax: %+v", blocks)
 	}

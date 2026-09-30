@@ -115,6 +115,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		fs.BoolVar(yes, "y", false, "approve export without interactive prompts")
 		format := fs.String("format", "", "markdown, pdf (with Markdown companions), or both")
 		pdfFont := fs.String("pdf-font", "", "optional local TrueType font for additional Unicode coverage")
+		pdfLimits := pdfLimitFlags(fs)
 		naming := fs.String("naming", "readable", "readable summary names or opaque")
 		relationships := fs.String("relationships", "both", "inline, sidecar, or both")
 		relatedOrder := fs.String("related-order", "relevance", "rank related summaries by relevance or recent")
@@ -189,8 +190,14 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("related-since must be YYYY-MM-DD or RFC3339"))
 			}
 		}
+		if err := pdfLimits.Validate(); err != nil {
+			return fail(err)
+		}
 		if *pdfFont != "" {
-			if err := exporter.ValidatePDFFont(*pdfFont); err != nil {
+			if err := ctx.Err(); err != nil {
+				return fail(err)
+			}
+			if err := exporter.ValidatePDFFont(ctx, *pdfFont); err != nil {
 				return fail(err)
 			}
 		}
@@ -354,7 +361,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
 		if err != nil {
 			return fail(err)

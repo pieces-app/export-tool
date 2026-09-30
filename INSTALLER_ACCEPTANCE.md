@@ -68,3 +68,5 @@ The bootstrap scripts did not change during this acceptance work. The previously
 The unattended complete/remove, complete/keep, and partial/remove cases were repeated successfully for `0.8.7-dev`: Bash HTTPS on macOS ARM64 and isolated Linux ARM64, plus PowerShell 7 with substituted file transport on macOS. The earlier interactive prompt evidence used `0.8.6-dev`; the scripts themselves are unchanged.
 
 The same unattended cases also passed with the `0.8.8-dev` packages on those platforms and transports, after the unchanged-record optimization. The CLI still scans retained records, returns partial status when selected content is unavailable, and leaves the finalized export after installer cleanup.
+
+The unattended actual-package cases also passed for `0.8.9-dev` on macOS ARM64 (Bash local HTTPS and PowerShell substituted file transport) and isolated Linux ARM64 (Bash local HTTPS). Complete/remove, complete/keep, and partial/remove retained the exported files as intended. Installer scripts and the published Gist are unchanged; this does not verify public hosting or native Windows execution.

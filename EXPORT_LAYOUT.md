@@ -1,6 +1,6 @@
 # Export folders, naming, and navigation
 
-Updated 2026-09-29. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest below remains planned.
+Updated 2026-09-30. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest below remains planned.
 
 ## Where the export goes
 
@@ -17,6 +17,8 @@ In PowerShell:
 ```
 
 Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder; resume is not implemented. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
+
+PDF limits and failure behavior are described in the [specification](EXPORT_SPEC.md#pdf-resource-limits-and-cancellation). Oversized documents are not truncated or automatically split; the entire PDF export stays unfinished on a limit failure. A finalized Markdown archive can be rebuilt repeatedly into separate destinations without rereading OS.
 
 ## Optional event history
 

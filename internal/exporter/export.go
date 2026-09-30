@@ -23,6 +23,7 @@ type Options struct {
 	Output, Mode, Timezone, Version         string
 	Format, Naming, Relationships, Metadata string
 	PDFFont                                 string
+	PDFLimits                               PDFLimits
 	PeopleMode                              string
 	MinPersonConnections                    int
 	RelatedOrder                            string
@@ -67,6 +68,7 @@ type Manifest struct {
 	RelatedLimit            int                      `json:"related_limit"`
 	RelatedSince            string                   `json:"related_since,omitempty"`
 	Format                  string                   `json:"format"`
+	PDFLimits               *PDFLimits               `json:"pdf_limits,omitempty"`
 	Warnings                []string                 `json:"warnings,omitempty"`
 	FormatVersion           int                      `json:"format_version"`
 	ToolVersion             string                   `json:"tool_version"`
@@ -195,6 +197,10 @@ func title(v map[string]any, m Material) string {
 }
 
 func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+	o.PDFLimits = o.PDFLimits.defaults()
+	if err := o.PDFLimits.Validate(); err != nil {
+		return Manifest{}, err
+	}
 	if err := validateScope(o); err != nil {
 		return Manifest{}, err
 	}
@@ -254,7 +260,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		return Manifest{}, errConfig("invalid format, naming, metadata, or relationships option")
 	}
 	if o.PDFFont != "" {
-		if err := ValidatePDFFont(o.PDFFont); err != nil {
+		if err := ValidatePDFFont(ctx, o.PDFFont); err != nil {
 			return Manifest{}, err
 		}
 	}
