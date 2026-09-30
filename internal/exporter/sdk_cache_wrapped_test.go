@@ -126,7 +126,11 @@ func TestWrappedSDKCacheCandidateRulesAndSharedBounds(t *testing.T) {
 			if good == nil || good.evidence.Material != table.material || good.evidence.RecordRef != opaque(table.material, "good") || good.evidence.CachedUpdated != "" {
 				t.Fatal("wrapper identity/type provenance was not retained")
 			}
-			if r.manifest.SDKCache.Invalid != 4 || r.manifest.SDKCache.UnknownFields != 1 || r.manifest.SDKCache.IdentityMismatch != 1 || r.manifest.SDKCache.UnusableTime != 1 || r.manifest.SDKCache.Matching != 0 {
+			invalid, emptyViews := 4, 0
+			if table.isProviderView() {
+				invalid, emptyViews = 3, 1
+			}
+			if r.manifest.SDKCache.Invalid != invalid || r.manifest.SDKCache.EmptyViews != emptyViews || r.manifest.SDKCache.UnknownFields != 1 || r.manifest.SDKCache.IdentityMismatch != 1 || r.manifest.SDKCache.UnusableTime != 1 || r.manifest.SDKCache.Matching != 0 {
 				t.Fatalf("unexpected aggregate coverage: %+v", r.manifest.SDKCache)
 			}
 			for _, budget := range []cacheReadBudget{{edges: maxCacheEdges}, {bytes: maxCacheReferenceBytes}} {
@@ -156,7 +160,7 @@ func wrappedExportFixture(t *testing.T) (*fakeOS, string) {
 		v["name"] = id
 		f.data["SIGNALS"] = append(f.data["SIGNALS"], v)
 	}
-	for id, typ := range map[string]string{"safe-body": "SIGNAL_DESCRIPTION", "inverse-body": "SIGNAL_DESCRIPTION", "private-body": "SIGNAL_DESCRIPTION", "summary-body": "SUMMARY", "profile": "HIERARCHICAL_PROFILE_SUMMARY"} {
+	for id, typ := range map[string]string{"safe-body": "SIGNAL_DESCRIPTION", "inverse-body": "SIGNAL_DESCRIPTION", "private-body": "SIGNAL_DESCRIPTION", "summary-body": "SUMMARY", "profile": "HIERARCHICAL_PROFILE_SUMMARY", "view-body": "SUMMARY", "view-description": "DESCRIPTION", "ui-only-body": "SUMMARY"} {
 		v := wrappedCurrent(id)
 		v["type"], v["text"] = typ, "Current retained narrative for "+id+"."
 		if id == "private-body" {
@@ -167,7 +171,7 @@ func wrappedExportFixture(t *testing.T) (*fakeOS, string) {
 	event := wrappedCurrent("bank-event")
 	event["url"] = "https://bank.example/private"
 	f.data["WORKSTREAM_EVENTS"] = []map[string]any{event}
-	f.data["WORKSTREAM_SUMMARIES"] = []map[string]any{wrappedCurrent("summary")}
+	f.data["WORKSTREAM_SUMMARIES"] = []map[string]any{wrappedCurrent("summary"), wrappedCurrent("view-summary"), wrappedCurrent("ui-only-summary")}
 	p := wrappedCurrent("person")
 	p["name"] = "Fixture Person"
 	f.data["PERSONS"] = []map[string]any{p}
@@ -181,6 +185,11 @@ func wrappedExportFixture(t *testing.T) (*fakeOS, string) {
 	person := wrappedHistorical("person", "annotations", "profile")
 	person["summaries"] = refs("summary")
 	wrappedCacheTable(t, db, "persons", []map[string]any{person})
+	wrappedCacheTable(t, db, "summaries_annotation_summary", []map[string]any{wrappedHistorical("view-body", "summaries", "view-summary"), wrappedCurrent("ui-only-body")})
+	wrappedCacheTable(t, db, "summaries_annotation_description", []map[string]any{wrappedHistorical("view-description", "summaries", "view-summary")})
+	if _, err := db.Exec("UPDATE summaries_annotation_summary SET key='SummaryRollupAnnotationNotifier(ui-only-summary)' WHERE key='1'; INSERT INTO summaries_annotation_summary (key,json) VALUES ('empty-view','null'),('draft-view','{\"os\":null}')"); err != nil {
+		t.Fatal(err)
+	}
 	return f, cache
 }
 
@@ -205,6 +214,18 @@ func assertWrappedRecovered(t *testing.T, output string, m Manifest, policy Poli
 	b, err := os.ReadFile(filepath.Join(output, links[opaque("WORKSTREAM_SUMMARIES", "summary")]))
 	if err != nil || !strings.Contains(string(b), "Current retained narrative for summary-body.") || !strings.Contains(string(b), "ANNOTATIONS record updated") {
 		t.Fatal("inverse cached summary body/provenance missing")
+	}
+	b, err = os.ReadFile(filepath.Join(output, links[opaque("WORKSTREAM_SUMMARIES", "view-summary")]))
+	if err != nil || !strings.Contains(string(b), "Current retained narrative for view-body.") || !strings.Contains(string(b), "Current retained narrative for view-description.") {
+		t.Fatal("canonical relationships from provider annotations were not recovered")
+	}
+	b, err = os.ReadFile(filepath.Join(output, links[opaque("WORKSTREAM_SUMMARIES", "ui-only-summary")]))
+	if err != nil || strings.Contains(string(b), "Current retained narrative for ui-only-body.") {
+		t.Fatal("UI provider key became a source attachment")
+	}
+	b, _ = os.ReadFile(filepath.Join(output, "relationships.jsonl"))
+	if !strings.Contains(string(b), `"record_table":"summaries_annotation_summary"`) || !strings.Contains(string(b), `"record_table":"summaries_annotation_description"`) || m.SDKCache.EmptyViews != 2 {
+		t.Fatal("provider table provenance or empty-view accounting missing")
 	}
 	profiles, _ := filepath.Glob(filepath.Join(output, "workstream_summaries/personas/related_persons/*/profile.md"))
 	if len(profiles) != 1 {
@@ -517,4 +538,76 @@ func TestActualLegacyWrappedCacheEligibility(t *testing.T) {
 		t.Fatal("old archive was modified")
 	}
 	t.Log("actual 0.9.1-dev archive remains partial: unknown wrapped eligibility counted and not inferred; source unchanged")
+}
+
+func TestSDKProviderCacheFieldPrecedenceAndPrivacy(t *testing.T) {
+	for _, scenario := range []string{"current-empty", "current-positive", "blocked-current-empty", "source-empty", "newer-view-empty", "cross-table-conflict", "null-view", "canonical-view"} {
+		t.Run(scenario, func(t *testing.T) {
+			summary, body := wrappedCurrent("summary"), wrappedCurrent("body")
+			body["type"], body["text"] = "SUMMARY", "Provider attachment body."
+			old := wrappedHistorical("body", "summaries", "summary")
+			view := wrappedHistorical("body", "summaries", "summary")
+			wantBody, wantBodyRecord, wantConflicts, wantInverse := true, true, 0, 0
+			switch scenario {
+			case "current-empty", "blocked-current-empty":
+				summary["annotations"], wantBody = refs(), false
+				if scenario == "blocked-current-empty" {
+					summary["url"], wantBodyRecord = "https://bank.example/private", false
+				} else {
+					wantInverse = 1
+				}
+			case "current-positive":
+				summary["annotations"], wantInverse = refs("body"), 1
+			case "source-empty":
+				body["summaries"], wantBody = refs(), false
+			case "newer-view-empty":
+				view["summaries"], view["updated"], wantBody = refs(), map[string]any{"value": "2026-09-28T00:00:00Z"}, false
+			case "cross-table-conflict":
+				view["summaries"], wantBody, wantConflicts = refs("different-summary"), false, 1
+			}
+			cache, db := cacheFixture(t, nil, false)
+			if scenario == "newer-view-empty" || scenario == "cross-table-conflict" || scenario == "null-view" {
+				wrappedCacheTable(t, db, "annotations", []map[string]any{old})
+			}
+			if scenario == "null-view" {
+				wrappedCacheTable(t, db, "summaries_annotation_summary", nil)
+				if _, err := db.Exec("INSERT INTO summaries_annotation_summary (key,json) VALUES ('SummaryRollupAnnotationNotifier(summary)','null')"); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				wrappedCacheTable(t, db, "summaries_annotation_summary", []map[string]any{view})
+			}
+			f := &fakeOS{data: map[string][]map[string]any{"WORKSTREAM_SUMMARIES": {summary}, "ANNOTATIONS": {body}}}
+			srv := f.server(t)
+			defer srv.Close()
+			client, _ := NewClient(srv.URL, time.Second, 8<<20)
+			materials, _ := SelectMaterials("WORKSTREAM_SUMMARIES,ANNOTATIONS")
+			policy := DefaultPolicy()
+			policy.Deny = []DomainRule{{"bank.example", true}}
+			out := filepath.Join(t.TempDir(), "archive")
+			m, err := Export(context.Background(), client, Options{Output: out, SDKCaches: []string{cache}, Mode: "filtered", Materials: materials, Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, policy)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var links map[string]string
+			b, _ := os.ReadFile(filepath.Join(out, "link-map.json"))
+			if json.Unmarshal(b, &links) != nil {
+				t.Fatal("invalid output links")
+			}
+			if (links[opaque("ANNOTATIONS", "body")] != "") != wantBodyRecord {
+				t.Fatal("cached blocked-owner dependency lost")
+			}
+			if path := links[opaque("WORKSTREAM_SUMMARIES", "summary")]; path != "" {
+				b, err := os.ReadFile(filepath.Join(out, path))
+				if err != nil || strings.Contains(string(b), "Provider attachment body.") != wantBody {
+					t.Fatal("provider recovery did not respect current/cross-table precedence")
+				}
+			} else if scenario != "blocked-current-empty" {
+				t.Fatal("summary unexpectedly lost")
+			}
+			if m.SDKCache.Conflicts != wantConflicts || m.SDKCache.InversePrecedence != wantInverse {
+				t.Fatalf("unexpected provider coverage: %+v", m.SDKCache)
+			}
+		})
+	}
 }

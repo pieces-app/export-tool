@@ -280,6 +280,7 @@ func TestLiveSDKCacheCandidates(t *testing.T) {
 		Caches               []string `json:"caches"`
 		Stage                string   `json:"stage"`
 		ReconcileAnnotations bool     `json:"reconcile_completed_annotations"`
+		CompareProviderViews bool     `json:"compare_provider_views"`
 	}
 	b, err := os.ReadFile(configPath)
 	if err != nil {
@@ -412,4 +413,7 @@ func TestLiveSDKCacheCandidates(t *testing.T) {
 	}
 	t.Logf("Completed annotation-stage probe: candidate targets=%d matched files=%d missing files=%d identity mismatches=%d nonempty-text annotations=%d SUMMARY-type nonempty-text annotations=%d; summaries with all cached annotation targets present=%d, any annotation text=%d, SUMMARY-type text=%d. Historical attachment candidates only; final privacy and authoritative completeness are not established. No archive was modified.", len(targets["annotations"]), len(present), missing, mismatched, len(textPresent), len(summaryText), allPresent, anyText, anySummaryText)
 	t.Logf("Missing annotation UUIDs matching the older payment-card heuristic=%d; this is diagnostic evidence, not proof of the omission reason. Reconcile finalized manifest decisions before any recovery.", legacyCardMatches)
+	if config.CompareProviderViews {
+		compareCachedProviderViews(t, r, config.Caches, config.Stage, candidates, summaryText)
+	}
 }

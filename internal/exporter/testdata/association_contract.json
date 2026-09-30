@@ -1,0 +1,278 @@
+[
+  {
+    "family": "connector_to_annotation_associations",
+    "path": "/connector_to_annotation_associations/connector/<connector>/annotation/<annotation>",
+    "model": "ConnectorToAnnotationAssociation",
+    "required": [
+      "id",
+      "connector",
+      "annotation",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_conversation_associations",
+    "path": "/connector_to_conversation_associations/connector/<connector>/conversation/<conversation>",
+    "model": "ConnectorToConversationAssociation",
+    "required": [
+      "id",
+      "connector",
+      "conversation",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_conversation_message_associations",
+    "path": "/connector_to_conversation_message_associations/connector/<connector>/message/<message>",
+    "model": "ConnectorToConversationMessageAssociation",
+    "required": [
+      "id",
+      "connector",
+      "conversationMessage",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_person_associations",
+    "path": "/connector_to_person_associations/connector/<connector>/person/<person>",
+    "model": "ConnectorToPersonAssociation",
+    "required": [
+      "id",
+      "connector",
+      "person",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_website_associations",
+    "path": "/connector_to_website_associations/connector/<connector>/website/<website>",
+    "model": "ConnectorToWebsiteAssociation",
+    "required": [
+      "id",
+      "connector",
+      "website",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_workstream_event_associations",
+    "path": "/connector_to_workstream_event_associations/connector/<connector>/workstream_event/<workstream_event>",
+    "model": "ConnectorToWorkstreamEventAssociation",
+    "required": [
+      "id",
+      "connector",
+      "workstreamEvent",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "connector_to_workstream_summary_associations",
+    "path": "/connector_to_workstream_summary_associations/connector/<connector>/workstream_summary/<workstream_summary>",
+    "model": "ConnectorToWorkstreamSummaryAssociation",
+    "required": [
+      "id",
+      "connector",
+      "workstreamSummary",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "fingerprint_to_person_associations",
+    "path": "/fingerprint_to_person_associations/fingerprint/<fingerprint>/person/<person>",
+    "model": "FingerprintToPersonAssociation",
+    "required": [
+      "id",
+      "fingerprint",
+      "person",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "fingerprint_to_workstream_event_associations",
+    "path": "/fingerprint_to_workstream_event_associations/fingerprint/<fingerprint>/workstream_event/<workstream_event>",
+    "model": "FingerprintToWorkstreamEventAssociation",
+    "required": [
+      "id",
+      "fingerprint",
+      "workstream_event",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_connector_associations",
+    "path": "/pipeline_to_connector_associations/pipeline/<pipeline>/connector/<connector>",
+    "model": "PipelineToConnectorAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "connector",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_range_associations",
+    "path": "/pipeline_to_range_associations/pipeline/<pipeline>/range/<range>",
+    "model": "PipelineToRangeAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "range",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_schedule_associations",
+    "path": "/pipeline_to_schedule_associations/pipeline/<pipeline>/schedule/<schedule>",
+    "model": "PipelineToScheduleAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "schedule",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_signal_associations",
+    "path": "/pipeline_to_signal_associations/pipeline/<pipeline>/signal/<signal>",
+    "model": "PipelineToSignalAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "signal",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_website_associations",
+    "path": "/pipeline_to_website_associations/pipeline/<pipeline>/website/<website>",
+    "model": "PipelineToWebsiteAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "website",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_workstream_pattern_engine_source_associations",
+    "path": "/pipeline_to_workstream_pattern_engine_source_associations/pipeline/<pipeline>/source/<source>",
+    "model": "PipelineToWorkstreamPatternEngineSourceAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "source",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "pipeline_to_workstream_summary_associations",
+    "path": "/pipeline_to_workstream_summary_associations/pipeline/<pipeline>/workstream_summary/<workstream_summary>",
+    "model": "PipelineToWorkstreamSummaryAssociation",
+    "required": [
+      "id",
+      "pipeline",
+      "workstreamSummary",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_annotation_associations",
+    "path": "/signal_to_annotation_associations/signal/<signal>/annotation/<annotation>",
+    "model": "SignalToAnnotationAssociation",
+    "required": [
+      "id",
+      "signal",
+      "annotation",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_person_associations",
+    "path": "/signal_to_person_associations/signal/<signal>/person/<person>",
+    "model": "SignalToPersonAssociation",
+    "required": [
+      "id",
+      "signal",
+      "person",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_range_associations",
+    "path": "/signal_to_range_associations/signal/<signal>/range/<range>",
+    "model": "SignalToRangeAssociation",
+    "required": [
+      "id",
+      "signal",
+      "range",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_website_associations",
+    "path": "/signal_to_website_associations/signal/<signal>/website/<website>",
+    "model": "SignalToWebsiteAssociation",
+    "required": [
+      "id",
+      "signal",
+      "website",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_workstream_event_associations",
+    "path": "/signal_to_workstream_event_associations/signal/<signal>/workstream_event/<workstream_event>",
+    "model": "SignalToWorkstreamEventAssociation",
+    "required": [
+      "id",
+      "signal",
+      "workstream_event",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "signal_to_workstream_summary_associations",
+    "path": "/signal_to_workstream_summary_associations/signal/<signal>/workstream_summary/<workstream_summary>",
+    "model": "SignalToWorkstreamSummaryAssociation",
+    "required": [
+      "id",
+      "signal",
+      "workstream_summary",
+      "created",
+      "updated"
+    ]
+  },
+  {
+    "family": "workstream_event_to_person_associations",
+    "path": "/workstream_event_to_person_associations/workstream_event/<workstream_event>/person/<person>",
+    "model": "WorkstreamEventToPersonAssociation",
+    "required": [
+      "id",
+      "workstream_event",
+      "person",
+      "created",
+      "updated"
+    ]
+  }
+]

@@ -257,3 +257,5 @@ PDF mode mirrors these documents under `pdf/signals/`, with the independent PDF 
 ## Regenerating an archive
 
 `rebuild --source <finalized-folder> --output <new-folder>` regenerates this layout offline and can add PDFs or narrow an all-people archive. Source files remain unchanged; original coverage gaps and privacy omissions persist. New format 5 state/graph/link-map checksums allow original user/projection evidence to survive rendering. Legacy format 4 imports remain partial. See [OFFLINE_REBUILD.md](OFFLINE_REBUILD.md).
+
+The `0.10.1-dev` cache reader also accepts canonical annotations embedded in the SDK's summary-body and description views. Their explicit OS fields use the same annotation paths and historical provenance as other recovered records. Provider keys never create file links. Candidate recovery and unresolved UI-only bindings are detailed in [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md#canonical-annotation-records-in-sdk-views).

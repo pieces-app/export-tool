@@ -88,7 +88,7 @@ Preservation mode bypasses content filtering and can retain credentials and priv
 
 Useful options:
 
-If you have an older native Pieces client cache, `--sdk-cache /path/to/pieces_client_sqlite.db` can recover historical summary, annotation, person, and signal links to current records. Repeat it for multiple explicitly selected files. It reads caches without modifying their records, imports no cached prose, labels recovered links with their provenance, and keeps the archive partial because cached links may be stale. Current OS fields take precedence; missing/excluded targets are not linked. This is optional and cannot promise complete recovery. Wrapped annotation/person/signal recovery requires original-field eligibility recorded by `0.10.0-dev` or newer; older archives skip unknown fields rather than infer them from filtered JSON.
+If you have an older native Pieces client cache, `--sdk-cache /path/to/pieces_client_sqlite.db` can recover historical summary, annotation, person, and signal links to current records. Repeat it for multiple explicitly selected files. It reads caches without modifying their records, imports no cached prose, labels recovered links with their provenance, and keeps the archive partial because cached links may be stale. Current OS fields take precedence; missing/excluded targets are not linked. Version `0.10.1-dev` also reads canonical annotation records in the SDK summary-body/description views; UI keys and cached text never create attachments. This is optional and cannot promise complete recovery. Wrapped annotation/person/signal recovery requires original-field eligibility recorded by `0.10.0-dev` or newer; older archives skip unknown fields rather than infer them from filtered JSON.
 
 ```sh
 ./pieces-export export --help

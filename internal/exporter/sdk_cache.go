@@ -32,6 +32,23 @@ var cacheTables = []cacheTable{
 	{"annotations", "ANNOTATIONS", true, []string{"summaries", "persons", "signals"}},
 	{"persons", "PERSONS", true, []string{"annotations", "summaries"}},
 	{"signals", "SIGNALS", true, []string{"annotations", "persons", "pipelines", "summaries", "workstream_events", "websites", "ranges"}},
+	// These SDK views contain LocalAnnotation too. Their provider keys are
+	// deliberately never read: only the nested OS record can supply an edge.
+	{"summaries_annotation_summary", "ANNOTATIONS", true, []string{"summaries", "persons", "signals"}},
+	{"summaries_annotation_description", "ANNOTATIONS", true, []string{"summaries", "persons", "signals"}},
+}
+
+func (table cacheTable) isProviderView() bool {
+	return table.table == "summaries_annotation_summary" || table.table == "summaries_annotation_description"
+}
+
+func validCacheEvidenceTable(name, material string) bool {
+	for _, table := range cacheTables {
+		if table.table == name && table.material == material {
+			return true
+		}
+	}
+	return false
 }
 
 func cacheFields(material string) []string {
@@ -65,6 +82,7 @@ type CacheEvidence struct {
 	OSUpdated           string `json:"os_summary_updated,omitempty"`
 	Material            string `json:"record_material,omitempty"`
 	RecordRef           string `json:"record_ref,omitempty"`
+	RecordTable         string `json:"record_table,omitempty"`
 	CachedRecordUpdated string `json:"cached_record_updated,omitempty"`
 	OSRecordUpdated     string `json:"os_record_updated,omitempty"`
 }
@@ -86,20 +104,22 @@ func (e CacheEvidence) description() string {
 }
 
 type CacheCoverage struct {
-	Selected         int `json:"selected_caches"`
-	Rows             int `json:"rows_read"`
-	Invalid          int `json:"invalid_or_oversized_rows"`
-	Expired          int `json:"expired_rows"`
-	Matching         int `json:"matching_summary_rows"`
-	MatchingRecords  int `json:"matching_record_rows"`
-	UnknownFields    int `json:"unknown_original_field_eligibility"`
-	IdentityMismatch int `json:"creation_time_mismatch_rows"`
-	UnusableTime     int `json:"invalid_or_future_update_rows"`
-	Conflicts        int `json:"conflicting_fields"`
-	Fields           int `json:"candidate_fields"`
-	MissingTargets   int `json:"unavailable_target_references"`
-	AddedEdges       int `json:"added_edges_before_privacy"`
-	RetainedEdges    int `json:"retained_historical_edges"`
+	Selected          int `json:"selected_caches"`
+	Rows              int `json:"rows_read"`
+	Invalid           int `json:"invalid_or_oversized_rows"`
+	Expired           int `json:"expired_rows"`
+	Matching          int `json:"matching_summary_rows"`
+	MatchingRecords   int `json:"matching_record_rows"`
+	UnknownFields     int `json:"unknown_original_field_eligibility"`
+	EmptyViews        int `json:"empty_provider_views"`
+	InversePrecedence int `json:"current_inverse_precedence"`
+	IdentityMismatch  int `json:"creation_time_mismatch_rows"`
+	UnusableTime      int `json:"invalid_or_future_update_rows"`
+	Conflicts         int `json:"conflicting_fields"`
+	Fields            int `json:"candidate_fields"`
+	MissingTargets    int `json:"unavailable_target_references"`
+	AddedEdges        int `json:"added_edges_before_privacy"`
+	RetainedEdges     int `json:"retained_historical_edges"`
 }
 
 type cacheCandidate struct {
@@ -251,6 +271,17 @@ func (r *run) recoverSDKCacheRelationships() error {
 			}
 			// Keep excluded/withheld targets in the private graph until privacy
 			// propagation. Skipping them here could leave derived text exposed.
+			source := r.meta[key.key]
+			if source.State == "included" && meta.State == "included" {
+				inverse := inverseAttachmentField(source.Type, meta.Type, key.relation)
+				if eligible, known := meta.SupplementableFields[inverse]; inverse != "" && known && !eligible {
+					// A current inverse collection (even empty/invalid) takes
+					// precedence over a historical attachment. Any current
+					// positive edge will supply its own inverse during reconciliation.
+					r.manifest.SDKCache.InversePrecedence++
+					continue
+				}
+			}
 			edge := Edge{key.key, target, key.relation}
 			if !seenEdges[edge] {
 				seenEdges[edge] = true
@@ -273,6 +304,30 @@ func (r *run) recoverSDKCacheRelationships() error {
 	r.issue("SDK_CACHE", "", "historical_relationships_unverified")
 	r.manifest.Warnings = append(r.manifest.Warnings, "Explicitly selected SDK caches supplied historical relationship evidence. Cached links may be stale; no current record or body was replaced. Current OS projections remain unverified, and this archive remains partial.")
 	return nil
+}
+
+func inverseAttachmentField(source, target, relation string) string {
+	if source == "SIGNALS" && signalInverseFields[target] != "" && relation == signalInverseFields[target] {
+		return "signals"
+	}
+	if target == "SIGNALS" && relation == "signals" {
+		return signalInverseFields[source]
+	}
+	switch {
+	case source == "ANNOTATIONS" && target == "WORKSTREAM_SUMMARIES" && relation == "summaries":
+		return "annotations"
+	case source == "WORKSTREAM_SUMMARIES" && target == "ANNOTATIONS" && relation == "annotations":
+		return "summaries"
+	case source == "PERSONS" && target == "ANNOTATIONS" && relation == "annotations":
+		return "persons"
+	case source == "ANNOTATIONS" && target == "PERSONS" && relation == "persons":
+		return "annotations"
+	case source == "PERSONS" && target == "WORKSTREAM_SUMMARIES" && relation == "summaries":
+		return "persons"
+	case source == "WORKSTREAM_SUMMARIES" && target == "PERSONS" && relation == "persons":
+		return "summaries"
+	}
+	return ""
 }
 
 func (r *run) readSDKCache(path string, ordinal int, candidates map[cacheField]*cacheCandidate, budget *cacheReadBudget) error {
@@ -340,7 +395,7 @@ func (r *run) readSDKCacheTable(ctx context.Context, tx *sql.Tx, table cacheTabl
 		v := map[string]any{}
 		decoder := json.NewDecoder(strings.NewReader(raw.String))
 		decoder.UseNumber()
-		if decoder.Decode(&v) != nil || v == nil {
+		if decoder.Decode(&v) != nil {
 			r.manifest.SDKCache.Invalid++
 			continue
 		}
@@ -349,7 +404,19 @@ func (r *run) readSDKCacheTable(ctx context.Context, tx *sql.Tx, table cacheTabl
 			r.manifest.SDKCache.Invalid++
 			continue
 		}
+		if v == nil {
+			if table.isProviderView() {
+				r.manifest.SDKCache.EmptyViews++
+			} else {
+				r.manifest.SDKCache.Invalid++
+			}
+			continue
+		}
 		if table.wrapped {
+			if value, exists := v["os"]; table.isProviderView() && exists && value == nil {
+				r.manifest.SDKCache.EmptyViews++
+				continue
+			}
 			v = object(v, "os")
 		}
 		if fieldString(v, "id") == "" {
@@ -418,6 +485,7 @@ func (r *run) readSDKCacheTable(ctx context.Context, tx *sql.Tx, table cacheTabl
 				evidence.OSUpdated = currentUpdated.UTC().Format(time.RFC3339Nano)
 			} else {
 				evidence.Material, evidence.RecordRef = table.material, opaque(table.material, m.ID)
+				evidence.RecordTable = table.table
 				evidence.CachedRecordUpdated = updated.UTC().Format(time.RFC3339Nano)
 				evidence.OSRecordUpdated = currentUpdated.UTC().Format(time.RFC3339Nano)
 			}

@@ -129,7 +129,12 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 				if len(cacheFields(p.Material)) == 0 || p.Material != owner.Type || p.RecordRef != opaque(owner.Type, owner.ID) || p.CachedUpdated != "" || p.OSUpdated != "" || err != nil || !updated.Equal(current) {
 					return errConfig("archive cache-edge record provenance is invalid")
 				}
-			} else if owner.Type != "WORKSTREAM_SUMMARIES" || p.RecordRef != "" || p.CachedRecordUpdated != "" || p.OSRecordUpdated != "" {
+				// Older typed evidence predates table labels. Present labels must
+				// identify an implemented canonical source for the owner material.
+				if p.RecordTable != "" && !validCacheEvidenceTable(p.RecordTable, p.Material) {
+					return errConfig("archive cache-edge table provenance is invalid")
+				}
+			} else if owner.Type != "WORKSTREAM_SUMMARIES" || p.RecordRef != "" || p.RecordTable != "" || p.CachedRecordUpdated != "" || p.OSRecordUpdated != "" {
 				return errConfig("archive legacy cache-edge owner is invalid")
 			}
 			if prior, exists := r.cachedEdges[e]; exists && prior != *p {
