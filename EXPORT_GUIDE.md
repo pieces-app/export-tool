@@ -586,6 +586,10 @@ The inspected batch implementation explicitly clears `signalsVector` before retu
 
 Sources: [Signal schema](../generated_runtime/spec/common/runtime_common_library.yaml), [signal routes](../isomorphic_server/lib/signal_internal_server.dart), [batch implementation](../isomorphic_server/lib/signals_internal_server.dart), [description annotation helper](../isomorphic_server/lib/utils/signal_description_annotation_helper.dart). These are source-contract findings; staged/live projection coverage still requires verification.
 
+The separately checked-out database facade at `43ba1bd444f5944fa1af882e43761b56b31e3809` forwards six signal relationship fields but does **not** forward `annotations` in `Package.signal` or `Package.flattenedSignal`. Its annotation packager also does not forward `signals`. This is a concrete source compatibility gap, not proof of which facade revision the running OS contains. Inspect the actual retained responses and supported association reads before claiming signal-description recovery. [Facade packaging](../unified_monorepo/backend/database_facade/lib/facades/utils/package.dart).
+
+**Staged evidence, 2026-09-30:** after the active export completed signal and annotation fetching, `TestLiveSignalStageCoverage` read all 6,716 retained signal files locally. All had nonempty names and creation timestamps; 6,625 had realtime origin and 91 hierarchical-rollup origin. Every record omitted all seven relationship fields and supplied an explicitly empty vector. No annotation IDs could be followed, so zero descriptions were attached by this probe; this does **not** mean no descriptions exist. This is a pre-final-privacy observation, not final source reconciliation. No HTTP requests, source writes, IDs, or text were involved in the probe output.
+
 ### Conversations and messages
 
 Enumerate both `CONVERSATIONS` and `CONVERSATION_MESSAGES`. Use the global message list to catch messages absent from a conversation's index. `/conversation/{id}/messages` follows that index and fails if a referenced message cannot be loaded; it is not a stronger completeness guarantee.
