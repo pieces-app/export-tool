@@ -1,12 +1,12 @@
 # Resumable export and durable staging
 
-Updated 2026-09-30. **Internal workspace and transactional storage implemented; exporter integration and CLI resume still pending.** The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+Updated 2026-09-30. **Internal workspace, transactional storage and completed-source capture/replay adapter implemented; CLI resume and interrupted-fetch recovery still pending.** The adapter is private and is not enabled in release ZIPs. The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
 
 ## Decision and implementation order
 
 Pursue a private, encrypted, batched SQLite workspace as the authoritative recovery input. SQLite is already a compiled dependency for SDK-cache recovery; users would not install another runtime. Keep the final archive as ordinary Markdown/PDF/JSON files. A database workspace is internal recovery state, not a replacement for the requested files and folders.
 
-The internal store/key/ownership layer now passes the available local acceptance checks described below. Next persist and restore actual exporter state. Integrate local rendering recovery before enabling interrupted source-fetch recovery: the latter additionally needs verified source identity and persisted inventory boundaries. These are implementation milestones toward full resume, not a change to the release objective. Do not advertise either milestone until its end-to-end tests pass.
+The internal store/key/ownership layer passes the available local acceptance checks described below. The private adapter now persists actual exporter state after final source reconciliation and replays local processing into a fresh destination. Next connect persistent key/workspace lifecycle and the CLI. Interrupted source-fetch recovery additionally needs verified source identity and persisted inventory boundaries. These are implementation milestones toward full resume, not a change to the release objective.
 
 The current file writer still calls `File.Sync`. Keep that behavior until a separate replay and durability test proves a replacement. Adding a checkpoint database beside every unchanged file write will add overhead; it is not itself a performance fix. The eventual capture adapter must avoid duplicating authoritative persistence, then materialize ordinary output files from committed records. Measure both phases together.
 
@@ -109,7 +109,7 @@ Ordinary failures retain recoverable state and print a usable command only after
 
 ## Internal workspace layer (implemented, not connected to export)
 
-`internal/recovery` provides `Create`, `Open`, `Close`, `Seal` and `Unseal`, plus the transactional store described next. This is an internal library; there is still no CLI resume command, exporter-state adapter, default platform key-directory resolver or automatic workspace cleanup. Release packages remain `0.13.1-dev`, and the original live process is unchanged.
+`internal/recovery` provides `Create`, `Open`, `Close`, `Seal` and `Unseal`, plus the transactional store described next. This is an internal library; there is still no CLI resume command, default platform key-directory resolver or automatic workspace cleanup. The private exporter adapter is described below. Release packages remain `0.14.1-dev`, and the original live process is unchanged.
 
 The caller supplies separate workspace/key directories with existing parents and a nonzero immutable-configuration digest. Directory paths are checked lexically and by filesystem identity to reject nesting and aliases. A workspace is created exclusively. Keys are random 32-byte values, created exclusively outside the workspace; existing keys are never regenerated. Header/proof/key reads are bounded. The canonical header rejects unknown/duplicate fields, unsupported versions, changed settings and invalid identifiers. Open performs no content writes. A failed initialization may retain an incomplete private directory/key; cleanup and interruption during initialization still need integration.
 
@@ -201,6 +201,30 @@ go test ./internal/exporter -run '^$' -bench '^BenchmarkRecoveryStorage$' \
   -benchtime=1x -count=3 -benchmem
 ```
 
+## Completed-source adapter (internal only)
+
+`internal/exporter/capture_checkpoint.go` captures the boundary after hierarchy, account/profile evidence, reference closure, optional SDK-cache recovery, selected association reads and final inventory reconciliation. The capture-complete marker means these read attempts ended; missing records and projection gaps remain explicit. It does not certify complete source coverage.
+
+The encrypted store contains one canonical body at a time plus all `Meta` states, including excluded/withheld identities and missing-record inverse edges. It also contains inventory order, original projection/eligibility maps, verified account mappings, person-selection evidence, derived/association/cache provenance, issue order, normalized options, policy and category hashes, normalized category domains, and the scanner's accumulated credentials. Arbitrary credential bytes use base64 inside encryption so invalid UTF-8 cannot silently change a matcher. Equal-length overlapping known secrets now use a stable replacement order.
+
+Ordinary transactions contain at most 50 items and roughly 7 MiB of encoded payload; a bounded oversized item is committed alone. Inventories/domains/issues/edges use 128-element fragments, and credential fragments also have a byte target. Every intermediate commit remains in `writing`; only a final state-only commit records `capture-complete`. A partial save cannot be replayed. Bodies are validated individually and are not retained as an additional in-memory dataset, although existing graph/ID memory costs remain.
+
+Replay authenticates the store and validates the adapter version, item counts/identities, configuration, canonical IDs, material paths, fragment continuity and original decisions before creating output. Frozen domain lists are restored without reading their original files. SDK caches and OS are not read again. An optional custom PDF font must still exist and have the captured digest; fonts are not embedded in the workspace. Adapter-version compatibility must be maintained explicitly when schema or processing behavior changes; a generic development version string is not a compatibility guarantee.
+
+The output must be a new destination with no existing `.partial` sibling. Replay restores canonical records, then reruns privacy reconciliation, dependency filtering, person selection, path assignment, Markdown/PDF, metadata, link checks and final audits. It leaves the interrupted output untouched and does not skip supposedly completed artifacts. The manifest's `capture_replay` records capture/replay times and the original source-request performance separately from zero current OS requests. Capture does not improve missing source evidence or turn unknown person connectivity into zero.
+
+Synthetic checks compare canonical files, Markdown, graph/link maps and reconstruction evidence with an uninterrupted export, excluding run diagnostics and PDF creation timestamps. They also verify moved Markdown/PDF navigation, late-discovered secrets, deleted domain-list files, unavailable SDK caches, association numeric precision, preserve mode, missing/withheld records, more than one transaction/fragment, invalid authenticated state, existing output conflicts, cancellation and incomplete capture rejection. A subprocess test exits immediately after the completion commit without closing the store, then reopens and completes offline. Process exit is not proof of hardware power-loss durability.
+
+The final focused capture suite passed with the race detector on macOS ARM64 in 48.582 seconds, under Rosetta AMD64, and in an unprivileged, network-isolated Linux ARM64 container with a read-only root and 512 MiB memory limit. This is bounded synthetic acceptance, not a large-history RSS bound. Both Windows architectures compile; native execution remains pending. The initial abrupt-exit assertion incorrectly expected request totals from a fixture client without performance collection enabled. The fixture now enables collection and checks positive original request totals separately from zero replay requests.
+
+The concurrent full `go test -race ./...` sweep compiled before that fixture correction and finished with that one failure (exporter 524.197 seconds); its other tests/packages passed. The corrected entire capture suite above passed afterward. This is not recorded as a successful single full-suite invocation for this revision. `go vet ./...` and diff checks passed. No release ZIP, original process, Actions job or hosted asset was changed.
+
+This is **not yet a CLI resume feature or a speed improvement**. The private hook adds capture I/O beside existing synchronized canonical writes. Production integration must avoid duplicate authoritative persistence, bind configuration and key/workspace/output locations, provide safe inspect/retention/cleanup UX, and verify actual platform behavior before exposing it. Interrupted reads, per-artifact skipping and eliminating ordinary per-file flushes remain unimplemented.
+
+```sh
+go test -race ./internal/exporter -run '^(TestCapture|TestKnownCredentialOverlap)' -count=1
+```
+
 ## Acceptance checklist
 
 - [x] Inventory in-memory recovery state and its privacy hazards from current source.
@@ -208,6 +232,7 @@ go test ./internal/exporter -run '^$' -bench '^BenchmarkRecoveryStorage$' \
 - [x] Test abrupt child-process exit with real spilled transactions, atomic record/scanner/cursor recovery, and ciphertext rejection on macOS and Linux ARM64.
 - [x] Implement versioned internal transactional schema, bounded reads, encrypted fields and authenticated checkpoint/current-item-set evidence; test available local runtimes and actual Linux filesystem exhaustion.
 - [ ] Integrate the exporter-specific state schema and phase-completion prerequisites; authenticate output artifact ownership and completion separately from stored-record completeness.
+- [x] Add a private completed-source capture/replay adapter with actual canonical records, privacy state, relationship evidence and fresh-output replay. Validate document/graph equivalence, missing/withheld decisions, frozen domain lists, chunk boundaries and invalid checkpoint rejection. CLI exposure, source-fetch continuation and reusing completed artifacts remain separate work.
 - [x] Implement and test the internal key/envelope/ownership layer on macOS and Linux, including copied-workspace locks and actual ACL fixtures.
 - [ ] Connect persistent platform key locations, archive-root exclusion, initialization durability and safe cleanup; execute native Windows ACL/ownership/long-path acceptance.
 - [ ] Add round-trip fixtures for every `Meta`, projection, association, person, cache and omission state; test credentials discovered before and after a checkpoint.

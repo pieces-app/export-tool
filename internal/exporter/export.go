@@ -17,6 +17,7 @@ import (
 )
 
 type Options struct {
+	captureCheckpoint                       func(*run) error
 	FileWorkers                             int
 	Associations                            string
 	Scope                                   string
@@ -56,6 +57,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	CaptureReplay           *CaptureReplayInfo       `json:"capture_replay,omitempty"`
 	FileWorkers             int                      `json:"file_workers,omitempty"`
 	LocalPerformance        *LocalPerformanceReport  `json:"local_performance,omitempty"`
 	Associations            *AssociationCoverage     `json:"associations,omitempty"`
@@ -91,6 +93,12 @@ type Manifest struct {
 	Issues                  []Issue           `json:"issues"`
 	Limitations             []string          `json:"limitations"`
 	WithheldRepresentations int               `json:"withheld_representations"`
+}
+
+type CaptureReplayInfo struct {
+	CapturedAt        time.Time        `json:"captured_at"`
+	ResumedAt         time.Time        `json:"resumed_at"`
+	SourcePerformance PerformanceStats `json:"source_performance"`
 }
 type Edge struct {
 	Source   string `json:"source"`
@@ -446,7 +454,19 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			r.issue(m.Type, "", "inventory_changed_during_export")
 		}
 	}
-	if o.Mode == "filtered" {
+	if o.captureCheckpoint != nil {
+		if err := o.captureCheckpoint(r); err != nil {
+			return r.manifest, err
+		}
+	}
+	return r.processCaptured(abs)
+}
+
+// All source reads, cached relationship recovery and inventory reconciliation
+// precede this boundary. Recovery must restore their evidence before replay.
+func (r *run) processCaptured(destination string) (Manifest, error) {
+	var err error
+	if r.opts.Mode == "filtered" {
 		if err = r.rescanKnownCredentials(); err != nil {
 			return r.manifest, err
 		}
@@ -481,7 +501,7 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 			cov.Withheld++
 		}
 	}
-	return r.finish(abs)
+	return r.finish(destination)
 }
 
 func (r *run) finish(destination string) (result Manifest, resultErr error) {

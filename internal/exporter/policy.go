@@ -424,7 +424,12 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 	for secret := range secrets {
 		ordered = append(ordered, secret)
 	}
-	sort.Slice(ordered, func(i, j int) bool { return len(ordered[i]) > len(ordered[j]) })
+	sort.Slice(ordered, func(i, j int) bool {
+		if len(ordered[i]) != len(ordered[j]) {
+			return len(ordered[i]) > len(ordered[j])
+		}
+		return ordered[i] < ordered[j]
+	})
 	for _, secret := range ordered {
 		if strings.Contains(value, secret) {
 			stats.Redactions++
