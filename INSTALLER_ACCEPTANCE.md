@@ -64,3 +64,5 @@ On a machine whose temporary directories use `noexec`, choose an allowed, privat
 - Installed Pieces OS lifecycle, real full-history migration, and native viewers/metadata remain independent of these synthetic installer checks.
 
 The bootstrap scripts did not change during this acceptance work. The previously verified Gist revisions and script hashes remain applicable; no application binaries or private records were uploaded.
+
+The unattended complete/remove, complete/keep, and partial/remove cases were repeated successfully for `0.8.7-dev`: Bash HTTPS on macOS ARM64 and isolated Linux ARM64, plus PowerShell 7 with substituted file transport on macOS. The earlier interactive prompt evidence used `0.8.6-dev`; the scripts themselves are unchanged.

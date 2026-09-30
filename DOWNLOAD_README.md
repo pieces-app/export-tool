@@ -119,4 +119,6 @@ Current OS versions may also omit summary annotation/person/pipeline links. Dire
 
 Current limits: no atomic snapshot, historical/deleted-data recovery, complete association-object export, supplementary settings/analysis views, resume, separate binary extraction, or guaranteed semantic privacy. Capture/editing during a run can change records; the manifest reports identity-set drift but cannot detect every in-place edit. Large exports keep IDs/graph metadata and configured domain lists in memory. Review coverage before treating the result as a complete migration.
 
+Signal descriptions live in linked `SIGNAL_DESCRIPTION` annotations. Missing signal relationships are reported as unknown coverage and make the archive partial, even when every signal ID was fetched. Signal batch responses also omit embeddings; empty vectors do not reproduce the original vector database. Rebuilding an older archive without signal projection evidence keeps those relationships unknown.
+
 This utility is intentionally unsigned and is not notarized. Its application source remains private; use of the downloaded binary is covered by `LICENSE.txt`. Keep `THIRD_PARTY_NOTICES.txt` with the executable. Platform runtime testing and complete migration acceptance are still required before a production-ready claim.

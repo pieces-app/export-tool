@@ -28,6 +28,16 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 		if m == nil || m.Type != row.Material || row.DataSHA256 != m.ArchiveDataSHA256 || !validDigest(row.DataSHA256) || row.Redactions < 0 {
 			return errConfig("archive included record is missing, altered, or has invalid evidence")
 		}
+		// Earlier format-5 writers did not record signal projection evidence.
+		// Pruned canonical JSON cannot tell us whether an empty field was
+		// originally empty. Accept the old row but keep all seven fields unknown.
+		// A partially populated evidence map is still invalid, as for other types.
+		if m.Type == "SIGNALS" && row.ProjectionStates == nil {
+			row.ProjectionStates = map[string]string{}
+			for _, field := range projectionFields(m.Type) {
+				row.ProjectionStates[field] = "absent"
+			}
+		}
 		for _, field := range projectionFields(m.Type) {
 			switch row.ProjectionStates[field] {
 			case "absent", "empty", "linked", "invalid":

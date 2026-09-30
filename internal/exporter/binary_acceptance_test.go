@@ -237,6 +237,54 @@ func TestPackagedLegacyRebuildCLI(t *testing.T) {
 	t.Log("legacy aggregate/issue reconciliation supports profile selection; unknown person retained and partial exit preserved")
 }
 
+// Use a real pre-signal-coverage format-5 writer to check compatibility rather
+// than relying only on mutation of a new archive's reconstruction state.
+func TestOlderPackagedSignalRebuild(t *testing.T) {
+	oldBinary := os.Getenv("PIECES_EXPORT_TEST_LEGACY_SIGNAL_BINARY")
+	if oldBinary == "" {
+		t.Skip("set PIECES_EXPORT_TEST_LEGACY_SIGNAL_BINARY to the native 0.8.6-dev executable")
+	}
+	oldBinary, err := filepath.Abs(oldBinary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signal := record("signal", "2026-09-30T00:00:00Z")
+	signal["name"] = "Old binary signal fixture"
+	for _, field := range projectionFields("SIGNALS") {
+		signal[field] = refs()
+	}
+	f := &fakeOS{data: map[string][]map[string]any{"SIGNALS": {signal}}}
+	srv := f.server(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	source := filepath.Join(t.TempDir(), "old archive")
+	b, err := exec.CommandContext(ctx, oldBinary, "export", "--base-url", srv.URL, "--materials", "SIGNALS", "--launch-os=false", "--close-desktop=false", "--output", source, "--metadata", "off", "--yes").CombinedOutput()
+	srv.Close()
+	if err != nil {
+		t.Fatalf("old fixture writer failed: %v %s", err, b)
+	}
+	old, err := InspectArchive(source)
+	if err != nil || old.ToolVersion != "0.8.6-dev" || old.ArchiveState == nil {
+		t.Fatal("expected the actual older format-5 package")
+	}
+	b, err = os.ReadFile(filepath.Join(source, archiveStateFile))
+	var row archiveRecord
+	if err != nil || json.Unmarshal(b, &row) != nil || row.ProjectionStates != nil {
+		t.Fatal("old writer unexpectedly supplied signal projection evidence")
+	}
+	out := filepath.Join(t.TempDir(), "rebuilt")
+	m, err := Rebuild(ctx, RebuildOptions{Source: source, Options: Options{Output: out, Scanner: scanner(t, DefaultPolicy())}})
+	if err != nil || m.Status != "partial" || len(m.RelationshipCoverage) != 7 || m.Performance.Requests != 0 {
+		t.Fatalf("old binary archive was not conservatively rebuilt: %v", err)
+	}
+	for _, coverage := range m.RelationshipCoverage {
+		if coverage.Material != "SIGNALS" || coverage.Absent != 1 {
+			t.Fatal("pruned legacy JSON was treated as original empty evidence")
+		}
+	}
+	t.Log("actual 0.8.6-dev archive rebuilt offline with all seven signal projections unknown and partial status")
+}
+
 func TestPackagedCacheCLI(t *testing.T) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {

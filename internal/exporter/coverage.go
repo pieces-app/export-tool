@@ -18,6 +18,8 @@ func projectionFields(material string) []string {
 		return []string{"annotations", "persons", "pipelines"}
 	case "PERSONS", "PIPELINES":
 		return []string{"summaries"}
+	case "SIGNALS":
+		return []string{"annotations", "persons", "pipelines", "summaries", "workstream_events", "websites", "ranges"}
 	}
 	return nil
 }
@@ -107,7 +109,7 @@ func projectionStates(material string, v map[string]any) map[string]string {
 
 func (r *run) collectRelationshipCoverage() {
 	r.manifest.RelationshipCoverage = []RelationshipCoverage{}
-	for _, material := range []string{"WORKSTREAM_SUMMARIES", "PERSONS", "PIPELINES"} {
+	for _, material := range []string{"WORKSTREAM_SUMMARIES", "PERSONS", "PIPELINES", "SIGNALS"} {
 		for _, field := range projectionFields(material) {
 			row := RelationshipCoverage{Material: material, Field: field}
 			for _, m := range r.meta {

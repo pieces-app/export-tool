@@ -28,6 +28,8 @@ The rebuild imports canonical `data/` records in filtered mode or `raw/` records
 
 Archive format 5 adds `rebuild-state.jsonl`, bound to the manifest by SHA-256. It records included-record content digests, original core projection states and cache eligibility, per-record redaction counts, person-query evidence, and explicit user/person mapping evidence. Excluded, withheld, missing, and omitted decisions contain only a material, opaque record reference, and state. Graph and link-map digests bind identities to their original paths. These checks detect accidental alteration; they are not signatures or authentication of an arbitrary archive's author. The full archive remains sensitive even though omitted identities are opaque.
 
+Format-5 archives through `0.8.6-dev` did not record signal projection states. The reader accepts a wholly missing map for a signal, reports all seven signal relationship fields as unknown, and keeps the result partial. It does not infer original emptiness from pruned JSON. Partial or invalid maps are rejected, and required evidence for other material types is unchanged. New exports/rebuilds persist signal states for subsequent reconstruction.
+
 The reader streams collection entries and JSONL. Manifest reads are bounded to 16 MiB, canonical record reads to 128 MiB, JSONL rows to 1 MiB, and the link map to 1 GiB. IDs, path maps, and graph metadata remain in memory. Large-history rebuild throughput and memory still require live acceptance; this feature does not yet provide disk-backed graph storage or resume after interruption.
 
 ## Privacy and omission rules
