@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const archiveStateFile = "rebuild-state.jsonl"
@@ -68,15 +69,19 @@ func readerDigest(ctx context.Context, input io.Reader) (string, error) {
 	}
 }
 
-func (r *run) writeArchiveState() error {
+func (r *run) writeArchiveState() (result error) {
 	r.progress.Stage("Record archive reconstruction evidence", len(r.meta))
+	started := time.Now()
+	w := &countedWriter{}
+	defer func() { r.local.record("artifact_write", time.Since(started), w.bytes, result) }()
 	f, err := os.OpenFile(filepath.Join(r.stage, archiveStateFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	h := sha256.New()
-	enc := json.NewEncoder(io.MultiWriter(f, h))
+	w.Writer = f
+	enc := json.NewEncoder(io.MultiWriter(w, h))
 	// Prior decisions have no IDs or bodies and cannot be restored by rebuilding.
 	for _, decision := range r.priorDecisions {
 		if err := enc.Encode(decision); err != nil {
@@ -111,7 +116,7 @@ func (r *run) writeArchiveState() error {
 		}
 		r.progress.Add(1)
 	}
-	if err := f.Sync(); err != nil {
+	if err := r.local.syncFile(f); err != nil {
 		return err
 	}
 	if err := f.Close(); err != nil {

@@ -61,6 +61,10 @@ func TestPackagedCLI(t *testing.T) {
 	if manifest.Status != "complete_for_implemented_scope" || len(manifest.Issues) != 0 {
 		t.Fatalf("synthetic archive is incomplete: %+v", manifest.Issues)
 	}
+	diagnostics := readLocalPerformance(t, out)
+	if diagnostics.HTTP.Requests == 0 || manifest.LocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 || diagnostics.State != "finalizing" {
+		t.Fatal("packaged export did not report HTTP/local persistence measurements")
+	}
 	for _, coverage := range manifest.Coverage {
 		if coverage.InitialCount != coverage.FinalCount || coverage.Fetched != coverage.InitialCount || coverage.Included != coverage.InitialCount {
 			t.Fatalf("synthetic collection did not reconcile: %+v", coverage)
@@ -195,6 +199,10 @@ func TestPackagedRebuildCLI(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(out, "manifest.json"))
 	if json.Unmarshal(b, &m) != nil || m.Performance.Requests != 0 || m.People.Selected != 1 || !m.Rebuild.SourceStarted.Equal(original.Started) {
 		t.Fatal("packaged rebuild evidence/selection incorrect")
+	}
+	diagnostics := readLocalPerformance(t, out)
+	if diagnostics.HTTP.Requests != 0 || m.Rebuild.SourceLocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 {
+		t.Fatal("packaged rebuild did not separate source and local measurements")
 	}
 	r := &run{ctx: ctx, stage: out, opts: Options{Scanner: scanner(t, policy)}}
 	if err := r.validateMarkdownLinks(); err != nil {

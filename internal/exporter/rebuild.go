@@ -23,22 +23,23 @@ import (
 )
 
 type RebuildInfo struct {
-	LegacyPersonEvidence    bool             `json:"legacy_person_evidence_reconciled"`
-	LegacyPersonsReconciled int              `json:"legacy_persons_reconciled"`
-	LegacyPersonsUnknown    int              `json:"legacy_persons_with_unknown_annotations"`
-	SourceManifestSHA256    string           `json:"source_manifest_sha256"`
-	SourceToolVersion       string           `json:"source_tool_version"`
-	SourceStarted           time.Time        `json:"source_started"`
-	SourceFinished          time.Time        `json:"source_finished"`
-	OriginalReadStarted     time.Time        `json:"original_read_started"`
-	OriginalReadFinished    time.Time        `json:"original_read_finished"`
-	SourceStatus            string           `json:"source_status"`
-	SourceCoverage          []*Coverage      `json:"source_coverage"`
-	SourcePeople            PeopleStats      `json:"source_people"`
-	SourcePerformance       PerformanceStats `json:"source_performance"`
-	LegacyEvidence          bool             `json:"legacy_evidence"`
-	UnavailableTargets      int              `json:"unavailable_dependency_targets"`
-	BlockedCacheBodies      int              `json:"bodies_with_unavailable_cached_summary"`
+	SourceLocalPerformance  *LocalPerformanceReport `json:"source_local_performance,omitempty"`
+	LegacyPersonEvidence    bool                    `json:"legacy_person_evidence_reconciled"`
+	LegacyPersonsReconciled int                     `json:"legacy_persons_reconciled"`
+	LegacyPersonsUnknown    int                     `json:"legacy_persons_with_unknown_annotations"`
+	SourceManifestSHA256    string                  `json:"source_manifest_sha256"`
+	SourceToolVersion       string                  `json:"source_tool_version"`
+	SourceStarted           time.Time               `json:"source_started"`
+	SourceFinished          time.Time               `json:"source_finished"`
+	OriginalReadStarted     time.Time               `json:"original_read_started"`
+	OriginalReadFinished    time.Time               `json:"original_read_finished"`
+	SourceStatus            string                  `json:"source_status"`
+	SourceCoverage          []*Coverage             `json:"source_coverage"`
+	SourcePeople            PeopleStats             `json:"source_people"`
+	SourcePerformance       PerformanceStats        `json:"source_performance"`
+	LegacyEvidence          bool                    `json:"legacy_evidence"`
+	UnavailableTargets      int                     `json:"unavailable_dependency_targets"`
+	BlockedCacheBodies      int                     `json:"bodies_with_unavailable_cached_summary"`
 }
 
 type RebuildOptions struct {
@@ -208,11 +209,13 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
 	r.manifest = original
+	r.manifest.LocalPerformance = nil
 	r.legacySignalPrivacy = original.SignalPrivacyVersion < currentSignalPrivacyVersion && o.Mode == "filtered" && o.Scanner.SourceFiltering()
 	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.
 	digest := sha256.Sum256(manifestBytes)
 	r.manifest.Rebuild = &RebuildInfo{SourceManifestSHA256: hex.EncodeToString(digest[:]), SourceToolVersion: original.ToolVersion, SourceStarted: original.Started, SourceFinished: original.Finished, SourceStatus: original.Status, SourceCoverage: original.Coverage, SourcePeople: original.People, SourcePerformance: original.Performance, LegacyEvidence: original.ArchiveState == nil}
 	r.manifest.Rebuild.OriginalReadStarted, r.manifest.Rebuild.OriginalReadFinished = original.Started, original.Finished
+	r.manifest.Rebuild.SourceLocalPerformance = original.LocalPerformance
 	if original.Rebuild != nil {
 		if original.Rebuild.OriginalReadStarted.IsZero() || original.Rebuild.OriginalReadFinished.Before(original.Rebuild.OriginalReadStarted) {
 			return Manifest{}, errConfig("source rebuild has an invalid original read interval")
@@ -266,8 +269,10 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := os.Mkdir(r.stage, 0700); err != nil {
 		return Manifest{}, errConfig("rebuild partial directory exists or cannot be created")
 	}
-	r.progress = startProgress(o.Progress, nil)
+	r.local = newLocalMeasurements()
+	r.progress = startMeasuredProgress(o.Progress, nil, r.local)
 	defer r.progress.Close()
+	defer r.closeMeasurements()
 	if r.progress != nil {
 		r.opts.Progress = r.progress.out
 	}

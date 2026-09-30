@@ -25,6 +25,12 @@ The current bottleneck is local record processing, with repeated durable file re
 
 The raw `proc_pid_rusage` timing fields were not treated as seconds; the reported CPU delta above comes from two `ps` cumulative CPU-time readings. Byte counters came from the installed SDK's `rusage_info_v4` layout. Idle runtime helper threads were not counted as evidence that the export itself is deadlocked.
 
+## Later observation: rendering is active
+
+At about 21 h 53 min total elapsed, the original process had finished privacy reconciliation and was rendering Markdown: roughly 38,700 of 1,907,456 records, at about 80.5 records/second. Its rendering-only estimate was about 6 h 27 min more. This is a phase estimate, not a completion promise; metadata, link checks and final audits remain afterward. The all-data run renders supporting event/tag/hint records as well as summaries. The original run remains intact.
+
+At the later 22 h 08 min checkpoint, rendering had reached 102,547/1,907,456 records (5.4%), averaging about 73 records/second, with a rendering-only estimate of 6 h 52 min more. The changing rate illustrates why this is not a reliable whole-run completion estimate. Client RSS was about 4.92 GiB.
+
 ## Improvements already available in the newer build
 
 1. **Unchanged files stay unchanged.** Since `0.8.8-dev`, privacy reconciliation still performs its full scan but compares original/sanitized values and rewrites only changed records. Rendering likewise rewrites canonical JSON only when reference pruning actually deletes something. Late-credential, privacy-deletion, and file-identity regression tests cover this behavior.
@@ -37,10 +43,14 @@ These changes do **not** remove the per-file flush from first writes or every ge
 ## Next work and acceptance
 
 - [ ] Finish and validate the existing run; do not treat its staged files as a resumable or finalized archive.
-- [ ] Record per-stage elapsed time, file/read/write/flush counts and durations in an aggregate performance report for new runs. Separate source wait, scanner work, local persistence, graph preparation, rendering and validation. Avoid record-derived values in diagnostics.
+- [x] Add aggregate local diagnostics for new exports/rebuilds: phase timing/counts, canonical JSON reads, scans, writes, syncs and unchanged-rewrite skips. Terminal counters distinguish last HTTP latency from current local work. Reports at finalization or ordinary failure contain no record-derived values. See [measurement boundaries and exclusions](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev); operation timing overlaps and is not an exclusive CPU/I/O breakdown.
 - [ ] Measure the newer summaries-focused path and a representative complete-history path with the actual OS, without concurrent readers. Compare final eligible record/body/graph counts as well as time and resources.
 - [ ] Replace excessive per-file flush work with a reviewed checkpoint/durability design. Keep cancellation, disk-full handling and exclusive finalization; validate crash recovery before weakening any existing persistence guarantee. Do not merely disable `Sync` to obtain a benchmark win.
 - [ ] Add resumable, checksummed staging and disk-backed inventory/graph storage. The current old run has no supported resume path; switching binaries would require a new run and separate validation.
-- [ ] Profile the later graph/rendering/audit stages at actual scale. No reliable remaining-time estimate exists for the old run, and the current privacy phase is not the last phase.
+- [ ] Profile the later graph/rendering/audit stages at actual scale. No reliable remaining-time estimate exists for the old run, and the active rendering phase is not the last phase.
 
 See [the execution checklist](TODO.md) for the independent data-coverage, native platform, viewer and distribution gates. Attachment/audio implementation is still open; its source inspection was paused to investigate this performance issue.
+
+## Diagnostics implementation verification (`0.12.3-dev`)
+
+New export/rebuild reports and terminal counters passed focused persistence, cancellation, exclusive-file collision, phase aggregation, and offline-provenance checks. Full `go test -race ./...` passed (exporter 477.812 seconds), as did vet, actionlint and ZIP/hash validation. Actual packages passed on macOS ARM64, Rosetta AMD64 and isolated Linux ARM64; native Windows remains pending. These timings are test-suite durations, not live export benchmarks. Measurements do not remove file sync, bypass privacy, or add resume support.

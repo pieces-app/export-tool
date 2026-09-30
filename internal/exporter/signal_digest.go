@@ -425,7 +425,7 @@ func (r *run) renderSignalDigest() error {
 		if b.err != nil {
 			return b.err
 		}
-		if err := writeFile(filepath.Join(r.stage, p.path), b.Bytes()); err != nil {
+		if err := r.writeFile(filepath.Join(r.stage, p.path), b.Bytes()); err != nil {
 			return err
 		}
 		stats.Entries += p.last - p.first + 1
@@ -451,7 +451,7 @@ func (r *run) renderSignalDigest() error {
 	if b.err != nil {
 		return b.err
 	}
-	if err := writeFile(filepath.Join(r.stage, stats.Index), b.Bytes()); err != nil {
+	if err := r.writeFile(filepath.Join(r.stage, stats.Index), b.Bytes()); err != nil {
 		return err
 	}
 	stats.TotalBytes += int64(b.Len())

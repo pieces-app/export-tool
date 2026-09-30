@@ -55,6 +55,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	LocalPerformance        *LocalPerformanceReport  `json:"local_performance,omitempty"`
 	Associations            *AssociationCoverage     `json:"associations,omitempty"`
 	Naming                  string                   `json:"naming"`
 	Relationships           string                   `json:"relationships"`
@@ -129,6 +130,9 @@ type run struct {
 	associationEdges    map[Edge]string
 	cachedEdges         map[Edge]CacheEvidence
 	progress            *Progress
+	local               *localMeasurements
+	performanceWritten  bool
+	finalized           bool
 	documentMetadata    map[string]*DocumentMetadata
 }
 
@@ -144,6 +148,13 @@ func writeJSON(path string, v any) error {
 	return writeFile(path, append(b, '\n'))
 }
 func writeFile(path string, b []byte) error {
+	return writeFileMeasured(path, b, nil)
+}
+
+func writeFileMeasured(path string, b []byte, metrics *localMeasurements) (result error) {
+	started := time.Now()
+	written := 0
+	defer func() { metrics.record("artifact_write", time.Since(started), int64(written), result) }()
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
@@ -151,9 +162,9 @@ func writeFile(path string, b []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = f.Write(b)
+	written, err = f.Write(b)
 	if err == nil {
-		err = f.Sync()
+		err = metrics.syncFile(f)
 	}
 	closeErr := f.Close()
 	if err != nil {
@@ -302,8 +313,10 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 		return Manifest{}, errConfig("partial directory already exists or cannot be created; choose a new output path")
 	}
 	r := &run{ctx: ctx, client: client, opts: o, stage: stage, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}}
-	r.progress = startProgress(o.Progress, client)
+	r.local = newLocalMeasurements()
+	r.progress = startMeasuredProgress(o.Progress, client, r.local)
 	defer r.progress.Close()
+	defer r.closeMeasurements()
 	if r.progress != nil {
 		r.opts.Progress = r.progress.out
 	}
@@ -515,7 +528,7 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 		return r.manifest, err
 	}
 	r.manifest.Finished = time.Now().UTC()
-	if err = writeJSON(filepath.Join(stage, "manifest.json"), r.manifest); err != nil {
+	if err = r.writeJSON(filepath.Join(stage, "manifest.json"), r.manifest); err != nil {
 		return r.manifest, err
 	}
 	if o.Mode == "filtered" {
@@ -523,9 +536,32 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 			return r.manifest, err
 		}
 	}
+	r.progress.Stage("Prepare final diagnostic reports", 0)
+	if report := r.performanceReport("finalizing"); report != nil {
+		r.manifest.LocalPerformance = report
+		if err = r.writePerformanceReport(report); err != nil {
+			return r.manifest, err
+		}
+		// Closing diagnostics are outside the measured boundary to avoid
+		// recursively measuring their own serialized counters.
+		if err = rewriteJSON(filepath.Join(stage, "manifest.json"), r.manifest); err != nil {
+			return r.manifest, err
+		}
+		if o.Mode == "filtered" {
+			for _, name := range []string{localPerformanceFile, "manifest.json"} {
+				if err = r.auditOutputFile(filepath.Join(stage, name)); err != nil {
+					return r.manifest, err
+				}
+			}
+		}
+	}
+	if err = r.ctx.Err(); err != nil {
+		return r.manifest, err
+	}
 	if err = commitDirectory(stage, destination); err != nil {
 		return r.manifest, err
 	}
+	r.finalized = true
 	return r.manifest, nil
 }
 
@@ -704,7 +740,7 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 				r.opts.Scanner.remember(fieldString(v, "text"))
 			}
 		}
-		clean, stats, err := r.opts.Scanner.Sanitize(r.ctx, v)
+		clean, stats, err := r.sanitizeRecord(v)
 		r.manifest.WithheldRepresentations += stats.WithheldRepresentations
 		meta.Redactions = stats.Redactions
 		if err != nil {
@@ -732,7 +768,7 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 	meta.SummaryKind = fieldString(v, "parentHierarchicalType")
 	meta.SummaryDescriptor = fieldString(v, "parentHierarchicalTypeDescriptor")
 	if meta.State == "included" {
-		if err := writeJSON(filepath.Join(r.stage, meta.DataPath), v); err != nil {
+		if err := r.writeJSON(filepath.Join(r.stage, meta.DataPath), v); err != nil {
 			meta.State = "withheld"
 			r.issue(m.Type, id, "record_write_failed")
 			r.meta[key] = meta
@@ -962,11 +998,11 @@ func (r *run) rescanKnownCredentials() error {
 		if m.State != "included" {
 			continue
 		}
-		v, err := readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
 		if err != nil {
 			return err
 		}
-		clean, stats, err := r.opts.Scanner.Sanitize(r.ctx, v)
+		clean, stats, err := r.sanitizeRecord(v)
 		if err != nil || fieldString(clean, "id") != m.ID {
 			m.State = "withheld"
 			r.issue(m.Type, m.ID, "final_record_scan_failed")
@@ -992,9 +1028,11 @@ func (r *run) rescanKnownCredentials() error {
 		// and domain checks, but retain the already-synced file when its value
 		// is identical. Redaction counts alone cannot establish equivalence.
 		if !reflect.DeepEqual(v, clean) {
-			if err := rewriteJSON(filepath.Join(r.stage, m.DataPath), clean); err != nil {
+			if err := r.rewriteJSON(filepath.Join(r.stage, m.DataPath), clean); err != nil {
 				return err
 			}
+		} else {
+			r.local.record("privacy_unchanged", 0, 0, nil)
 		}
 	}
 	return nil

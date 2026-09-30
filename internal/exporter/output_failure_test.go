@@ -69,6 +69,9 @@ func TestDestinationFailureStopsHydrationWithoutFinalizing(t *testing.T) {
 			if _, err := os.Stat(out + ".partial"); err != nil {
 				t.Fatal("partial evidence was removed")
 			}
+			if readLocalPerformance(t, out+".partial").State != "stopped_before_finalization" {
+				t.Fatal("failed fetch lacks stopped diagnostic evidence")
+			}
 		})
 	}
 }

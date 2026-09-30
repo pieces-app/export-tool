@@ -151,7 +151,7 @@ func (r *run) writeSummaryIndex(path, heading, intro string, items []*Meta) erro
 	if len(items) == 0 {
 		b.WriteString("No included records in this folder. Missing association coverage is not evidence that no relationships existed.\n")
 	}
-	return writeFile(filepath.Join(r.stage, path), []byte(b.String()))
+	return r.writeFile(filepath.Join(r.stage, path), []byte(b.String()))
 }
 
 func (r *run) writeGroupedSummaryIndexes(indexPath, heading, intro string, groups map[string][]*Meta, labels map[string]string) error {
@@ -175,7 +175,7 @@ func (r *run) writeGroupedSummaryIndexes(indexPath, heading, intro string, group
 	if len(keys) == 0 {
 		b.WriteString("No included summaries in this category.\n")
 	}
-	return writeFile(filepath.Join(r.stage, indexPath), []byte(b.String()))
+	return r.writeFile(filepath.Join(r.stage, indexPath), []byte(b.String()))
 }
 
 func (r *run) renderPipelineAssociations(groups map[string]*Meta, memberships map[string][]string) error {
@@ -208,7 +208,7 @@ func (r *run) renderPipelineAssociations(groups map[string]*Meta, memberships ma
 	if len(keys) == 0 {
 		b.WriteString("No included pipeline records.\n")
 	}
-	return writeFile(filepath.Join(r.stage, path), []byte(b.String()))
+	return r.writeFile(filepath.Join(r.stage, path), []byte(b.String()))
 }
 
 func (r *run) renderOrganization() error {

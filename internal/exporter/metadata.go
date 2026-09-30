@@ -27,7 +27,7 @@ func (r *run) applyMetadata() error {
 				failures++
 			}
 		}
-		if err := writeJSON(filepath.Join(r.stage, sidecarPath(path)), meta); err != nil {
+		if err := r.writeJSON(filepath.Join(r.stage, sidecarPath(path)), meta); err != nil {
 			return err
 		}
 	}

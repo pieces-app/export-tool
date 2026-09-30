@@ -62,7 +62,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 		for _, d := range dimensions {
 			keys[d] = map[string]string{}
 		}
-		v, err := readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 			if a != nil && a.State == "included" && a.Type == "ANNOTATIONS" && strings.Contains(a.AnnotationType, "DESCRIPTION") {
 				text, loaded := descriptions[a.Key]
 				if !loaded {
-					value, err := readRecord(filepath.Join(r.stage, a.DataPath))
+					value, err := r.readRecord(filepath.Join(r.stage, a.DataPath))
 					if err != nil {
 						return nil, err
 					}
@@ -108,7 +108,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 			case "WEBSITES":
 				host, loaded := hosts[node.Key]
 				if !loaded {
-					website, err := readRecord(filepath.Join(r.stage, node.DataPath))
+					website, err := r.readRecord(filepath.Join(r.stage, node.DataPath))
 					if err != nil {
 						return err
 					}
@@ -261,7 +261,7 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 					for _, member := range members {
 						fmt.Fprintf(&group, "- [%s](%s)\n", md(member.Title), relative(path, member.Path))
 					}
-					if err := writeFile(filepath.Join(r.stage, path), []byte(group.String())); err != nil {
+					if err := r.writeFile(filepath.Join(r.stage, path), []byte(group.String())); err != nil {
 						return "", err
 					}
 					g.Written[path] = true

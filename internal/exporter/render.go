@@ -228,15 +228,17 @@ func (r *run) render() error {
 		if m.State != "included" {
 			continue
 		}
-		v, err := readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
 		if err != nil {
 			return err
 		}
 		if r.opts.Mode == "filtered" {
 			if pruneReferences(v, r.meta) {
-				if err = rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
+				if err = r.rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
 					return err
 				}
+			} else {
+				r.local.record("render_unchanged", 0, 0, nil)
 			}
 		}
 		var b strings.Builder
@@ -271,7 +273,7 @@ func (r *run) render() error {
 				if e.Relation != "annotations" || a == nil || a.State != "included" {
 					continue
 				}
-				av, err := readRecord(filepath.Join(r.stage, a.DataPath))
+				av, err := r.readRecord(filepath.Join(r.stage, a.DataPath))
 				if err != nil {
 					return err
 				}
@@ -329,7 +331,7 @@ func (r *run) render() error {
 				if len(r.opts.SDKCaches) > 0 {
 					body += "\nHistorical client-cache relationships may contribute to these suggestions. See the summary and export coverage for provenance.\n"
 				}
-				if err := writeFile(filepath.Join(r.stage, sibling), []byte(body)); err != nil {
+				if err := r.writeFile(filepath.Join(r.stage, sibling), []byte(body)); err != nil {
 					return err
 				}
 				fmt.Fprintf(&b, "\n[Relationship graph](%s)\n", relative(m.Path, sibling))
@@ -338,14 +340,14 @@ func (r *run) render() error {
 			r.documentMetadata[m.Path] = meta
 		}
 
-		if err = writeFile(filepath.Join(r.stage, m.Path), []byte(b.String())); err != nil {
+		if err = r.writeFile(filepath.Join(r.stage, m.Path), []byte(b.String())); err != nil {
 			return err
 		}
 	}
-	if err := writeJSONL(filepath.Join(r.stage, "relationships.jsonl"), edges); err != nil {
+	if err := writeJSONL(filepath.Join(r.stage, "relationships.jsonl"), edges, r.local); err != nil {
 		return err
 	}
-	if err := writeJSONL(filepath.Join(r.stage, "timeline", "records.jsonl"), entries); err != nil {
+	if err := writeJSONL(filepath.Join(r.stage, "timeline", "records.jsonl"), entries, r.local); err != nil {
 		return err
 	}
 	zone, _ := time.LoadLocation(r.opts.Timezone)
@@ -373,7 +375,7 @@ func (r *run) render() error {
 			t, _ := time.Parse(time.RFC3339Nano, e.Created)
 			fmt.Fprintf(&b, "- %s — [%s](%s) (%s)\n", t.In(zone).Format("15:04:05 -07:00"), md(e.Title), relative(path, e.Path), e.Type)
 		}
-		if err := writeFile(filepath.Join(r.stage, path), []byte(b.String())); err != nil {
+		if err := r.writeFile(filepath.Join(r.stage, path), []byte(b.String())); err != nil {
 			return err
 		}
 		fmt.Fprintf(&index, "- [%s](%s) (%d records)\n", day, path, len(days[day]))
@@ -382,7 +384,7 @@ func (r *run) render() error {
 	if len(dayNames) == 0 {
 		chronology.WriteString("No included records have a valid creation timestamp.\n")
 	}
-	if err := writeFile(filepath.Join(r.stage, "timeline/index.md"), []byte(chronology.String())); err != nil {
+	if err := r.writeFile(filepath.Join(r.stage, "timeline/index.md"), []byte(chronology.String())); err != nil {
 		return err
 	}
 	if r.opts.Format != "markdown" {
@@ -417,10 +419,10 @@ func (r *run) render() error {
 			links[opaque(m.Type, m.ID)] = m.Path
 		}
 	}
-	if err := writeJSON(filepath.Join(r.stage, "link-map.json"), links); err != nil {
+	if err := r.writeJSON(filepath.Join(r.stage, "link-map.json"), links); err != nil {
 		return err
 	}
-	if err := writeFile(filepath.Join(r.stage, "index.md"), []byte(index.String())); err != nil {
+	if err := r.writeFile(filepath.Join(r.stage, "index.md"), []byte(index.String())); err != nil {
 		return err
 	}
 	var b strings.Builder
@@ -428,10 +430,17 @@ func (r *run) render() error {
 	for _, m := range undated {
 		fmt.Fprintf(&b, "- [%s](%s) (%s)\n", md(m.Title), relative("markdown/undated.md", m.Path), m.Type)
 	}
-	return writeFile(filepath.Join(r.stage, "markdown", "undated.md"), []byte(b.String()))
+	return r.writeFile(filepath.Join(r.stage, "markdown", "undated.md"), []byte(b.String()))
 }
 
-func writeJSONL[T any](path string, items []T) error {
+func writeJSONL[T any](path string, items []T, measurements ...*localMeasurements) (result error) {
+	var metrics *localMeasurements
+	if len(measurements) > 0 {
+		metrics = measurements[0]
+	}
+	started := time.Now()
+	w := &countedWriter{}
+	defer func() { metrics.record("artifact_write", time.Since(started), w.bytes, result) }()
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
@@ -439,14 +448,15 @@ func writeJSONL[T any](path string, items []T) error {
 	if err != nil {
 		return err
 	}
-	enc := json.NewEncoder(f)
+	w.Writer = f
+	enc := json.NewEncoder(w)
 	for _, item := range items {
 		if err = enc.Encode(item); err != nil {
 			f.Close()
 			return err
 		}
 	}
-	if err = f.Sync(); err != nil {
+	if err = metrics.syncFile(f); err != nil {
 		f.Close()
 		return err
 	}
@@ -555,7 +565,7 @@ func (r *run) transcript(b *strings.Builder, m *Meta) error {
 		if e.Relation != "messages" || n == nil || n.State != "included" {
 			continue
 		}
-		v, err := readRecord(filepath.Join(r.stage, n.DataPath))
+		v, err := r.readRecord(filepath.Join(r.stage, n.DataPath))
 		if err != nil {
 			return err
 		}

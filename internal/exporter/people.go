@@ -296,7 +296,7 @@ func (r *run) preparePeople() error {
 		if m.Type != "PERSONS" || m.State != "included" {
 			continue
 		}
-		v, err := readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
 		if err != nil {
 			return err
 		}
@@ -504,14 +504,14 @@ func (r *run) renderPersonas() error {
 					body.WriteString("No included records.\n")
 				}
 				if len(items) > 0 && items[0].Type == "ANNOTATIONS" {
-					v, err := readRecord(filepath.Join(r.stage, items[0].DataPath))
+					v, err := r.readRecord(filepath.Join(r.stage, items[0].DataPath))
 					if err != nil {
 						return err
 					}
 					body.WriteString("\n### Latest retained text\n\n" + rewriteMarkdown(fieldString(v, "text"), profilePath, r.meta) + "\n")
 				}
 			}
-			if err := writeFile(filepath.Join(r.stage, profilePath), []byte(body.String())); err != nil {
+			if err := r.writeFile(filepath.Join(r.stage, profilePath), []byte(body.String())); err != nil {
 				return err
 			}
 			history, associated := []*Meta{}, []*Meta{}
@@ -550,7 +550,7 @@ func (r *run) renderPersonas() error {
 		if len(keys) == 0 {
 			categoryIndex.WriteString("No included people in this category.\n")
 		}
-		if err := writeFile(filepath.Join(r.stage, categoryPath), []byte(categoryIndex.String())); err != nil {
+		if err := r.writeFile(filepath.Join(r.stage, categoryPath), []byte(categoryIndex.String())); err != nil {
 			return err
 		}
 		fmt.Fprintf(&index, "## %s\n\n%s\n\n[%s](%s) — %d folder(s)\n\n", category.heading, category.intro, category.heading, relative(indexPath, categoryPath), len(keys))
@@ -576,5 +576,5 @@ func (r *run) renderPersonas() error {
 		}
 		index.WriteByte('\n')
 	}
-	return writeFile(filepath.Join(r.stage, indexPath), []byte(index.String()))
+	return r.writeFile(filepath.Join(r.stage, indexPath), []byte(index.String()))
 }

@@ -18,6 +18,8 @@ In PowerShell:
 
 Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder; resume is not implemented. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
 
+`performance.json` is produced at finalization (or best effort after a failure), starting with `0.12.3-dev`. It contains aggregate diagnostics only and cannot certify completeness or resume a partial archive. See [measurement boundaries](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev).
+
 PDF limits and failure behavior are described in the [specification](EXPORT_SPEC.md#pdf-resource-limits-and-cancellation). Oversized documents are not truncated or automatically split; the entire PDF export stays unfinished on a limit failure. A finalized Markdown archive can be rebuilt repeatedly into separate destinations without rereading OS.
 
 ## Optional event history
@@ -35,6 +37,7 @@ Pieces-Export/
   index.md                                  # start here
   index.pdf                                 # when PDF requested
   manifest.json                             # counts, issues, hierarchy checks, performance
+  performance.json                          # aggregate local phase/read/scan/write/flush measurements
   rebuild-state.jsonl                       # hashed included evidence; opaque omission decisions
   coverage.md                               # aggregate record/projection gaps; partial status
   link-map.json                             # canonical paths keyed by material/ID hash

@@ -26,14 +26,25 @@ type Progress struct {
 	done, total  int
 	started      time.Time
 	stop, exited chan struct{}
+	local        *localMeasurements
+	phaseStart   map[string]OperationMeasurement
+	phases       map[string]PhaseMeasurement
+	phaseOrder   []string
 }
 
 func startProgress(w io.Writer, c *Client) *Progress {
+	return startMeasuredProgress(w, c, nil)
+}
+
+func startMeasuredProgress(w io.Writer, c *Client, local *localMeasurements) *Progress {
 	if w == nil {
-		return nil
+		if local == nil {
+			return nil
+		}
+		w = io.Discard
 	}
 	safe := &lockedOutput{out: w}
-	p := &Progress{out: safe, client: c, stop: make(chan struct{}), exited: make(chan struct{})}
+	p := &Progress{out: safe, client: c, local: local, phases: map[string]PhaseMeasurement{}, stop: make(chan struct{}), exited: make(chan struct{})}
 	if c != nil && c.pacer != nil {
 		c.pacer.output = safe
 	}
@@ -58,10 +69,12 @@ func (p *Progress) Stage(name string, total int) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.recordPhase(time.Now())
 	p.stage = name
 	p.done = 0
 	p.total = total
 	p.started = time.Now()
+	p.phaseStart = p.local.snapshot()
 	fmt.Fprintf(p.out, "Stage: %s", name)
 	if total > 0 {
 		fmt.Fprintf(p.out, " (%d records)", total)
@@ -91,13 +104,90 @@ func (p *Progress) print() {
 			remaining := time.Duration(float64(max(0, p.total-p.done)) / rate * float64(time.Second))
 			fmt.Fprintf(p.out, " | %.1f records/s | phase ETA %s", rate, remaining.Round(time.Second))
 		}
+	} else if p.done > 0 {
+		fmt.Fprintf(p.out, " | %d processed (total unknown)", p.done)
 	}
 	if p.client == nil {
+		p.printLocal()
 		fmt.Fprintln(p.out)
 		return
 	}
 	stats := p.client.Performance()
-	fmt.Fprintf(p.out, " | OS p95 %.0fms | requests %d | retries %d | backoffs %d\n", stats.P95MS, stats.Requests, stats.Retries, stats.Backoffs)
+	fmt.Fprintf(p.out, " | last HTTP p95 %.0fms | requests %d | retries %d | backoffs %d", stats.P95MS, stats.Requests, stats.Retries, stats.Backoffs)
+	p.printLocal()
+	fmt.Fprintln(p.out)
+}
+
+func (p *Progress) printLocal() {
+	if p.local == nil {
+		return
+	}
+	counts := p.local.snapshot()
+	writes, syncs := counts["artifact_write"], counts["artifact_sync"]
+	fmt.Fprintf(p.out, " | file writes %d | flush time %s", writes.Calls, (time.Duration(syncs.Milliseconds) * time.Millisecond).Round(time.Millisecond))
+}
+
+func (p *Progress) phaseAt(now time.Time) PhaseMeasurement {
+	if p.stage == "" {
+		return PhaseMeasurement{}
+	}
+	row := PhaseMeasurement{Name: p.stage, Visits: 1, Milliseconds: now.Sub(p.started).Milliseconds(), Processed: int64(p.done), KnownTotal: int64(p.total), Operations: map[string]OperationMeasurement{}}
+	if p.total == 0 {
+		row.UnknownTotalVisits = 1
+	}
+	addMeasurements(row.Operations, p.local.snapshot(), p.phaseStart)
+	return row
+}
+
+func mergePhase(a, b PhaseMeasurement) PhaseMeasurement {
+	a.Visits += b.Visits
+	a.Milliseconds += b.Milliseconds
+	a.Processed += b.Processed
+	a.KnownTotal += b.KnownTotal
+	a.UnknownTotalVisits += b.UnknownTotalVisits
+	if a.Operations == nil {
+		a.Operations = map[string]OperationMeasurement{}
+	}
+	addMeasurements(a.Operations, b.Operations, nil)
+	return a
+}
+
+func (p *Progress) recordPhase(now time.Time) {
+	if p.stage == "" {
+		return
+	}
+	row, exists := p.phases[p.stage]
+	if !exists {
+		row.Name = p.stage
+		p.phaseOrder = append(p.phaseOrder, p.stage)
+	}
+	p.phases[p.stage] = mergePhase(row, p.phaseAt(now))
+}
+
+func (p *Progress) measurements() []PhaseMeasurement {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	rows := make([]PhaseMeasurement, 0, len(p.phaseOrder)+1)
+	active := p.phaseAt(time.Now())
+	found := false
+	for _, name := range p.phaseOrder {
+		row := p.phases[name]
+		copy := map[string]OperationMeasurement{}
+		addMeasurements(copy, row.Operations, nil)
+		row.Operations = copy
+		if name == p.stage {
+			row = mergePhase(row, active)
+			found = true
+		}
+		rows = append(rows, row)
+	}
+	if p.stage != "" && !found {
+		rows = append(rows, active)
+	}
+	return rows
 }
 func (p *Progress) Close() {
 	if p == nil {

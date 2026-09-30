@@ -532,7 +532,7 @@ func (r *run) writePDF(source, target string, data []byte, meta *DocumentMetadat
 	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
-	if err := writeFile(filepath.Join(r.stage, target), pdfBytes); err != nil {
+	if err := r.writeFile(filepath.Join(r.stage, target), pdfBytes); err != nil {
 		return 0, err
 	}
 	if err := r.auditPDFFile(filepath.Join(r.stage, target), false, true); err != nil {
