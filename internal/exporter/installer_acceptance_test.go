@@ -59,7 +59,7 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 		t.Fatal(err)
 	}
 	interactive := os.Getenv("PIECES_EXPORT_TEST_INSTALLER_PROMPT")
-	scenarios := []string{"complete-remove", "complete-keep", "partial-remove"}
+	scenarios := []string{"complete-remove", "complete-keep", "partial-remove", "recovery-remove"}
 	if interactive != "" {
 		if interactive != "remove" && interactive != "keep" {
 			t.Fatal("PIECES_EXPORT_TEST_INSTALLER_PROMPT must be remove or keep")
@@ -115,6 +115,12 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 				args = append(args, cleanup)
 			}
 			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
+			var work, keys string
+			if scenario == "recovery-remove" {
+				cfg := recoveryOptionsFixture(t)
+				work, keys = cfg.Directory, cfg.KeyDirectory
+				args = append(args, "--work", work, "--recovery-keys", keys)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", args...)
@@ -128,6 +134,7 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 					cleanup = "Ask"
 				}
 				cmd = packagedPowerShellInstallerCommand(t, ctx, script, release, version, out, temp, osServer.URL, cleanup)
+				cmd.Env = append(cmd.Env, "PIECES_TEST_RECOVERY_WORK="+work, "PIECES_TEST_RECOVERY_KEYS="+keys)
 			}
 			var log bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &log, &log
@@ -179,6 +186,19 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 			}
 			if manifest.People.Mode != "profiles" || manifest.People.Selected != 1 || manifest.People.Omitted != 1 {
 				t.Fatal("installed default export lost profile selection")
+			}
+			if scenario == "recovery-remove" {
+				session, err := OpenRecovery(ctx, RecoveryOptions{Directory: work, KeyDirectory: keys})
+				if err != nil {
+					t.Fatal("installer cleanup lost recovery state or keys", err)
+				}
+				info := session.Info()
+				if err := session.Close(); err != nil {
+					t.Fatal(err)
+				}
+				if !info.CanResume || info.Records == 0 {
+					t.Fatal("installer left an unusable capture")
+				}
 			}
 			paths := map[string]string{}
 			b, err = os.ReadFile(filepath.Join(out, "link-map.json"))
@@ -244,6 +264,7 @@ function Get-PiecesReleaseFile {
  Copy-Item -LiteralPath $source -Destination $Destination
 }
 $options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--format','both','--metadata','off')}
+if ($env:PIECES_TEST_RECOVERY_WORK) { $options.ExportArgs += @('--work',$env:PIECES_TEST_RECOVERY_WORK,'--recovery-keys',$env:PIECES_TEST_RECOVERY_KEYS) }
 exit (Invoke-PiecesBootstrap @options)
 `
 	path := filepath.Join(t.TempDir(), "bootstrap-test.ps1")

@@ -158,6 +158,7 @@ func (r *run) saveCapture(s *recovery.Store) error {
 	}
 	core := captureCore{CapturedAt: time.Now().UTC(), Options: r.opts, Manifest: r.manifest, Policy: r.opts.Scanner.Policy, PolicyHash: r.opts.Scanner.Hash, ListHashes: r.opts.Scanner.ListHashes}
 	core.Options.Scanner, core.Options.Progress, core.Options.captureCheckpoint = nil, nil, nil
+	core.Options.Recovery = nil
 	core.Manifest.Issues = nil
 	if r.client != nil {
 		core.Manifest.Performance = r.client.Performance()
@@ -455,11 +456,11 @@ func loadCapture(ctx context.Context, s *recovery.Store) (*run, uint64, error) {
 			return nil, 0, errConfig("recovery domain list is invalid")
 		}
 	}
-	if core.CapturedAt.IsZero() || core.Options.Scanner != nil || core.Options.Progress != nil || core.Manifest.Status != "running" || !core.Manifest.Finished.IsZero() || core.Manifest.ArchiveState != nil || core.Manifest.Rebuild != nil || core.Manifest.CaptureReplay != nil {
+	if core.CapturedAt.IsZero() || core.Options.Scanner != nil || core.Options.Progress != nil || core.Options.Recovery != nil || core.Manifest.Status != "running" || !core.Manifest.Finished.IsZero() || core.Manifest.ArchiveState != nil || core.Manifest.Rebuild != nil || core.Manifest.CaptureReplay != nil {
 		return nil, 0, errConfig("recovery checkpoint is not an unprocessed source capture")
 	}
 	r.opts, r.manifest = core.Options, core.Manifest
-	r.manifest.CaptureReplay = &CaptureReplayInfo{CapturedAt: core.CapturedAt, SourcePerformance: core.Manifest.Performance}
+	r.manifest.CaptureReplay = &CaptureReplayInfo{CapturedAt: core.CapturedAt, SourceToolVersion: core.Manifest.ToolVersion, SourcePerformance: core.Manifest.Performance}
 	r.manifest.Performance = PerformanceStats{}
 	r.opts.Scanner, err = restoreCaptureScanner(*core, domains, secrets)
 	if err != nil {
@@ -545,6 +546,14 @@ func validateCaptureOptions(o Options) error {
 func replayCapture(ctx context.Context, s *recovery.Store, output string, progress io.Writer) (Manifest, error) {
 	r, generation, err := loadCapture(ctx, s)
 	if err != nil {
+		return Manifest{}, err
+	}
+	return replayLoadedCapture(r, s, generation, output, progress)
+}
+
+func replayLoadedCapture(r *run, s *recovery.Store, generation uint64, output string, progress io.Writer) (Manifest, error) {
+	ctx := r.ctx
+	if err := ctx.Err(); err != nil {
 		return Manifest{}, err
 	}
 	abs, err := filepath.Abs(output)

@@ -29,6 +29,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 	switch args[0] {
 	case "rebuild":
 		return rebuild(ctx, args[1:], stdin, stdout, stderr, version)
+	case "resume":
+		return resume(ctx, args[1:], stdin, stdout, stderr, version)
 	case "version", "--version":
 		fmt.Fprintln(stdout, "pieces-export", version)
 		return 0
@@ -99,6 +101,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		timeout := fs.Duration("timeout", 60*time.Second, "timeout for each OS request")
 		maxMiB := fs.Int64("max-response-mib", 64, "maximum OS response size in MiB")
 		out := fs.String("output", "pieces-export-"+time.Now().Format("20060102-150405"), "new output directory (must not exist)")
+		work := fs.String("work", "", "opt-in encrypted recovery workspace (new directory); recovery begins after all source reads")
+		keys := fs.String("recovery-keys", "", "private key directory outside workspace/output; required with --work; directories are retained")
 		mode := fs.String("mode", "filtered", "filtered or preserve; preserve includes original sensitive content")
 		policyPath := fs.String("policy", "", "JSON privacy policy; defaults to embedded secret and basic financial detection")
 		scope := fs.String("scope", "", "summaries (default) or all; summaries skips events and reads supporting labels only when referenced")
@@ -229,6 +233,16 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 		}
 
+		var recoveryOptions *exporter.RecoveryOptions
+		if *work != "" || *keys != "" {
+			if args[0] != "export" || *dryRun {
+				return fail(fmt.Errorf("--work and --recovery-keys apply only to an actual export"))
+			}
+			recoveryOptions = &exporter.RecoveryOptions{Directory: *work, KeyDirectory: *keys}
+			if err := exporter.ValidateRecoveryOptions(*recoveryOptions, *out, true); err != nil {
+				return fail(err)
+			}
+		}
 		p, dir, err := exporter.LoadPolicy(*policyPath)
 		if err != nil {
 			return fail(err)
@@ -364,6 +378,10 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		fmt.Fprintf(stdout, "Local Markdown writers: %d (file sync retained).\n", *fileWorkers)
 		fmt.Fprintf(stdout, "Performance: %s, ≤1 outstanding data request, batch ceiling %d, target %s | People: %s\n", *performance, *batch, *targetLatency, *people)
 		fmt.Fprintln(stdout, "Website categories apply only if domain lists are configured in the policy.")
+		if recoveryOptions != nil {
+			fmt.Fprintln(stdout, "Recovery enabled after source collection completes. Interrupted fetching cannot resume yet; checkpointing adds disk work.")
+			fmt.Fprintln(stdout, "Workspace and separate keys are retained after success or failure. They contain private recovery evidence; keep both outside the shareable archive.")
+		}
 		if *closeDesktop {
 			fmt.Fprintln(stdout, "After approval, Pieces Desktop will close gracefully. Pieces OS stays running.")
 		}
@@ -383,8 +401,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 				return fail(fmt.Errorf("Pieces OS stopped responding after desktop closure"))
 			}
 		}
-		manifest, err := exporter.Export(ctx, client, exporter.Options{FileWorkers: *fileWorkers, Associations: *associations, Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
+		manifest, err := exporter.Export(ctx, client, exporter.Options{Recovery: recoveryOptions, FileWorkers: *fileWorkers, Associations: *associations, Scope: selection.Name, ReferenceOnly: selection.ReferenceOnly, SDKCaches: sdkCaches, PeopleMode: *people, MinPersonConnections: *minConnections, Output: *out, Mode: *mode, Timezone: *zone, Version: version, Materials: selected, BatchSize: *batch, WindowIDs: *window, Scanner: scanner, Progress: stderr, PDFFont: *pdfFont, PDFLimits: *pdfLimits, SignalDigest: *signalDigest, Format: *format, Naming: *naming, Relationships: *relationships, Metadata: *metadata, RelatedOrder: *relatedOrder, RelatedLimit: *relatedLimit, RelatedSince: since})
 
+		printRecoveryHint(stdout, recoveryOptions)
 		if err != nil {
 			return fail(err)
 		}
@@ -419,6 +438,9 @@ Usage:
   pieces-export export --scope all --output ./my-export [--format markdown|pdf|both] [--yes]
   pieces-export export --output ./private-originals --mode preserve
   pieces-export rebuild --source ./finished-export --output ./rebuilt --format both
+  pieces-export export --output ./my-export --work ./private-work --recovery-keys ./private-keys
+  pieces-export resume --work ./private-work --recovery-keys ./private-keys --inspect
+  pieces-export resume --work ./private-work --recovery-keys ./private-keys --output ./recovered
   pieces-export policy init --output policy.json
   pieces-export lists fetch --output lists --categories adult,bank
   pieces-export materials
@@ -430,6 +452,8 @@ Filtered mode embeds secret detection; no Python or separate scanner is required
 Website categories require local domain lists; they are not enabled by default.
 Exit codes: 0 completed within implemented scope, 1 failed, 2 partial export.
 Known coverage limits are always recorded in manifest.json.
+Opt-in recovery starts after source collection; interrupted fetching cannot resume yet.
+Recovery workspace and separate keys are retained; their parent directories must exist.
 `
 
 func readAnswer(ctx context.Context, input *bufio.Reader) (string, error) {

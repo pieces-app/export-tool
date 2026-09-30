@@ -20,7 +20,21 @@ The CLI scans inventory, shows a rough duration estimate, offers Markdown/PDF ou
 
 `--output` resolves from the terminal working directory; the CLI prints the absolute destination. With no option, it creates `pieces-export-<timestamp>` there. Open `my-pieces-export/index.md` after completion, or `index.pdf` when PDF was requested. Read `manifest.json` for included, excluded, withheld, and missing records and current coverage limits. Existing output directories are never overwritten. Exit code 2 means a partial export that needs review; exit code 1 means failure. Interrupted/failed runs can leave a `.partial` directory; it is not a completed export, even if it contains a provisional manifest. Finalization refuses an existing destination. Filesystems lacking that safe rename operation leave the partial folder intact and require a new output on a supported filesystem. This version does not resume partial directories: choose a new output path for a retry.
 
-Exports default to summary documents and persona profiles (`--scope summaries --people profiles`):
+Exports default to summary documents and persona profiles (`--scope summaries --people profiles`).
+
+Optional recovery can save completed source collection for offline replay:
+
+```sh
+./pieces-export export --output ./my-export --work ./private-work --recovery-keys ./private-keys
+./pieces-export resume --work ./private-work --recovery-keys ./private-keys --inspect
+./pieces-export resume --work ./private-work --recovery-keys ./private-keys --output ./recovered-export
+```
+
+Use `.\pieces-export.exe` on Windows. Both recovery options are required; their parent directories must exist. The workspace must be new, and workspace, key directory, output and partial output must be separate and non-nested. Recovery becomes available only after source collection completes. Interrupted fetching or incomplete checkpoint writing cannot resume yet. `--inspect` verifies state and reports readiness without OS calls or archive creation; it acquires exclusive ownership and may roll back an interrupted private SQLite transaction. Replay inherits the original settings, reruns privacy/document/link checks, and writes a new output. Existing partial directories are never reused. A custom PDF font must still be available and unchanged.
+
+Recovery is opt-in and adds storage work; it is not a speed optimization. The encrypted workspace contains private record evidence and learned secrets. Keys stay outside it. Both directories are retained after success or failure and must be kept private, outside the shareable archive and installer temporary files. Losing the keys prevents recovery. Replay does not repair original coverage gaps or turn historical cache links into current source evidence.
+
+The normal summaries/profile command is:
 
 ```sh
 ./pieces-export export --output ./my-summaries

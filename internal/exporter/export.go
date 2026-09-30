@@ -18,6 +18,7 @@ import (
 
 type Options struct {
 	captureCheckpoint                       func(*run) error
+	Recovery                                *RecoveryOptions
 	FileWorkers                             int
 	Associations                            string
 	Scope                                   string
@@ -98,6 +99,7 @@ type Manifest struct {
 type CaptureReplayInfo struct {
 	CapturedAt        time.Time        `json:"captured_at"`
 	ResumedAt         time.Time        `json:"resumed_at"`
+	SourceToolVersion string           `json:"source_tool_version"`
 	SourcePerformance PerformanceStats `json:"source_performance"`
 }
 type Edge struct {
@@ -225,7 +227,7 @@ func title(v map[string]any, m Material) string {
 	return strings.ReplaceAll(m.Type, "_", " ")
 }
 
-func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
+func Export(ctx context.Context, client *Client, o Options) (result Manifest, resultErr error) {
 	if o.FileWorkers == 0 {
 		o.FileWorkers = defaultFileWorkers
 	}
@@ -320,6 +322,24 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	}
 	if _, err = os.Lstat(abs); !os.IsNotExist(err) {
 		return Manifest{}, errConfig("output already exists or cannot be inspected; choose a new directory")
+	}
+	if o.Recovery != nil {
+		if _, err := os.Lstat(abs + ".partial"); !os.IsNotExist(err) {
+			return Manifest{}, errConfig("partial directory already exists or cannot be inspected; choose a new output path")
+		}
+		if o.captureCheckpoint != nil {
+			return Manifest{}, errConfig("multiple recovery adapters requested")
+		}
+		store, err := createExportRecovery(ctx, *o.Recovery, abs)
+		if err != nil {
+			return Manifest{}, err
+		}
+		defer func() {
+			if err := store.Close(); err != nil && resultErr == nil {
+				resultErr = errConfig("archive was written but recovery workspace close failed; retain the archive and recovery directories")
+			}
+		}()
+		o.captureCheckpoint = func(r *run) error { return r.saveCapture(store) }
 	}
 	stage := abs + ".partial"
 	if err = os.MkdirAll(filepath.Dir(stage), 0700); err != nil {

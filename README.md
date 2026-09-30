@@ -29,7 +29,17 @@ The default `filtered` mode removes detected secrets and basic financial identif
 ./pieces-export export --mode preserve --output ./exports/private-archive
 ```
 
-`--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. There is no resume yet; choose a new path after a failed run. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
+Opt-in recovery in `0.15.0-dev` saves the completed-source boundary. After that checkpoint, local privacy/graph/document processing can restart without OS access:
+
+```sh
+./pieces-export export --output ./exports/my-export --work ./exports/private-work --recovery-keys ./exports/private-keys
+./pieces-export resume --work ./exports/private-work --recovery-keys ./exports/private-keys --inspect
+./pieces-export resume --work ./exports/private-work --recovery-keys ./exports/private-keys --output ./exports/recovered
+```
+
+Parents must exist; the workspace must be new. Workspace, keys and output must be separate and non-nested. Both private recovery directories are retained. This does not resume interrupted source fetching or reuse `.partial` folders, and it adds checkpoint I/O. See [the recovery contract and limitations](RECOVERY_DESIGN.md#cli-and-failure-ux).
+
+`--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. An ordinary run has no recovery checkpoint. Opt-in `--work` supports offline replay only after source collection completes; every retry/replay needs a new output path. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
 
 ## Summaries and personas by default
 
@@ -137,10 +147,10 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.13.1-dev --output dist/0.13.1-dev
+go run ./cmd/release --version 0.15.0-dev --output dist/0.15.0-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.13.1-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.15.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 
