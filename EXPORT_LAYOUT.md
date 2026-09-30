@@ -230,6 +230,8 @@ Individual `SIGNALS` records already export; the earlier live inventory counted 
 
 Generate from sanitized staged data and the final path map. Include signal identity, origin/category, timestamps/ranges, approved annotation text, and links to canonical signal/person/pipeline/summary/evidence records. Sort newest-created first, display occurrence ranges separately, and reconcile every included signal to a digest entry. Do not refetch or regenerate signals.
 
+Descriptions come from attached `SIGNAL_DESCRIPTION` annotations. Preserve all approved versions/attachments and flag ambiguous multiplicity; do not infer prose from a name or category when the relationship is absent. The seven relationship collections and batch embedding omission are documented in [the signal traversal contract](EXPORT_GUIDE.md#signals-and-their-description-annotations).
+
 Initial splitting design: 1,000 signals or 8 MiB approved text per part; report oversized single signals explicitly. A single-document choice needs a size estimate. PDF needs its own page/memory/cancellation budget. Test empty, large, tied, undated, missing-link, filtered, Unicode, moved-folder, and interrupted cases before claiming full digest coverage. Track the work in [TODO.md](TODO.md).
 
 ## Regenerating an archive

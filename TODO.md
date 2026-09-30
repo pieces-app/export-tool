@@ -213,6 +213,7 @@ Implementation contract: [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md), archive format 5;
 Individual `SIGNALS` records already export. The aggregate view is planned separately in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md#signals-digest-planned-next).
 
 - [ ] Verify live signal annotation/association projections against the source schema; inventory remains independent of summary reachability.
+- [x] Document the source contract: `SIGNAL_DESCRIPTION` annotation bodies; seven relationship collections; origin/category enums; 50-ID batch chunks; and deliberate batch omission of `signalsVector`. Source review does not verify live projections or recover embeddings. See [signal traversals](EXPORT_GUIDE.md#signals-and-their-description-annotations).
 - [ ] Add a single Markdown digest option and a bounded split option with `signals/index.md`. Initial split design: 1,000 signals or 8 MiB approved text per part, with reported handling of an oversized individual signal.
 - [ ] Include source ID/name/origin/category, creation/update and occurrence ranges, approved annotation text, and valid links to canonical signal/person/pipeline/summary/evidence records.
 - [ ] Sort newest-created first with stable ID tie-break and explicit undated handling. Reconcile digest membership to included signals, distinct from excluded/withheld/missing counts; never silently truncate.

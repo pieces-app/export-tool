@@ -62,7 +62,7 @@ ETA must distinguish measured work from assumptions. Sample small read-only batc
 
 The order is required: fetch canonical records → sanitize/withhold → resolve allowed graph → assign every final path → create links/relationship indexes → write Markdown → validate text → convert approved Markdown to PDF → apply approved metadata → validate all representations → finalize.
 
-See [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete **implemented archive-format-4** tree, examples, canonical placement rules, person histories, descriptor groups, and planned signals digest.
+See [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete **implemented archive-format-5** tree, examples, canonical placement rules, person histories, descriptor groups, and planned signals digest.
 
 The primary browsing root is `workstream_summaries/`, containing `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/`. Temporal and UNKNOWN/legacy summaries go into its timeline. SPECIFIC hierarchical summaries use `parentHierarchicalTypeDescriptor` to choose a single-click folder, including `daily_standups`, `morning_briefs`, `end_of_day_recaps`, `week_recaps`, and other exact SDK descriptors. Missing descriptors go to `unclassified`; unknown custom descriptors use safe labels plus deterministic hash suffixes. Exact `custom_pipeline_<id>` descriptors use that included pipeline's approved name when available, with the same descriptor hash suffix; excluded/missing pipelines retain the fallback. This lookup does not add an association. Other explicit hierarchy types go into `hierarchical_summaries/<type>/`. No title matching is involved. The root-level `timeline/records.jsonl` and daily indexes cover all material types separately.
 

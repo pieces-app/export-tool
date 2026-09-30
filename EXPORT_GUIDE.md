@@ -572,6 +572,20 @@ The [event/context schemas][common-spec] contain several kinds of content. The p
 
 Follow summaries, tags, sources, source windows (`source_windows`), messages, annotations, anchors, websites, people, hints, connectors, fingerprints, and signals. Fetch available fingerprint audio separately. Never reduce the archive to `readable` alone: event context can carry additional text and metadata. Unknown fields from newer OS builds must survive raw JSON storage even if an older generated SDK omits them on reserialization.
 
+### Signals and their description annotations
+
+Inventory `SIGNALS` independently through material IDs and hydrate `/signals/batch/fetch`; do not require a summary to reference a signal before exporting it. The singular endpoint is `GET /signal/{id}`. In the inspected server, batch input accepts active `signals.indices` and `signals.iterable` references, deduplicates IDs, and processes chunks of 50 within `inBatch`. Missing records and per-record failures are returned in `notFound`; that list does not distinguish deletion from other read errors.
+
+A signal's descriptive prose lives in an attached annotation of type **`SIGNAL_DESCRIPTION`**, rather than an inline `description` property. Follow active `annotations.indices` references and read the annotation text. Negative indices are inactive. The server description helper returns the first matching nonempty description it can read; the exporter should retain every approved attached annotation and explicitly report multiple descriptions instead of silently selecting one as complete history. Do not invoke the upsert helper: it creates or updates annotations and embeddings.
+
+The schema has seven relationship collections: `pipelines`, `summaries`, `workstream_events`, `persons`, `websites`, `ranges`, and `annotations`. Their absence from a response is unknown projection coverage, not evidence that a signal has no related records. A digest can link only to included canonical targets, and must keep unavailable descriptions/relationships visible as coverage gaps. Use `created` for stable chronological ordering and attached ranges for occurrence context; a signal's creation date is not necessarily the date of every activity it describes.
+
+`origin` is one of `UNKNOWN`, `REALTIME_WORKSTREAM_PATTERN_ENGINE`, or `HIERARCHICAL_ROLLUP`. `category` is `UNKNOWN`, `ORGANIZATION`, `LOCATION`, `CONCEPT`, `PRODUCT`, `EVENT`, `ARTIFACT`, `INTENT`, `TASK`, `PROBLEM`, or `DECISION`. Preserve unknown future values in canonical JSON without guessing a known category. These enums classify signals; they cannot reconstruct absent graph edges.
+
+The inspected batch implementation explicitly clears `signalsVector` before returning each record. A successful signal inventory/batch export therefore does **not** prove recovery of original embeddings. The ordinary memory-document export has no verified vector-recovery contract; an all-data completeness claim must disclose this omission or separately verify an appropriate read path.
+
+Sources: [Signal schema](../generated_runtime/spec/common/runtime_common_library.yaml), [signal routes](../isomorphic_server/lib/signal_internal_server.dart), [batch implementation](../isomorphic_server/lib/signals_internal_server.dart), [description annotation helper](../isomorphic_server/lib/utils/signal_description_annotation_helper.dart). These are source-contract findings; staged/live projection coverage still requires verification.
+
 ### Conversations and messages
 
 Enumerate both `CONVERSATIONS` and `CONVERSATION_MESSAGES`. Use the global message list to catch messages absent from a conversation's index. `/conversation/{id}/messages` follows that index and fails if a referenced message cannot be loaded; it is not a stronger completeness guarantee.
