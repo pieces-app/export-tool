@@ -435,7 +435,21 @@ func Export(ctx context.Context, client *Client, o Options) (Manifest, error) {
 	return r.finish(abs)
 }
 
-func (r *run) finish(destination string) (Manifest, error) {
+func (r *run) finish(destination string) (result Manifest, resultErr error) {
+	defer func() {
+		if resultErr != nil {
+			// Success is provisional until validation and the final directory
+			// rename both succeed. Never return that provisional status on error.
+			r.manifest.Status = "failed"
+			r.manifest.Finished = time.Time{}
+			result = r.manifest
+			var pathErr *os.PathError
+			var linkErr *os.LinkError
+			if errors.As(resultErr, &pathErr) || errors.As(resultErr, &linkErr) {
+				resultErr = &outputFilesystemError{cause: resultErr}
+			}
+		}
+	}()
 	var err error
 	o := r.opts
 	stage := r.stage
@@ -482,7 +496,7 @@ func (r *run) finish(destination string) (Manifest, error) {
 			return r.manifest, err
 		}
 	}
-	if err = os.Rename(stage, destination); err != nil {
+	if err = commitDirectory(stage, destination); err != nil {
 		return r.manifest, err
 	}
 	return r.manifest, nil

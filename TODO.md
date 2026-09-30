@@ -122,7 +122,8 @@ Implementation: render from canonical approved Markdown; retain it in PDF export
 - [ ] Expand adversarial tests across all generated surfaces/native properties; the implemented checks are not a universal secret-detection guarantee.
 - [x] Exercise Preview on a moved synthetic archive; fix relative-URI failure using PDF file actions and verify a summary/index round trip with an accented filename after both targets are opened directly.
 - [ ] Resolve/document first-use Preview file-access restrictions and test Acrobat/Edge plus a Linux viewer. Do not count parser/path checks as unrestricted viewer navigation.
-- [ ] Test PDF render failure/disk full/cancel and guarantee no falsely successful final archive.
+- [x] Test actual Linux tmpfs exhaustion during PDF writes and later metadata/archive-state output; verify the packaged CLI exits 1, removes its incomplete PDF, retains staging, and never finalizes. Test cancellation entering PDF/metadata stages and late destination collisions.
+- [ ] Test cancellation during unusually large single-block/font rendering, crash/power-loss durability, and native Windows/filesystem failure behavior. See [failure testing](FAILURE_TESTING.md).
 
 ## 7. Completeness and privacy hardening
 
@@ -133,7 +134,7 @@ Implementation: render from canonical approved Markdown; retain it in PDF export
 - [ ] Implement attachment/fingerprint audio extraction for preservation mode and validated format-specific filtering for supported attachments. Do not copy unscanned originals into filtered archives.
 - [ ] Extend privacy tests to filenames, all four relationship sections, sidecars, native metadata, PDF text/metadata, URLs with query credentials, and late-discovered credentials.
 - [ ] Add recorded large-history fixtures without private content; test memory, disk use, retries, server mutation, interrupted runs, and resumed runs once resume exists.
-- [x] Stop hydration immediately when record persistence fails, with a content-free actionable error. Test an unwritable destination and cancellation during fetch; neither finalizes an archive or fetches subsequent batches. Actual ENOSPC during PDF/metadata output and resumable recovery remain separate unchecked work.
+- [x] Stop hydration immediately when record persistence fails, with a content-free actionable error. Test an unwritable destination and cancellation during fetch; neither finalizes an archive or fetches subsequent batches. Actual Linux ENOSPC during PDF/metadata/archive-state output is now verified below. Other native filesystems and resumable recovery remain separate unchecked work.
 - [ ] Implement disk-backed IDs/graph and resumable manifests for datasets beyond the current memory/response limits.
 - [x] Review manifest semantics: intentional exclusions versus failures, metadata warnings versus content failures, requested format versus generated format, and date/graph evidence.
 - [x] Count absent/null, malformed, explicitly empty, and populated core summary/person/pipeline relationship fields separately. Emit aggregate `relationship_coverage` in the manifest and `coverage.md`; unresolved projections produce partial status/exit 2 even when all material IDs reconcile. Preflight discloses sampled projection gaps before approval. Reverse-edge recovery does not certify a complete projection.
@@ -356,3 +357,17 @@ Live exports stay under ignored `exports/`. Record counts/timings/statuses in th
 - All three missing annotation UUIDs match the older payment-card heuristic. The diagnostic probe passed and logged only aggregate counts. The corrected scanner already has synthetic regression coverage; the old running process remains unchanged.
 - [ ] Reconcile the three absent annotation IDs against final source-archive decisions; distinguish the old numeric-UUID false positive from intentional withholding before any corrected source reread. Audit other material omissions from the old binary as well.
 - [ ] Apply historical attachment recovery to the finalized archive, measure retained body coverage after privacy, and validate the actual person reduction. No live reduction claim follows from the cached two-person association set.
+
+### Output exhaustion and finalization (2026-09-29)
+
+- [x] Exercise real ENOSPC in a dedicated 8 MiB tmpfs inside the isolated Linux ARM64 container: first record write, actual PDF byte write, metadata sidecar write, and reconstruction-state write. The test refuses the host filesystem or a large/nonempty mount. Incomplete PDF cleanup, retained staging, and absent final/success output passed.
+- [x] Fix the discovered late-status bug: archive-state exhaustion previously returned a manifest marked complete alongside its error. The shared export/rebuild finish path now returns `failed` and clears its completion timestamp on failure. Filesystem errors preserve errno while hiding generated private paths from terminal text.
+- [x] Add exclusive native directory finalization. macOS/Linux collision fixtures verify that a file or empty directory appearing after preflight remains unchanged and that an offline rebuild leaves its source bytes untouched. Unsupported filesystems fail closed. Windows code and its long local/UNC path tests compile, but runtime verification remains pending.
+- [x] Exercise the actual packaged Linux executable on the full tmpfs during PDF conversion: exit 1, actionable failure text, no `Export written` announcement, retained `.partial`, and no success manifest. Only the synthetic child process inside the container is paused to inject this failure; the live export is never signaled.
+- [x] Verify cancellation entering PDF/metadata stages and a late reconstruction-file collision. A provisional manifest inside `.partial` remains unfinalized and is rejected by offline rebuild.
+- [x] Full `go test -race ./...` passed (exporter 165.677 seconds); `go vet ./...`, final Linux exhaustion regressions, and actionlint passed. The workflow now includes the isolated Linux disk-full test for future native runners. GitHub Actions was neither dispatched nor retried.
+- [x] Build six `0.8.6-dev` binary-only packages; verify SHA-256 and exact four-file ZIP layouts including updated partial-output instructions. Actual packaged ordinary/cache/summaries/rebuild/legacy-rebuild acceptance passed on macOS ARM64, macOS AMD64 under Rosetta, and isolated Linux ARM64. The Windows test executable also cross-compiled. No upload or publication occurred.
+- [ ] Run native Windows long-path/finalization tests and broaden filesystem failure coverage; verify crash/power-loss durability and cancellation during very large single-block/font rendering. Resume remains a separate unimplemented feature.
+
+Reproduction commands, behavior, and limits are in [FAILURE_TESTING.md](FAILURE_TESTING.md). These results do not close the live migration, authoritative relationship recovery, actual person reduction, viewer acceptance, or configured GCP installer/download gates.
+- Native dependency check: `GOTOOLCHAIN=go1.27.1 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...` passed with zero reachable findings. The tool also reported 3 imported-package and 18 required-module advisories outside detected called paths; this is not a universal security guarantee.

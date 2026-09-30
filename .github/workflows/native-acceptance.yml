@@ -79,6 +79,22 @@ jobs:
         env:
           PIECES_EXPORT_TEST_BINARY: ${{ github.workspace }}/dist/pieces-export_${{ env.RELEASE_VERSION }}_${{ matrix.label }}/${{ matrix.executable }}
         run: go test ./internal/exporter -run '^TestPackaged(CLI|CacheCLI|SummaryCLI|RebuildCLI|LegacyRebuildCLI)$' -count=1 -v
+      - name: Linux isolated disk-full acceptance
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          enospc_tests=$(mktemp -d "$RUNNER_TEMP/pieces-export-enospc.XXXXXX")
+          CGO_ENABLED=0 go test -c -o "$enospc_tests/exporter.test" ./internal/exporter
+          docker run --rm --platform '${{ matrix.target }}' \
+            --network none --read-only --cpus=2 --memory=512m \
+            --tmpfs /tmp:rw,size=128m --tmpfs /enospc:rw,size=8m \
+            --mount type=bind,source="$enospc_tests",target=/tests,readonly \
+            --mount type=bind,source="$PWD/dist/pieces-export_${RELEASE_VERSION}_${{ matrix.label }}",target=/app,readonly \
+            --env PIECES_EXPORT_ENOSPC_ROOT=/enospc \
+            --env PIECES_EXPORT_TEST_BINARY=/app/pieces-export \
+            debian@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 \
+            /tests/exporter.test \
+            -test.run '^Test(ActualENOSPCLeavesUnfinalizedArchive|PackagedDiskFullCLI)$' -test.v
       - name: Retain binary-only acceptance artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
