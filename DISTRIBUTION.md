@@ -2,15 +2,19 @@
 
 Updated 2026-10-01. The application is closed source under [LICENSE.txt](LICENSE.txt). Binaries are intentionally unsigned and unnotarized. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that production acceptance has passed.
 
-The latest local candidate packages are `0.17.5-dev` under `dist/0.17.5-dev/`. They add one complete fresh secret-scan retry after a local deadline, retaining parent cancellation and repeated-timeout failure. Earlier parallel text audits, missing-person navigation correction and default single relationship sibling remain included. All six ZIP hashes, exact four-file layouts and extracted bytes were verified. Actual Mac ARM64 CLI/installer checks passed (105.458 s with race checks), Rosetta CLI/retry checks passed (12.265 s), and ten Linux ARM64 fixture/package/installer checks passed. Full regression and real replay status are tracked in [TODO](TODO.md); native Windows and public-host acceptance remain open.
+## Frozen release candidate — 0.18.0-rc1
 
-The corrected real `0.17.5-dev` replay finalized partial in **29m52s**, retaining all **11,746 captured summaries**. Independent body/graph/link acceptance, source comparison and stored macOS metadata checks passed. **43 unavailable people and 375 metadata-only summaries**, unacceptable runtime and full migration remain release gaps. The earlier 51m23s live export, 38m06s identical replay and failed `0.17.3-dev` replay remain preserved. Current Linux ARM64 package/installer, real disk-full and stored-xattr checks passed in the local Docker VM. The actual Linux AMD64 package passed 25 CLI/recovery/privacy/disk-full checks through VM translation. Native AMD64 hardware/installer execution, native Windows, desktop viewers/lifecycle and public-host installation acceptance remain open. No binaries have been uploaded, no GCP base is configured, and Actions remains on the billing hold. See [the current checklist](TODO.md#current-outcome-and-immediate-fixes--2026-10-01) and [installer evidence](INSTALLER_ACCEPTANCE.md); versioned notes below are historical.
+Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.
 
-On 2026-10-01 the published Gist's two files were fetched again through the GitHub API and matched the local Bash/PowerShell scripts byte-for-byte by SHA-256. The prepared native workflow now selects all `TestPackaged.*CLI` cases, so current-junction, missing-owner, recovery and paginated-navigation checks cannot be omitted by a stale explicit name list. The workflow passed actionlint; no job was dispatched.
+The actual Mac ARM64 package passed all 18 CLI checks and both installer suites, including forced interrupted-fetch recovery. Mac AMD64 under Rosetta and Linux ARM64/translated AMD64 passed the selected CLI/recovery checks. Bash installation passed through local HTTPS on Mac/Linux ARM64. PowerShell passed on Mac with substituted local-file transport; native Windows and public HTTPS delivery remain unverified. Translation is not native AMD64 hardware acceptance.
+
+**Full real-data recovery passed.** The packaged CLI was killed after 500 saved snapshots, then resumed into a new output in **43m45s**, including fresh OS reads. All 500 snapshots were reused; the original partial folder is unchanged. Independent checks verified **11,751 summaries, 1,380 people, 5,170 profile-history documents, 547,897 graph edges and 23,502 native metadata documents**. The archive remains partial: **43 unavailable people, 375 summaries without attached text**, plus reported source-inventory changes. See [the evidence and source-drift explanation](RECOVERY_DESIGN.md#candidate-verification). Storage prototypes, optional formats and automatic recovery cleanup remain deferred.
+
+The local Bash bootstrap additionally fixes cleanup after a failed download. Missing checksum/archive HTTP 404 cases reproduced the failure, then passed with the fix. The full installer suite and current Mac/Linux ARM64 packaged Bash checks pass. The ZIP executables are unchanged by this installer-only fix. The existing Gist has **not** been updated; its earlier byte-match record no longer applies to the local Bash script. Publish the tested script with the chosen release later.
 
 ## First public release scope — user decision, 2026-10-01
 
-The measured **28m32s** runtime is acceptable for this user's database. Further speed work is not an open-ended release blocker. Verify the pending storage/audit candidates preserve the archive and do not materially regress the accepted runtime before promoting them; otherwise retain the accepted implementation.
+The measured **28m32s** offline rebuild runtime is acceptable for this user's database. Freeze the first release at **0.18.0-rc1**: summaries, profiles, linked Markdown, privacy and recovery. Further storage rewrites, automatic recovery paths/cleanup and extra formats are deferred. The separate range/all-material storage prototypes are not being merged for this release. Verify the chosen package once against real data; do not reopen optimization work without a demonstrated failure.
 
 The release focuses on **Markdown summaries, persona/profile histories, pipeline organization and their linked graph**, with privacy filtering and explicit coverage reports. Attachment extraction, audio and PDF acceptance are **deferred and do not block this release**. Existing optional code is not evidence of public support. Signals/all-data expansion also stays outside the default summaries release.
 
@@ -18,7 +22,7 @@ The verified **43 unavailable people and 375 summary records without attached bo
 
 Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
 
-**Latest direction:** focus on recovery now. Hosting work and broader storage-candidate integration are paused; public GitHub Releases is the likely distribution route, pending a later decision.
+**Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration, Actions dispatch or publication is required for the current work.
 
 ## Installation UX
 
@@ -36,19 +40,19 @@ The Gist bootstrap can run from memory, so there is no separate saved bootstrap 
 Repository commands, before publication:
 
 ```sh
-bash install/install.sh --base-url https://storage.googleapis.com/BUCKET/releases \
+bash install/install.sh --base-url https://github.com/OWNER/RELEASES-REPO/releases/download \
   --version VERSION --output "$HOME/Documents/Pieces-Export"
 
 # Optional CLI flags follow --. An unattended export needs explicit approval.
-bash install/install.sh --base-url https://storage.googleapis.com/BUCKET/releases \
+bash install/install.sh --base-url https://github.com/OWNER/RELEASES-REPO/releases/download \
   --version VERSION --remove -- --yes --format markdown --people profiles
 ```
 
 ```powershell
-& ./install/install.ps1 -BaseUrl 'https://storage.googleapis.com/BUCKET/releases' `
+& ./install/install.ps1 -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' `
   -Version 'VERSION' -Output "$HOME\Documents\Pieces-Export"
 
-& ./install/install.ps1 -BaseUrl 'https://storage.googleapis.com/BUCKET/releases' `
+& ./install/install.ps1 -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' `
   -Version 'VERSION' -Cleanup Remove -ExportArgs @('--yes', '--format', 'markdown')
 ```
 
@@ -59,12 +63,12 @@ The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca
 ```sh
 curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location \
   'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/6d928715f5faf7bf4e9776be2a8b34c981abacab/install.sh' | bash -s -- \
-  --base-url https://storage.googleapis.com/BUCKET/releases --version VERSION
+  --base-url https://github.com/OWNER/RELEASES-REPO/releases/download --version VERSION
 ```
 
 ```powershell
 $bootstrap = (Invoke-WebRequest -UseBasicParsing -Uri 'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/866cfdf5ec3192a7a43d82f4b3c4b34343f523de/install.ps1').Content
-& ([scriptblock]::Create($bootstrap)) -BaseUrl 'https://storage.googleapis.com/BUCKET/releases' -Version 'VERSION'
+& ([scriptblock]::Create($bootstrap)) -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' -Version 'VERSION'
 ```
 
 Checksums fetched from the same HTTPS release origin detect corruption or mismatched files; they are not independent proof against a compromised publisher/bucket. Version objects should be immutable. The Gist does not contain application source, credentials, private fixtures, or exported records.

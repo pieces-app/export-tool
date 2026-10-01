@@ -1,6 +1,20 @@
 # Installer acceptance
 
-## Current local package — 2026-10-01
+## Frozen release candidate — 0.18.0-rc1
+
+Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.
+
+The actual Mac ARM64 package passed all 18 CLI checks and both installer suites, including forced interrupted-fetch recovery. Mac AMD64 under Rosetta and Linux ARM64/translated AMD64 passed the selected CLI/recovery checks. Bash installation passed through local HTTPS on Mac/Linux ARM64. PowerShell passed on Mac with substituted local-file transport; native Windows and public HTTPS delivery remain unverified. Translation is not native AMD64 hardware acceptance.
+
+**Full real-data recovery passed.** The packaged CLI was killed after 500 saved snapshots, then resumed into a new output in **43m45s**, including fresh OS reads. All 500 snapshots were reused; the original partial folder is unchanged. Independent checks verified **11,751 summaries, 1,380 people, 5,170 profile-history documents, 547,897 graph edges and 23,502 native metadata documents**. The archive remains partial: **43 unavailable people, 375 summaries without attached text**, plus reported source-inventory changes. See [the evidence and source-drift explanation](RECOVERY_DESIGN.md#candidate-verification). Storage prototypes, optional formats and automatic recovery cleanup remain deferred.
+
+## Download-failure cleanup — 2026-10-01
+
+A missing checksum or archive returned HTTP 404 but the Bash EXIT handler lost its function-local state, leaving cleanup incomplete and reporting an unbound variable. Running the installer function in a subshell keeps that state available to EXIT. Regression cases reproduce both failures, then verify curl's exit status 22, no executable invocation and no retained installation directory. All installer source tests pass (7.091s), and actual `0.18.0-rc1` Bash ZIP installation/cleanup checks pass again on macOS ARM64 and Linux ARM64. No CLI executable or exported archive changed. The local script fix has not been republished to the Gist.
+
+Recovery installer scenarios now request supported Markdown and verify `index.md`; existing non-recovery PDF fixture scenarios remain unchanged. These test cases do not make PDF a supported first-release feature.
+
+## Earlier local package checks — 2026-10-01
 
 The **`0.17.5-dev`** scan-retry candidate passed all selected actual Mac ARM64 packaged CLI/installer cases in **105.458 s** with race checks. The actual Mac AMD64 executable under Rosetta passed CLI/default-summary/recovery checks and the retry fixtures in **12.265 s**. Six ZIP hashes, exact four-file layouts and embedded files were verified. The Linux ARM64 package passed ten top-level checks, covering retry/cancellation, missing-person recovery, ordinary/default-summary CLI export, recovery and Bash HTTPS installation/cleanup. Its isolated Docker container had no network or private export/source mounts. The later production change is limited to complete scanner retries and aggregate retry accounting; the separate `0.17.4-dev` disk-full/native-xattr checks below remain revision-specific evidence.
 
@@ -22,7 +36,7 @@ Recorded 2026-09-29–30 using the existing, unmodified `0.8.6-dev` release ZIPs
 
 `internal/exporter/installer_acceptance_test.go` supplies a synthetic OS with a summary, its annotation body, a user persona/profile, and referenced tags/source. The actual bootstrap verifies and extracts the actual release package, then invokes `export --format both --yes --launch-os=false --close-desktop=false --metadata off` against that fixture. Starting with the `0.14.0-dev` acceptance run, the test omits scope and people flags and asserts summaries/profile defaults; earlier runs explicitly selected summaries.
 
-Every case checks the finalized manifest, summary scope, output retention, PDF index, credential filtering, and Markdown/PDF link audits after relocating the archive. Complete cases also check summary text and inventory reconciliation. The source fixture records requests so the test can reject event-body reads and unexpected inventories.
+Every case checks the finalized manifest, summary scope, output retention, credential filtering, and link audits after relocating the archive. Recovery cases use Markdown and check its index; the older non-recovery cases also check PDF output. Complete cases also check summary text and inventory reconciliation. The source fixture records requests so the test can reject event-body reads and unexpected inventories.
 
 | Platform and shell | Package delivery | Cases verified |
 | --- | --- | --- |

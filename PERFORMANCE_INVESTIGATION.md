@@ -1,8 +1,30 @@
 # Live export performance investigation
 
-**Release decision, 2026-10-01:** the user accepts the measured 28m32s duration. Earlier descriptions of this runtime as unacceptable are superseded. Verify pending candidates preserve content and avoid material regression; further optimization is not an open-ended release gate.
+**Release decision, 2026-10-01:** the user accepts the measured 28m32s duration. Earlier descriptions of this runtime as unacceptable are superseded. Freeze the `0.18.0-rc1` Markdown/recovery candidate. The separate storage prototypes are deferred; further optimization is not an open-ended release gate.
 
-**Current result, 2026-10-01:** the range-storage/sidecar candidate finalized an offline rebuild of the accepted real archive in **28m32s**, exit **2 / partial**, with **zero current OS requests**. Independent archive acceptance and record/graph/native-metadata reconciliation passed. All **11,746 captured summaries** are retained; the earlier 187-summary/403-annotation withholding bug remains corrected. The original source fetch of those summary snapshots took **1m36s**. Local processing still takes far too long for this use case; complete migration and production readiness remain open. No export or rebuild process remains running at this checkpoint.
+## Final recovery candidate accepted — 0.18.0-rc1
+
+The actual Mac ARM64 package was killed after 500 durable hydration snapshots, then resumed and finalized partial in **43m45s**. It reused all 500 and fetched 65,075 additional snapshots. Source phases took **23m41s**; the complete-source checkpoint and all local processing took **20m03s**. Peak RSS was **1.57 GiB**. This is a fresh-source recovery run, not the earlier offline rebuild, and host/source conditions differ; no controlled speedup is claimed.
+
+| Phase | Wall time |
+| --- | ---: |
+| Summary snapshot fetch (included in source total) | 2m32s |
+| All source phases | 23m41s |
+| Complete encrypted checkpoint | 1m48s |
+| Privacy reconciliation | 1m24s |
+| Group association evidence | 19s |
+| Markdown generation | 7m11s |
+| Graph/navigation files | 33s |
+| Both output audits | 5m54s |
+| Native/portable metadata | 2m12s |
+| Local-link validation | 24s |
+| Reconstruction evidence | 15s |
+
+The run made **209,229 HTTP requests**, zero retries and 82 pacing backoffs. It performed **177,839 public writes/syncs**, writing **1,596,216,231 logical bytes**; there were no write or audit-scan failures. Filtering redacted 55 records; no selected summaries were excluded or withheld. Independent archive checks and native metadata readback passed. All **11,751 summaries**, **1,380 people**, **5,170 profile-history documents**, **547,897 graph edges** and **23,502 native metadata documents** are verified. Earlier summary IDs are all retained. The same 43 unavailable people / 375 metadata-only summaries remain. Current source drift is reported, including three added people during collection and one older profile owner no longer returned by OS.
+
+Evidence: `exports/release-summary-recovery-20261001-210315/release-acceptance.json` and the finalized archive's `performance.json`. No additional optimization is required by this result. Separate storage prototypes remain deferred.
+
+**Earlier accepted rebuild, 2026-10-01:** the range-storage/sidecar candidate finalized an offline rebuild of the accepted real archive in **28m32s**, exit **2 / partial**, with **zero current OS requests**. Independent archive acceptance and record/graph/native-metadata reconciliation passed. All **11,746 captured summaries** are retained; the earlier 187-summary/403-annotation withholding bug remains corrected. The original source fetch of those summary snapshots took **1m36s**. The user accepted this duration; missing source data remains explicitly partial. No process was running at that earlier checkpoint.
 
 Both prior processes—the original all-data export and `0.17.0-dev` current-junction attempt—exited with errors and left unfinished folders. Neither was stopped or replaced. The latter failed after **46m31s** while scanning a 20 MB generated index. The **65m45s historical-cache baseline** is an earlier partial archive; the new archive uses current junction evidence without historical caches. Different captured graphs, source inventories and host contention prevent treating this as a controlled speed comparison. [The failed run and forward fixes](#failed-current-junction-run-and-forward-fixes) are documented below. Older process checkpoints are historical.
 
@@ -22,7 +44,7 @@ Open `exports/live-summaries-20261001-range-sidecar/index.md`. The actual Mac AR
 | Validate local links | 33s |
 | Reconstruction evidence | 20s |
 
-There were **163,861 public writes/syncs** and **1,592,921,195 logical bytes written**. Range canonical storage fell from **11,072 individual JSON files to 222 JSONL chunks**. Across the combined storage and relationship-layout changes, logical writes fell by 402,941,989 bytes from the prior replay. Other fixture tests overlapped on this host, and rebuilding differs from replaying a capture; these are not controlled speed comparisons. This result does not establish an acceptable total duration. The metadata phase alone spent 120.414 seconds syncing 23,492 portable sidecars; native attribute calls do not explain most of that phase.
+There were **163,861 public writes/syncs** and **1,592,921,195 logical bytes written**. Range canonical storage fell from **11,072 individual JSON files to 222 JSONL chunks**. Across the combined storage and relationship-layout changes, logical writes fell by 402,941,989 bytes from the prior replay. Other fixture tests overlapped on this host, and rebuilding differs from replaying a capture; these are not controlled speed comparisons. The user accepted this offline duration; it does not measure a fresh source export. The metadata phase alone spent 120.414 seconds syncing 23,492 portable sidecars; native attribute calls do not explain most of that phase.
 
 The original private comparison script failed after successful export and acceptance because it assumed legacy reconstruction rows had `data_path`. A corrected read-only comparison handled both individual and grouped storage; no export was repeated. Both reports remain preserved. `exports/live-summaries-20261001-range-sidecar-reconciliation.json` records the successful final comparison.
 
@@ -30,7 +52,7 @@ The original private comparison script failed after successful export and accept
 
 The isolated `export-cli/all-canonical-storage` branch, commit `55c7522`, extends bounded encrypted staging and grouped canonical JSON to every supported material (format 8 / reconstruction version 5). Summary/profile Markdown and other ordinary documents remain individual. Full source tests passed (exporter 168.529s), the multi-material source/capture/replay/rebuild cycle passed with race checks, vet passed, and actual compiled Mac CLI/legacy-upgrade/late-privacy/destination-failure checks passed (72.544s). It is **not merged, promoted, or accepted against the real capture**, and other runtimes remain unverified.
 
-The main working tree also avoids repeating identical successful JSON-token privacy scans within a single file. Approval keys use exact string equality, bounded to 4,096 entries / 1 MiB owned text / 2,048 bytes per token. Every byte is still decoded and hashed, every new token is scanned, cancellation is checked, failed scans are never cached, and approvals cannot survive the file or a scanner-policy change. Focused race tests passed (13.687s), and full source tests passed (exporter 143.477s). The repeated-token microbenchmark fell from approximately 104 ms to 0.22 ms for 16,000 highly repetitive tokens; it excludes JSON decoding, hashing, I/O and unique values and is **not an export speed estimate**. Neither candidate was in the 28m32s rebuild. The next performance gate is one combined real-data measurement with the same record/body/graph/privacy acceptance.
+The main working tree also avoids repeating identical successful JSON-token privacy scans within a single file. Approval keys use exact string equality, bounded to 4,096 entries / 1 MiB owned text / 2,048 bytes per token. Every byte is still decoded and hashed, every new token is scanned, cancellation is checked, failed scans are never cached, and approvals cannot survive the file or a scanner-policy change. Focused race tests passed (13.687s), and full source tests passed (exporter 143.477s). The repeated-token microbenchmark fell from approximately 104 ms to 0.22 ms for 16,000 highly repetitive tokens; it excludes JSON decoding, hashing, I/O and unique values and is **not an export speed estimate**. Neither candidate was in the 28m32s rebuild. The token-audit change is included in `0.18.0-rc1`; combining the separate storage prototype is deferred.
 
 ## Corrected real replay accepted — 0.17.5
 

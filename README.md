@@ -1,8 +1,10 @@
 # Pieces Export
 
-A Go CLI that exports local Pieces OS records as chronological Markdown, PDFs, JSON, and a linked graph. Source stays private; users receive a native executable with its secret detector and timezone database included. They do not need Go, Python, Flutter, or a separately installed scanner.
+A compiled Go CLI for exporting local Pieces summaries, persona/profile histories and their linked graph to Markdown. Source stays private; users receive an executable with the secret detector and timezone database included. No Go, Python, Flutter or separate scanner is required to run it.
 
-The latest verified real archive retains **11,746 summaries and 1,381 selected people**. Its corrected completed-source replay finalized in **29m52s with partial status**, with independent body/graph/link, source-preservation and stored macOS metadata checks. **43 unavailable people and 375 metadata-only summaries** remain visible; performance is still too slow. Fetching the summaries themselves took 96 seconds. See [measured results](PERFORMANCE_INVESTIGATION.md). Native Windows, file-manager/PDF-viewer integration, complete source coverage and public download acceptance remain release gates. Signing and notarization are not required. Follow the [checklist](TODO.md), [specification](EXPORT_SPEC.md) and [folder layout](EXPORT_LAYOUT.md). Archive consistency does not establish that every byte ever stored in Pieces has been recovered.
+The frozen **0.18.0-rc1** candidate adds interrupted-fetch recovery to the existing Markdown export. Six binary-only ZIPs are built under `dist/0.18.0-rc1/`; see [download instructions](DOWNLOAD_README.md). Mac ARM64, Rosetta and Linux ARM64/translated AMD64 CLI/recovery checks pass. The full real-summary interruption/resume check passed in 43m45s, including source reads; the finalized archive retains all 11,751 summaries and passed independent body/graph/link and native metadata checks. Native Windows and public download checks remain outstanding; hosting is deferred and Actions remains on hold.
+
+The user accepted the measured 28m32s offline rebuild duration and the clearly reported source limitations: 43 unavailable people and 375 summaries without attached body text in the earlier accepted archive. Those remain partial exports, not invented completeness. Further storage rewrites, PDF/audio/attachments and signals expansion are outside this release. Follow the [current checklist](TODO.md#current-remaining-work-in-execution-order), [specification](EXPORT_SPEC.md) and [folder layout](EXPORT_LAYOUT.md).
 
 ## Run from this repository
 
@@ -29,7 +31,7 @@ The default `filtered` mode removes detected secrets and basic financial identif
 ./pieces-export export --mode preserve --output ./exports/private-archive
 ```
 
-The `0.18.0` recovery candidate saves completed Markdown source batches. Unfinished fetching reconnects to the same OS, checks freshness, and repeats relationship reads. After source capture completes, local processing can restart without OS access:
+The `0.18.0-rc1` recovery candidate saves completed Markdown source batches. Unfinished fetching reconnects to the same OS, checks freshness, and repeats relationship reads. After source capture completes, local processing can restart without OS access:
 
 ```sh
 ./pieces-export export --output ./exports/my-export --work ./exports/private-work --recovery-keys ./exports/private-keys
