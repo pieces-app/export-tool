@@ -186,7 +186,8 @@ func (r *run) performanceReport(state string) *LocalPerformanceReport {
 		ElapsedMS: time.Since(r.local.started).Milliseconds(), Operations: r.local.snapshot(), Phases: r.progress.measurements(),
 		Limitations: []string{
 			"Phase durations are wall time; operation durations overlap (artifact writes include sync and streamed encoding/hash work). Do not sum them as CPU or elapsed time.",
-			"Canonical JSON reads/scans and generated artifact writes/syncs are measured. Hashing, archive/cache/PDF/audit reads, directory operations and native property writes are not individual operation counters; their phase wall time remains included.",
+			"Canonical JSON reads/scans, artifact writes/syncs, full audit content reads/scans and repeated-audit checksum reads are measured. Other hashing, source-archive/cache/PDF reads, directory operations, pathname scans and native property writes are not individual operation counters; their phase wall time remains included.",
+			"Audit reuse always rereads and hashes full file bytes under unchanged scanner inputs; reused-byte counts duplicate checksum-read bytes and are not extra I/O. PDF semantic checks are never reused. The private bounded cache is process-local, not recovery or completeness evidence.",
 			"Repeated phase names are aggregated; processed/known-total counts are work items, not distinct source records. Unknown totals stay unknown.",
 			"Diagnostic/final-manifest writes, final directory rename and preflight before staging are excluded. This file cannot establish archive completeness or resume a partial export.",
 			"HTTP counters cover the client lifetime, which can include preflight. Logical bytes are bytes read/written through these helpers, not physical disk traffic or unique archive size.",

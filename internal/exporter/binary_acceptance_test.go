@@ -62,6 +62,7 @@ func TestPackagedCLI(t *testing.T) {
 		t.Fatalf("synthetic archive is incomplete: %+v", manifest.Issues)
 	}
 	diagnostics := readLocalPerformance(t, out)
+	assertAuditReuseMeasurements(t, diagnostics)
 	if diagnostics.HTTP.Requests == 0 || manifest.FileWorkers != 2 || diagnostics.FileWorkers != 2 || manifest.LocalPerformance == nil || diagnostics.Operations["artifact_sync"].Calls == 0 || diagnostics.State != "finalizing" {
 		t.Fatal("packaged export did not report HTTP/local persistence measurements")
 	}
@@ -186,6 +187,7 @@ func testPackagedSummaryCLI(t *testing.T, scopeFlags []string, projected bool) {
 	if manifest.People.Mode != "profiles" || manifest.People.Selected != 1 || manifest.People.Omitted != 1 {
 		t.Fatalf("default people selection did not retain only the profile: %+v", manifest.People)
 	}
+	assertAuditReuseMeasurements(t, readLocalPerformance(t, out))
 	if projected && manifest.People.UnknownEventConnections != 1 {
 		t.Fatal("binary did not preserve unqueried event-count evidence")
 	}

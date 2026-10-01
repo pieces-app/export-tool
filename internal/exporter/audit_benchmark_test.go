@@ -44,6 +44,7 @@ func BenchmarkFinalAuditSmallDocuments(b *testing.B) {
 			b.SetBytes(int64(count * len(body)))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				r.auditCache = nil // Measure a full scan, never an implicit warm pass.
 				if err := r.auditOutput(); err != nil {
 					b.Fatal(err)
 				}
@@ -83,9 +84,57 @@ func BenchmarkFinalAuditJSONRecords(b *testing.B) {
 	b.SetBytes(totalBytes)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		r.auditCache = nil
 		if err := r.auditOutput(); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// Compare full scans with byte-verified reuse of the same mixed output. The
+// prerequisite successful scan is outside the reuse timer. This is a local
+// phase comparison, not a whole-export estimate or a replacement for live data.
+func BenchmarkAuditUnchangedOutput(b *testing.B) {
+	for _, reuse := range []bool{false, true} {
+		b.Run(fmt.Sprintf("reuse_%t", reuse), func(b *testing.B) {
+			scanner, err := NewScanner(DefaultPolicy(), "")
+			if err != nil {
+				b.Fatal(err)
+			}
+			r := &run{ctx: context.Background(), stage: b.TempDir(), opts: Options{Scanner: scanner}}
+			var total int64
+			for i := 0; i < 256; i++ {
+				for _, ext := range []string{"md", "json"} {
+					body := []byte("# Synthetic document\n\n" + strings.Repeat("Ordinary approved document content.\n", 64))
+					if ext == "json" {
+						body, err = json.Marshal(map[string]any{"id": fmt.Sprintf("synthetic-%04d", i), "text": string(body), "tags": []string{"synthetic", "approved"}})
+						if err != nil {
+							b.Fatal(err)
+						}
+					}
+					if err := os.WriteFile(filepath.Join(r.stage, fmt.Sprintf("document-%04d.%s", i, ext)), body, 0600); err != nil {
+						b.Fatal(err)
+					}
+					total += int64(len(body))
+				}
+			}
+			if reuse {
+				if err := r.auditOutput(); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.ReportAllocs()
+			b.SetBytes(total)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if !reuse {
+					r.auditCache = nil
+				}
+				if err := r.auditOutput(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 

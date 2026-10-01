@@ -12,6 +12,23 @@ The current file writer still calls `File.Sync`. Keep that behavior until a sepa
 
 ## Why existing files are insufficient
 
+### Next performance gate: association storage and presentation
+
+The current junction reader improves source completeness but also feeds association records through ordinary `run.store` and `render`. Each included association therefore acquires its own synced canonical JSON and Markdown file. This is the wrong cost model for internal graph evidence at the observed cardinality. A faster reader alone can make local output work larger. The live sizing evidence and limits are in [JUNCTION_API.md](JUNCTION_API.md#live-cardinality-check-before-another-export).
+
+The next implementation must preserve complete association payloads and typed proof identities while consolidating their storage and presentation. Keep summaries and person/profile documents as ordinary navigable files. An association need not have an individual human-readable document when its source/target links and metadata are available in a bounded family index and canonical record stream. This is planned work; current archives still have individual association files.
+
+- [ ] Introduce an explicit canonical-record access layer for write/read/replace/remove/hash operations. Cover source capture, late-credential rescanning, pruning, body rendering, recovery capture/replay and offline rebuilding; changing only `run.store` leaves direct filesystem assumptions elsewhere.
+- [ ] Batch authoritative capture in the encrypted transactional store, instead of adding database writes beside every existing synced JSON write. Preserve exclusion decisions and learned credential state. Bound batches by both record count and encoded bytes; retain source-stop behavior on storage failure.
+- [ ] Design a versioned public canonical stream/index for associations, with bounded chunks, exact record locations/hashes, declared counts, and rejection of missing, duplicated, altered or unaccounted rows. Compact late privacy changes before final publication; excluded payloads cannot remain in an earlier chunk or a temporary sibling.
+- [ ] Separate record identity/coverage from document identity. `archiveLinkMap` currently requires a unique `.md` path for every included record; reconstruction, graph provenance and final-archive acceptance must support data-only proof records explicitly. Older readers must refuse the new format rather than silently lose proofs.
+- [ ] Render bounded association-family indexes with working source/target document links. Keep related-summary sections linked directly to summaries/persons. If section fragments are used, validate their existence in Markdown and PDF; never invent links to omitted documents.
+- [ ] Rebuild and resume the consolidated format, retaining current-junction empty decisions, historical-cache precedence, privacy withholding and complete canonical association metadata. Keep readers for existing per-file archives.
+- [ ] Test abrupt capture/materialization exits, disk exhaustion, cancellation, checksum/index tampering, privacy changes affecting one row of a chunk, moved-folder links and exclusive finalization. Keep durability guarantees explicit; buffering a write is not an acknowledged recoverable checkpoint.
+- [ ] Benchmark capture **plus** all final files, metadata, privacy audits and reconstruction. Compare artifact/write/sync counts, body/graph coverage, wall time and peak memory on the actual summaries/profile workload before another full live performance claim.
+
+This change is independent of checksum-based audit reuse. It must not mutate the original running export, reinterpret its `.partial` files as checkpoints, or remove requested summary/profile files to improve a benchmark.
+
 Current source evidence:
 
 | State | Current location | Required recovery behavior |

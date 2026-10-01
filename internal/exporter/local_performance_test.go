@@ -104,6 +104,7 @@ func TestLocalPerformanceRepeatedPhasesAndSnapshots(t *testing.T) {
 func TestLocalPerformanceExportAndOfflineRebuild(t *testing.T) {
 	source, policy, original := createRebuildFixture(t)
 	first := readLocalPerformance(t, source)
+	assertAuditReuseMeasurements(t, first)
 	if !reflect.DeepEqual(first, original.LocalPerformance) || first.State != "finalizing" || first.Operations["privacy_unchanged"].Calls == 0 || first.Operations["render_unchanged"].Calls == 0 || len(first.Phases) < 5 {
 		t.Fatalf("export measurements missing, inconsistent, or not collected without terminal output: %+v", first)
 	}
@@ -113,8 +114,17 @@ func TestLocalPerformanceExportAndOfflineRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	rebuilt := readLocalPerformance(t, out)
+	assertAuditReuseMeasurements(t, rebuilt)
 	if !reflect.DeepEqual(first, m.Rebuild.SourceLocalPerformance) || !reflect.DeepEqual(rebuilt, m.LocalPerformance) || rebuilt.HTTP.Requests != 0 || rebuilt.Operations["record_scan"].Calls == 0 {
 		t.Fatal("offline rebuild must keep source measurements separate from fresh local counters")
+	}
+}
+
+func assertAuditReuseMeasurements(t *testing.T, report *LocalPerformanceReport) {
+	t.Helper()
+	full, hashed, reused := report.Operations["audit_content_scan"], report.Operations["audit_hash_read"], report.Operations["audit_reused"]
+	if full.Calls == 0 || full.Bytes == 0 || reused.Calls == 0 || reused.Bytes == 0 || hashed.Calls < reused.Calls || hashed.Bytes < reused.Bytes || full.Failures != 0 || hashed.Failures != 0 {
+		t.Fatal("finalized export did not measure full scans and byte-verified audit reuse")
 	}
 }
 

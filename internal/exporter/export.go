@@ -127,6 +127,7 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
+	auditCache            *outputAuditCache
 	junctionFamiliesRead  map[string]bool
 	junctionIdentityBytes int
 	priorDecisions        []archiveRecord

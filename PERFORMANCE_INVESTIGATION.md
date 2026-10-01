@@ -1,5 +1,7 @@
 # Live export performance investigation
 
+**Current result:** the newer summaries-focused baseline finished in **65m45s**, still too slow. Summary retrieval/persistence took **2m49s**; annotation retrieval took **18m01s**, Markdown writing **14m00s**, and repeated audits **20m43s**. [Final counts and phase evidence](#finalized-summaries-focused-baseline--2026-09-30) are below. The original all-data run remains a separate unfinished older process. Historical checkpoints in this document must not be read as the latest status.
+
 Observed 2026-09-30 against the original running `0.4.1-dev` export. The user requested that this run finish; it was not stopped, restarted, signalled, or replaced. The investigation used one five-second native stack sample, read-only process/resource counters, existing source/history, and filesystem-capacity checks. No OS HTTP reader or source mutation was added. Stack/resource artifacts are ignored local files under `exports/`; no record bodies, names or identifiers are included in this document.
 
 ## What is taking time
@@ -183,3 +185,20 @@ Independent finalized-archive acceptance passed in **79.85 s**: 87,998 included 
 Person selection retained **1,381 of 4,413**, a **68.7% reduction** (3,032 intentional omissions). All retained persons have profile history, with 5,171 history links. This is selection, not deduplication/merging. Three summaries and 39 annotations were withheld; 43 person references were unavailable; the annotation inventory grew by 13 during the read interval. Historical links and absent core projections also keep this archive partial. The original all-data export is still running and has not acquired these changes.
 
 The next acceptance target is a current-junction export with fewer supporting artifacts, improved persistence and less repeated audit work. The junction integration passed the full race suite (exporter 534.994 s). Candidate `0.16.1-dev` adds a reconstruction-state compatibility guard, verified by focused export/rebuild/capture/archive checks (141.306 s), vet, six ZIP/hash checks and available Mac package tests, but per-file sync and full audits remain. **Do not claim this candidate is already a fast or complete live migration.**
+
+## Reusing unchanged audit results
+
+The working tree avoids repeating expensive content scanning when the second traversal rereads identical bytes under identical scanner inputs. It still reads/hashes full files, checks every pathname, fully scans changed/new content, and repeats PDF semantic checks. Learned credentials and policy/domain changes invalidate the cache; no audit cache is persisted. Details and limits are in [EXPORT_SPEC.md](EXPORT_SPEC.md#reusing-unchanged-final-audit-results-working-tree).
+
+A 512-file synthetic mixed JSON/Markdown comparison measured median **181.23 ms** for a full scan versus **11.22 ms** for checksum-verified reuse (about **93.8% less time for that repeated phase**). Allocated bytes were approximately 22.54 MB versus 1.41 MB. Three samples of three iterations each on Apple M4 Max; fixture setup and prerequisite scanning are excluded, and these are warm local files. Existing full-scan benchmarks now explicitly clear reuse state between iterations to preserve their meaning. This does not establish whole-export speedup.
+
+An opt-in read-only comparison against the finalized focused archive is in progress. It performs no OS request, output write or native metadata change. It uses the default policy but cannot reconstruct credentials learned by the original process, so its result will measure repeated-audit cost, not recertify privacy or source completeness. The original all-data exporter continues on the same filesystem.
+
+Candidate `0.16.2-dev` is packaged locally for all six targets. Full race regression passed (exporter 508.055 s); focused audit/performance tests passed in 31.593 s. Actual packaged Mac ARM64 export/default/projected/current-junction/rebuild/recovery checks passed in 31.132 s with race checks, and Rosetta CLI/default/current-junction checks passed in 8.689 s. Final ZIP contents/hashes/instructions and executable bytes were verified. Current Linux/Windows runtime acceptance is still pending. The new private cache does not change record sync calls or accelerate an already running older executable.
+
+```sh
+go test ./internal/exporter -run '^$' \
+  -bench '^BenchmarkAuditUnchangedOutput$' -benchtime=3x -count=3 -benchmem
+PIECES_EXPORT_LIVE_AUDIT_ARCHIVE=/absolute/finalized/archive \
+  go test ./internal/exporter -run '^TestLiveAuditUnchangedArchive$' -count=1 -v -timeout 26m
+```

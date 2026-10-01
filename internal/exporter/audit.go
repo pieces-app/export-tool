@@ -2,11 +2,13 @@ package exporter
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const auditReadBytes = 1 << 20
@@ -20,14 +22,26 @@ type outputAuditor struct {
 	run        *run
 	buffer     []byte
 	jsonReader *bufio.Reader
+	hashBuffer []byte
+	cache      *outputAuditCache
 }
 
 // Final defense against values accidentally restored by a renderer or metadata writer.
 // Overlapping bounded chunks avoid loading the entire exported timeline into memory.
-func (r *run) auditOutput() error {
+func (r *run) auditOutput() (result error) {
+	defer func() {
+		// A failed/canceled traversal never supplies reuse evidence for a retry.
+		if result != nil {
+			r.auditCache = nil
+		}
+	}()
 	r.progress.Stage("Audit filtered output", 0)
-	auditor := outputAuditor{run: r}
-	return filepath.WalkDir(r.stage, func(path string, d fs.DirEntry, walkErr error) error {
+	cache, err := r.beginOutputAudit()
+	if err != nil {
+		return err
+	}
+	auditor := outputAuditor{run: r, cache: cache}
+	if err := filepath.WalkDir(r.stage, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -45,7 +59,18 @@ func (r *run) auditOutput() error {
 		}
 		r.progress.Add(1)
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	for _, entry := range cache.entries {
+		if err := r.ctx.Err(); err != nil {
+			return err
+		}
+		if entry.pass != cache.pass {
+			return errConfig("previously audited output file is missing")
+		}
+	}
+	return nil
 }
 
 func (r *run) auditOutputFile(path string) error {
@@ -53,7 +78,7 @@ func (r *run) auditOutputFile(path string) error {
 	return auditor.file(path)
 }
 
-func (a *outputAuditor) file(path string) error {
+func (a *outputAuditor) file(path string) (result error) {
 	r := a.run
 	if err := r.ctx.Err(); err != nil {
 		return err
@@ -65,11 +90,47 @@ func (a *outputAuditor) file(path string) error {
 	if filepath.Ext(path) == ".pdf" {
 		return r.auditPDF(path)
 	}
+	st, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !st.Mode().IsRegular() {
+		return errConfig("output audit requires a regular file")
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+	if a.cache != nil {
+		if previous, ok := a.cache.entries[relative]; ok {
+			digest, size, err := a.hashFile(f)
+			if err != nil {
+				return err
+			}
+			if previous.digest == digest {
+				a.cache.remember(relative, digest)
+				r.local.record("audit_reused", 0, size, nil)
+				return nil
+			}
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
+				return err
+			}
+		}
+	}
+	// Hash exactly the same bytes consumed by the successful semantic scan.
+	// A post-scan reopen/hash could accidentally approve different file bytes.
+	h := sha256.New()
+	counter := &countedReader{Reader: io.TeeReader(f, h)}
+	started := time.Now()
+	defer func() {
+		r.local.record("audit_content_scan", time.Since(started), counter.bytes, result)
+		if result == nil {
+			var digest [32]byte
+			copy(digest[:], h.Sum(nil))
+			a.cache.remember(relative, digest)
+		}
+	}()
 	// Scan decoded JSON tokens so escaped ampersands/unicode are interpreted
 	// as their actual content, including already-redacted URL query values.
 	if ext := filepath.Ext(path); ext == ".json" || ext == ".jsonl" {
@@ -77,9 +138,9 @@ func (a *outputAuditor) file(path string) error {
 		// in bounded blocks, but create a fresh decoder and reset all unread
 		// buffered bytes for every file, including after a prior audit error.
 		if a.jsonReader == nil {
-			a.jsonReader = bufio.NewReaderSize(f, auditJSONReadBytes)
+			a.jsonReader = bufio.NewReaderSize(counter, auditJSONReadBytes)
 		} else {
-			a.jsonReader.Reset(f)
+			a.jsonReader.Reset(counter)
 		}
 		decoder := json.NewDecoder(a.jsonReader)
 		decoder.UseNumber()
@@ -122,7 +183,7 @@ func (a *outputAuditor) file(path string) error {
 	}
 	tail := ""
 	for {
-		n, readErr := f.Read(a.buffer)
+		n, readErr := counter.Read(a.buffer)
 		if n > 0 {
 			// Only the newly read bytes belong to this file. The rest of the
 			// buffer can retain arbitrary bytes from a prior, longer document.
@@ -138,6 +199,30 @@ func (a *outputAuditor) file(path string) error {
 		}
 		if readErr != nil {
 			return readErr
+		}
+	}
+}
+
+func (a *outputAuditor) hashFile(f *os.File) (digest [32]byte, bytes int64, result error) {
+	started := time.Now()
+	defer func() { a.run.local.record("audit_hash_read", time.Since(started), bytes, result) }()
+	if a.hashBuffer == nil {
+		a.hashBuffer = make([]byte, 128<<10)
+	}
+	h := sha256.New()
+	for {
+		if err := a.run.ctx.Err(); err != nil {
+			return digest, bytes, err
+		}
+		n, err := f.Read(a.hashBuffer)
+		bytes += int64(n)
+		h.Write(a.hashBuffer[:n])
+		if err == io.EOF {
+			copy(digest[:], h.Sum(nil))
+			return digest, bytes, nil
+		}
+		if err != nil {
+			return digest, bytes, err
 		}
 	}
 }
