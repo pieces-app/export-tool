@@ -101,7 +101,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		timeout := fs.Duration("timeout", 60*time.Second, "timeout for each OS request")
 		maxMiB := fs.Int64("max-response-mib", 64, "maximum OS response size in MiB")
 		out := fs.String("output", "pieces-export-"+time.Now().Format("20060102-150405"), "new output directory (must not exist)")
-		work := fs.String("work", "", "opt-in encrypted recovery workspace (new directory); recovery begins after all source reads")
+		work := fs.String("work", "", "opt-in encrypted recovery workspace (new directory); saves completed source batches")
 		keys := fs.String("recovery-keys", "", "private key directory outside workspace/output; required with --work; directories are retained")
 		mode := fs.String("mode", "filtered", "filtered or preserve; preserve includes original sensitive content")
 		policyPath := fs.String("policy", "", "JSON privacy policy; defaults to embedded secret and basic financial detection")
@@ -379,7 +379,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		fmt.Fprintf(stdout, "Performance: %s, ≤1 outstanding data request, batch ceiling %d, target %s | People: %s\n", *performance, *batch, *targetLatency, *people)
 		fmt.Fprintln(stdout, "Website categories apply only if domain lists are configured in the policy.")
 		if recoveryOptions != nil {
-			fmt.Fprintln(stdout, "Recovery enabled after source collection completes. Interrupted fetching cannot resume yet; checkpointing adds disk work.")
+			fmt.Fprintln(stdout, "Recovery saves encrypted record batches during fetching. Resume rechecks freshness and repeats relationship reads; completed captures replay offline.")
 			fmt.Fprintln(stdout, "Workspace and separate keys are retained after success or failure. They contain private recovery evidence; keep both outside the shareable archive.")
 		}
 		if *closeDesktop {
@@ -452,7 +452,7 @@ Filtered mode embeds secret detection; no Python or separate scanner is required
 Website categories require local domain lists; they are not enabled by default.
 Exit codes: 0 completed within implemented scope, 1 failed, 2 partial export.
 Known coverage limits are always recorded in manifest.json.
-Opt-in recovery starts after source collection; interrupted fetching cannot resume yet.
+Opt-in recovery checkpoints source batches; unfinished source recovery reconnects to the same OS.
 Recovery workspace and separate keys are retained; their parent directories must exist.
 `
 

@@ -29,7 +29,7 @@ The default `filtered` mode removes detected secrets and basic financial identif
 ./pieces-export export --mode preserve --output ./exports/private-archive
 ```
 
-Opt-in recovery in `0.15.0-dev` saves the completed-source boundary. After that checkpoint, local privacy/graph/document processing can restart without OS access:
+The `0.18.0` recovery candidate saves completed Markdown source batches. Unfinished fetching reconnects to the same OS, checks freshness, and repeats relationship reads. After source capture completes, local processing can restart without OS access:
 
 ```sh
 ./pieces-export export --output ./exports/my-export --work ./exports/private-work --recovery-keys ./exports/private-keys
@@ -37,9 +37,9 @@ Opt-in recovery in `0.15.0-dev` saves the completed-source boundary. After that 
 ./pieces-export resume --work ./exports/private-work --recovery-keys ./exports/private-keys --output ./exports/recovered
 ```
 
-Parents must exist; the workspace must be new. Workspace, keys and output must be separate and non-nested. Both private recovery directories are retained. This does not resume interrupted source fetching or reuse `.partial` folders, and it adds checkpoint I/O. See [the recovery contract and limitations](RECOVERY_DESIGN.md#cli-and-failure-ux).
+Parents must exist; the workspace must be new. Workspace, keys and output must be separate and non-nested. Both private recovery directories are retained. Resume writes a new archive and preserves every earlier `.partial` folder. It restores the recorded policy and re-fetches changed/unverifiable snapshots. Checkpointing adds disk work; these private directories must stay outside your shared export. See [the recovery contract and limitations](RECOVERY_DESIGN.md#cli-and-failure-ux).
 
-`--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. An ordinary run has no recovery checkpoint. Opt-in `--work` supports offline replay only after source collection completes; every retry/replay needs a new output path. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
+`--output` is relative to your terminal working directory, or may be absolute. Without it, the CLI uses `pieces-export-<timestamp>` in that working directory. It prints the absolute destination before confirmation. Output must be a new directory. Work is staged in a sibling `.partial` directory and renamed after rendering and validation. An ordinary run has no recovery checkpoint. Opt-in `--work` supports source continuation in the candidate, and offline replay after collection completes; every retry/replay needs a new output path. Exit codes: `0` = completed for the implemented scope, `1` = fatal error, `2` = archive produced with missing records or other completeness issues.
 
 New exports write related-summary suggestions once in `.relationships_graph.md` siblings, linked from summary footers. Use `--relationships both` only when you want the lists duplicated inside summaries too. The ranked suggestions and full graph remain available in either layout.
 

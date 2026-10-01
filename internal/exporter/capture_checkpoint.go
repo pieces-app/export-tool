@@ -26,6 +26,7 @@ import (
 const captureVersion = 1
 
 type captureFrame struct {
+	Fetch   *fetchState `json:",omitempty"`
 	Version int
 	Phase   string
 	Parts   map[string]int
@@ -159,6 +160,7 @@ func (r *run) saveCapture(s *recovery.Store) error {
 	core := captureCore{CapturedAt: time.Now().UTC(), Options: r.opts, Manifest: r.manifest, Policy: r.opts.Scanner.Policy, PolicyHash: r.opts.Scanner.Hash, ListHashes: r.opts.Scanner.ListHashes}
 	core.Options.Scanner, core.Options.Progress, core.Options.captureCheckpoint = nil, nil, nil
 	core.Options.Recovery = nil
+	core.Options.fetchCheckpoint = nil
 	core.Manifest.Issues = nil
 	if r.client != nil {
 		core.Manifest.Performance = r.client.Performance()

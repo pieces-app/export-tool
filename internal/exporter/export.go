@@ -14,9 +14,12 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pieces-app/export-tool/internal/recovery"
 )
 
 type Options struct {
+	fetchCheckpoint                         *fetchCheckpoint
 	captureCheckpoint                       func(*run) error
 	Recovery                                *RecoveryOptions
 	FileWorkers                             int
@@ -57,7 +60,15 @@ type Issue struct {
 	Key      string `json:"record_ref,omitempty"`
 	Code     string `json:"code"`
 }
+type SourceRecoveryInfo struct {
+	Started       time.Time `json:"started"`
+	Resumed       bool      `json:"resumed"`
+	ReusedRecords int       `json:"reused_records"`
+	FreshRecords  int       `json:"fresh_records"`
+}
+
 type Manifest struct {
+	SourceRecovery          *SourceRecoveryInfo      `json:"source_recovery,omitempty"`
 	Junctions               []JunctionCoverage       `json:"junction_reads,omitempty"`
 	CaptureReplay           *CaptureReplayInfo       `json:"capture_replay,omitempty"`
 	FileWorkers             int                      `json:"file_workers,omitempty"`
@@ -323,7 +334,11 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	if _, err = os.Lstat(abs); !os.IsNotExist(err) {
 		return Manifest{}, errConfig("output already exists or cannot be inspected; choose a new directory")
 	}
+	var sourceStore *recovery.Store
 	if o.Recovery != nil {
+		if o.Format != "markdown" || len(o.SDKCaches) > 0 {
+			return Manifest{}, errConfig("source recovery currently supports Markdown exports without SDK-cache input")
+		}
 		if _, err := os.Lstat(abs + ".partial"); !os.IsNotExist(err) {
 			return Manifest{}, errConfig("partial directory already exists or cannot be inspected; choose a new output path")
 		}
@@ -339,7 +354,7 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 				resultErr = errConfig("archive was written but recovery workspace close failed; retain the archive and recovery directories")
 			}
 		}()
-		o.captureCheckpoint = func(r *run) error { return r.saveCapture(store) }
+		sourceStore = store
 	}
 	stage := abs + ".partial"
 	if err = os.MkdirAll(filepath.Dir(stage), 0700); err != nil {
@@ -385,6 +400,25 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 		return r.manifest, err
 	}
 	r.manifest.OSVersion = fieldString(clean, "version")
+	if sourceStore != nil {
+		tracker, e := startFetchRecovery(r, sourceStore, *o.Recovery)
+		if e != nil {
+			return r.manifest, e
+		}
+		defer func() {
+			if e := tracker.close(); e != nil && resultErr == nil {
+				resultErr = e
+			}
+		}()
+		o.fetchCheckpoint = tracker
+		o.captureCheckpoint = tracker.capture
+		r.opts.fetchCheckpoint = tracker
+		r.opts.captureCheckpoint = tracker.capture
+	}
+	if o.fetchCheckpoint != nil {
+		r.manifest.SourceRecovery = &SourceRecoveryInfo{Started: o.fetchCheckpoint.state.Core.Manifest.Started, Resumed: o.fetchCheckpoint.resumed}
+		r.manifest.Limitations = append(r.manifest.Limitations, "Source recovery reuses only saved snapshots whose identities are still present and not reported updated since collection began; relationship and inventory reads repeat. This is not an atomic snapshot or protection against unreported in-place edits.")
+	}
 	for _, m := range o.Materials {
 		if ctx.Err() != nil {
 			return r.manifest, ctx.Err()
@@ -489,6 +523,10 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	}
 	if err := r.canonicalRecords().Flush(ctx); err != nil {
 		return r.manifest, err
+	}
+	if o.fetchCheckpoint != nil {
+		r.manifest.SourceRecovery.ReusedRecords = o.fetchCheckpoint.reused
+		r.manifest.SourceRecovery.FreshRecords = o.fetchCheckpoint.fresh
 	}
 	if o.captureCheckpoint != nil {
 		if err := o.captureCheckpoint(r); err != nil {
@@ -699,6 +737,16 @@ func (r *run) fetch(m Material, ids []string) error {
 	for _, id := range ids {
 		key := m.Type + "\x00" + id
 		if _, ok := r.meta[key]; !ok {
+			cached, err := r.opts.fetchCheckpoint.get(r.ctx, m, id)
+			if err != nil {
+				return err
+			}
+			if cached != nil {
+				if err = r.store(m, cached, false); err != nil {
+					return err
+				}
+				continue
+			}
 			pending[id] = true
 		}
 	}
@@ -723,6 +771,9 @@ func (r *run) fetch(m Material, ids []string) error {
 				if v, ok := item.(map[string]any); ok {
 					id := fieldString(v, "id")
 					if pending[id] {
+						if err := r.opts.fetchCheckpoint.put(r.ctx, m, v); err != nil {
+							return err
+						}
 						if err := r.store(m, v, false); err != nil {
 							return err
 						}
@@ -754,11 +805,14 @@ func (r *run) fetch(m Material, ids []string) error {
 			r.issue(m.Type, id, "record_fetch_failed")
 			continue
 		}
+		if err := r.opts.fetchCheckpoint.put(r.ctx, m, v); err != nil {
+			return err
+		}
 		if err := r.store(m, v, false); err != nil {
 			return err
 		}
 	}
-	return nil
+	return r.opts.fetchCheckpoint.flush(r.ctx)
 }
 func (r *run) store(m Material, v map[string]any, replace bool) error {
 	if err := r.ctx.Err(); err != nil {

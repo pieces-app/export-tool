@@ -43,6 +43,8 @@ func refs(ids ...string) map[string]any {
 }
 
 type fakeOS struct {
+	healthIdentity     string
+	updatedUnavailable bool
 	requestedMaterials []string
 	beforeBatch        func()
 	data               map[string][]map[string]any
@@ -74,7 +76,11 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 		}
 		if r.URL.Path == "/.well-known/health" || r.URL.Path == "/.well-known/version" {
 			if r.URL.Path == "/.well-known/health" {
-				write("ok:macos")
+				if f.healthIdentity != "" {
+					write("ok:" + f.healthIdentity)
+				} else {
+					write("ok:macos")
+				}
 			} else {
 				write("12.3.108")
 			}
@@ -247,6 +253,10 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 			if x, ok := input["filters"].(map[string]any); ok {
 				filters = x
 			}
+			if filters["updated"] != nil && f.updatedUnavailable {
+				http.Error(w, "unsupported", 404)
+				return
+			}
 			window, _ := filters["created"].(map[string]any)
 			ids := []string{}
 			for _, v := range records {
@@ -260,6 +270,19 @@ func (f *fakeOS) server(t *testing.T) *httptest.Server {
 					ts, _ := time.Parse(time.RFC3339Nano, fieldString(bound, "value"))
 					if k == "from" && date.Before(ts) || k == "to" && date.After(ts) {
 						include = false
+					}
+				}
+				if updated, ok := filters["updated"].(map[string]any); ok {
+					date, e := time.Parse(time.RFC3339Nano, timestamp(v, "updated"))
+					if e != nil {
+						include = false
+					}
+					for k, raw := range updated {
+						bound, _ := raw.(map[string]any)
+						ts, _ := time.Parse(time.RFC3339Nano, fieldString(bound, "value"))
+						if k == "from" && date.Before(ts) || k == "to" && date.After(ts) {
+							include = false
+						}
 					}
 				}
 				if include {

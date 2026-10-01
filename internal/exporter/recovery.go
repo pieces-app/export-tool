@@ -31,6 +31,7 @@ type RecoveryOptions struct {
 type RecoveryInfo struct {
 	Phase, Scope, Mode, Format, PeopleMode                 string
 	CanResume                                              bool
+	NeedsSource                                            bool
 	CapturedAt                                             time.Time
 	SourceStarted                                          time.Time
 	Generation, StoredItems                                uint64
@@ -40,6 +41,8 @@ type RecoveryInfo struct {
 // RecoverySession holds exclusive workspace and key ownership across review
 // and replay. It is single-use and must be closed; do not use it concurrently.
 type RecoverySession struct {
+	fetch      *fetchCheckpoint
+	child      *RecoverySession
 	store      *recovery.Store
 	options    RecoveryOptions
 	r          *run
@@ -195,6 +198,43 @@ func OpenRecovery(ctx context.Context, o RecoveryOptions) (_ *RecoverySession, r
 	}
 	s.info = RecoveryInfo{Phase: frame.Phase, Generation: cp.Generation, StoredItems: cp.Records}
 	switch frame.Phase {
+	case "source-fetching":
+		if cp.Records != 0 {
+			return nil, errConfig("unexpected records in recovery controller")
+		}
+		s.fetch, err = openFetchRecovery(ctx, store, o, frame, cp.Generation)
+		if err != nil {
+			return nil, err
+		}
+		if s.fetch.state.Complete != "" {
+			childOptions, e := s.fetch.completeOptions()
+			if e != nil {
+				return nil, e
+			}
+			s.child, e = OpenRecovery(ctx, childOptions)
+			if e != nil {
+				return nil, e
+			}
+			if !s.child.info.CanResume || s.child.info.NeedsSource {
+				return nil, errConfig("incomplete linked source capture")
+			}
+			s.r = s.child.r
+			s.info = s.child.info
+		} else {
+			core := s.fetch.state.Core
+			s.info.CanResume = true
+			s.info.NeedsSource = true
+			s.info.Scope = core.Options.Scope
+			s.info.Mode = core.Options.Mode
+			s.info.Format = core.Options.Format
+			s.info.PeopleMode = core.Options.PeopleMode
+			s.info.SourceStarted = core.Manifest.Started
+			checkpoint, e := s.fetch.records.Snapshot(ctx)
+			if e != nil {
+				return nil, e
+			}
+			s.info.StoredItems = checkpoint.Records
+		}
 	case "fetching":
 		if cp.Generation != 0 || cp.Records != 0 || len(frame.Parts) != 0 {
 			return nil, errConfig("invalid initial recovery checkpoint")
@@ -238,8 +278,21 @@ func (s *RecoverySession) Close() error {
 	if s.store == nil {
 		return nil
 	}
+	var first error
+	if s.child != nil {
+		first = s.child.Close()
+		s.child = nil
+	}
+	if s.fetch != nil {
+		if e := s.fetch.close(); first == nil {
+			first = e
+		}
+	}
 	err := s.store.Close()
 	s.store, s.r = nil, nil
+	if first != nil {
+		return first
+	}
 	return err
 }
 
@@ -247,7 +300,13 @@ func (s *RecoverySession) Replay(ctx context.Context, output string, progress io
 	if err := s.ValidateOutput(output); err != nil {
 		return Manifest{}, err
 	}
+	if s.info.NeedsSource {
+		return Manifest{}, errConfig("source fetching is incomplete; resume requires a verified OS connection")
+	}
 	s.used = true
+	if s.child != nil {
+		return s.child.Replay(ctx, output, progress, version)
+	}
 	s.r.ctx = ctx
 	s.r.opts.Version, s.r.manifest.ToolVersion = version, version
 	return replayLoadedCapture(s.r, s.store, s.generation, output, progress)
@@ -266,8 +325,16 @@ func (s *RecoverySession) ValidateOutput(output string) error {
 	if err := ValidateRecoveryOptions(s.options, output, false); err != nil {
 		return err
 	}
-	if err := separateRecoveryPaths(s.r.opts.Output, s.r.opts.Output+".partial", output, output+".partial"); err != nil {
-		return errConfig("resume output must be separate from the original output and partial directory")
+	var previous []string
+	if s.fetch != nil {
+		previous = s.fetch.state.Outputs
+	} else {
+		previous = []string{s.r.opts.Output}
+	}
+	for _, prior := range previous {
+		if err := separateRecoveryPaths(prior, prior+".partial", output, output+".partial"); err != nil {
+			return errConfig("resume output must be separate from every previous output and partial directory")
+		}
 	}
 	for _, path := range []string{output, output + ".partial"} {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {

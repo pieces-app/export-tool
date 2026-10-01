@@ -40,7 +40,7 @@ In PowerShell:
 .\pieces-export.exe export --people profiles --output "$HOME\Documents\Pieces-Export"
 ```
 
-Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder. Optional completed-source recovery can replay into a new destination; interrupted source fetching cannot resume yet. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
+Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder. With an explicit recovery workspace, the `0.18.0` candidate can continue interrupted Markdown fetching into a new destination, rechecking freshness and repeating relationships. Complete captures can replay offline; every previous partial folder remains unchanged. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
 
 `performance.json` is produced at finalization (or best effort after a failure), starting with `0.12.3-dev`. It contains aggregate diagnostics only and cannot certify completeness or resume a partial archive. See [measurement boundaries](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev).
 

@@ -8,6 +8,18 @@ The corrected real `0.17.5-dev` replay finalized partial in **29m52s**, retainin
 
 On 2026-10-01 the published Gist's two files were fetched again through the GitHub API and matched the local Bash/PowerShell scripts byte-for-byte by SHA-256. The prepared native workflow now selects all `TestPackaged.*CLI` cases, so current-junction, missing-owner, recovery and paginated-navigation checks cannot be omitted by a stale explicit name list. The workflow passed actionlint; no job was dispatched.
 
+## First public release scope — user decision, 2026-10-01
+
+The measured **28m32s** runtime is acceptable for this user's database. Further speed work is not an open-ended release blocker. Verify the pending storage/audit candidates preserve the archive and do not materially regress the accepted runtime before promoting them; otherwise retain the accepted implementation.
+
+The release focuses on **Markdown summaries, persona/profile histories, pipeline organization and their linked graph**, with privacy filtering and explicit coverage reports. Attachment extraction, audio and PDF acceptance are **deferred and do not block this release**. Existing optional code is not evidence of public support. Signals/all-data expansion also stays outside the default summaries release.
+
+The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
+
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
+
+**Latest direction:** focus on recovery now. Hosting work and broader storage-candidate integration are paused; public GitHub Releases is the likely distribution route, pending a later decision.
+
 ## Installation UX
 
 1. The user runs the Bash bootstrap on macOS/Linux or the PowerShell bootstrap on Windows. No administrator permissions or package manager are needed. The CLI itself needs no Go/Python/.NET installation; the Windows bootstrap uses built-in PowerShell/.NET facilities.

@@ -2,11 +2,37 @@
 
 Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
 
+## First public release scope — user decision, 2026-10-01
+
+The measured **28m32s** runtime is acceptable for this user's database. Further speed work is not an open-ended release blocker. Verify the pending storage/audit candidates preserve the archive and do not materially regress the accepted runtime before promoting them; otherwise retain the accepted implementation.
+
+The release focuses on **Markdown summaries, persona/profile histories, pipeline organization and their linked graph**, with privacy filtering and explicit coverage reports. Attachment extraction, audio and PDF acceptance are **deferred and do not block this release**. Existing optional code is not evidence of public support. Signals/all-data expansion also stays outside the default summaries release.
+
+The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
+
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
+
+**Latest direction:** focus on recovery now. Hosting work and broader storage-candidate integration are paused; public GitHub Releases is the likely distribution route, pending a later decision.
+
+## Interrupted-fetch recovery candidate — 2026-10-01
+
+Current work is recovery only. The candidate is implemented locally; no package was published and the broader canonical-storage prototype remains separate.
+
+- [x] Save completed hydration batches and cumulative learned credentials atomically in the existing encrypted workspace layer. Restore the original policy and loaded list contents. Reject unsupported new incremental PDF/SDK-cache combinations explicitly.
+- [x] Continue fetching with the same installation/version/user, including a changed port. Recheck full/updated identifiers; reuse only present, validly timestamped, unchanged snapshots. Re-fetch changed/unverifiable records and repeat relationship, hierarchy and inventory traversals.
+- [x] Preserve all prior output/partial folders across repeated interruptions. Authenticate and lock workspace/key ownership before inspection or continuation. Complete-source handoff uses a new encrypted capture child and atomic controller update; an interrupted handoff remains recoverable.
+- [x] Pass focused and actual compiled Mac ARM64 CLI race tests, including forced process termination, inspection/declining with OS unavailable, online continuation, offline replay, source mismatch, changed/deleted rows, unsupported freshness, retained credentials, two interruptions, capture failure and independent archive checks. Final compiled-candidate pass: 25.793s. A separate uninterrupted/resumed comparison passed in 6.360s with race checks, matching canonical data, summary/profile documents, graph, scope, people and policy.
+- [x] Pass full source suite (exporter 156.462s, without full-suite race instrumentation), focused race suite and `go vet ./...`.
+- [x] Verify bounded real staging-OS recovery with the actual binary: kill after one saved pipeline record; resume reuses one and fetches 12, retaining all 13; 1.344s, exit 2 with one recorded source issue. Independent final-archive acceptance passed; original partial hashes unchanged. No Desktop closure or source mutation. Aggregate report: `exports/live-fetch-recovery-20261001-205513/result.json`.
+- [ ] Verify interruption/resume at full-summary scale on the final chosen release candidate. The 13-pipeline test proves real API recovery on a small scope, not full-history runtime, memory or junction traversal savings.
+- [ ] Run the recovery candidate on the remaining supported native runtimes before claiming cross-platform acceptance. Keep Actions on hold; no workflow dispatch.
+- Deferred conveniences: automatic workspace/key paths, automatic cleanup and durable relationship-page cursors. The supported candidate uses explicit private paths, keeps recovery inputs, repeats relationships and regenerates output into a new folder. See [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md).
+
 ## Current outcome and immediate fixes — 2026-10-01
 
 The latest real-archive rebuild (`0.17.6-range-candidate`, range JSONL plus separate relationship documents) **finished in 28m32s**, with **partial status** and **zero current OS requests**. Independent checks preserved all **197,667 canonical records**, including **11,746 summaries**, **1,381 people** and **5,171 profile-history documents**, plus **547,477 graph edges**, **44 memberships across four pipelines** and **23,492 stored macOS metadata documents**. The corrected missing-person navigation behavior is retained. **43 people remain unavailable and 375 summaries have no nonempty attached annotation text.** No export/rebuild is still running at this checkpoint. Open `exports/live-summaries-20261001-range-sidecar/index.md`. The previous accepted archive remains unchanged.
 
-Fetching summary snapshots originally took **96 seconds**. The latest offline run still performed **163,861 public writes/syncs**; local storage and privacy auditing remain too expensive. Broader canonical-file batching and exact repeated-token scan reuse now pass their respective source tests, but their combined real-data duration is unverified. They are not in released packages. See [measurements and acceptance limits](PERFORMANCE_INVESTIGATION.md#latest-real-rebuild-accepted--range-storage-and-sidecar-layout). Complete migration and production readiness remain open.
+Fetching summary snapshots originally took **96 seconds**. The latest offline run still performed **163,861 public writes/syncs**; local storage and privacy auditing remain too expensive. Broader canonical-file batching and exact repeated-token scan reuse now pass their respective source tests, but their combined real-data duration is unverified. They are not in released packages. See [measurements and acceptance limits](PERFORMANCE_INVESTIGATION.md#latest-real-rebuild-accepted--range-storage-and-sidecar-layout). Public release gates remain open.
 
 Both previous live processes exited with code 1 and left `.partial` directories. Neither was stopped or replaced. The original all-data run reached all 1,907,456 record renders but did not finalize; its terminal error was not retained in the aggregate checkpoint. The `0.17.0-dev` default summaries/profile run failed after **46m31s** with `secret scan did not finish` while auditing its approximately 20 MB root index. That failure and the earlier **65m45s partial historical-cache baseline** are historical results, not current running processes.
 
@@ -96,11 +122,11 @@ The original process remains alive and untouched. Its latest observed Markdown c
 
 The corrected replay and subsequent range/sidecar rebuild both finalized and passed independent partial-archive acceptance. The earlier withholding bug restored 187 summaries, 403 annotations and 3,658 associations; that verification is complete. Original failed folders, accepted archives, encrypted source capture and recovery keys remain preserved. No source OS changes or historical SDK-cache input were used for the offline runs.
 
-1. **Prove acceptable summaries-export speed.** Combine the tested all-material canonical-storage prototype and per-file token-audit optimization, then measure one real-data run against the retained archive/capture. Require exact records, bodies, graph proofs, privacy decisions, local links and honest partial status. Compare time, memory and write counts under stated host conditions. The latest 28m32s remains unacceptable. Ordinary Markdown and portable metadata sidecars still create many small files. About 209,000 source requests are a separate traversal cost; server concurrency cannot fix offline work.
+1. **Verify the chosen summaries-export candidate.** Combine the tested all-material canonical-storage prototype and per-file token-audit optimization, then measure one real-data run against the retained archive/capture. Require exact records, bodies, graph proofs, privacy decisions, local links and honest partial status. Compare time, memory and write counts under stated host conditions. The latest 28m32s is accepted by the user. Ordinary Markdown and portable metadata sidecars still create many small files. About 209,000 source requests are a separate traversal cost; server concurrency cannot fix offline work.
 2. **Resolve or precisely report source coverage gaps.** All 11,746 captured summaries are retained, but 375 lack nonempty attached annotation text and 43 referenced people are unavailable. Do not invent missing content or claim a consistency check proves historical completeness. Current junction reads cover nine families through eleven owner sides. Historical-cache recovery stays explicit. Person selection reduced 4,343 inventoried people to 1,381 (68.2%); identities were not merged.
-3. **Finish recovery lifecycle.** Completed-source replay works. Interrupted source fetching still cannot resume. Implement source checkpoints, safe crash-leftover cleanup and default platform key locations, with cancellation/crash acceptance.
-4. **Verify optional coverage separately.** Full signals, attachment/audio and supplemental coverage, and full-history PDF output still need acceptance. These do not belong in the default summaries export; events are optional through all-data/custom scope.
-5. **Complete runtime and download acceptance.** Current Mac and isolated Linux checks exist, including Linux AMD64 through translation; native Windows, remaining desktop viewers/lifecycle and new-candidate runtime checks remain open. GitHub Actions stays on the user's billing hold. The Bash/PowerShell Gist exists; GCP public binary hosting and clean-machine public-download checks remain pending. Source stays private; binary ZIPs remain unsigned/unnotarized as authorized.
+3. **Current priority: finish recovery release acceptance.** Interrupted-fetch continuation is implemented and passed Mac compiled/crash checks plus the bounded real OS test above. Full-summary scale and remaining native runtime checks are still open. Explicit private workspace/key paths and retained inputs are the release contract; automatic paths/cleanup are deferred.
+4. **Deferred; not a first-release gate.** Full signals, attachment/audio, supplemental views and full-history PDFs are outside this Markdown release. Existing optional commands do not establish support.
+5. **Complete runtime and download acceptance.** Current Mac and isolated Linux checks exist, including Linux AMD64 through translation; native Windows, remaining desktop viewers/lifecycle and new-candidate runtime checks remain open. GitHub Actions stays on the user's billing hold. The Bash/PowerShell Gist exists; public hosting (likely GitHub Releases) and clean-machine download checks are deferred while recovery is the focus. Source stays private; binary ZIPs remain unsigned/unnotarized as authorized.
 
 ## 0. Baseline and scope
 
@@ -108,7 +134,8 @@ The corrected replay and subsequent range/sidecar rebuild both finalized and pas
 - [x] Baseline fixture/race tests and six-platform binary packager exist; first macOS packaged fixture export passed on 2026-09-28.
 - [x] Document the requested lifecycle, UX, naming, two-pass links, related-summary graph, PDF strategy, and native metadata differences in EXPORT_SPEC.
 - [x] Update this checklist with the evidence from the new implementation and keep README/download instructions synchronized.
-- [ ] Define a release coverage contract for “all retained exposed data”; close the existing association/binary/supplemental-view gaps or explicitly list them in every manifest and download guide.
+- [x] Define the first-release scope above: Markdown summaries/personas/graph, with accepted source warnings and explicit partial status. Attachments/audio/PDFs and broader all-data coverage do not block this release.
+- [ ] Ensure the final published download instructions and manifest describe that supported scope and its limits.
 
 ## 0a. Optional events and summaries-focused export
 
