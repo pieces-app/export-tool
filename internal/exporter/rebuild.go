@@ -114,10 +114,10 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
 		return Manifest{}, errConfig("source manifest is unfinished or uses an unsupported archive format")
 	}
-	if original.FormatVersion == 5 && (original.ArchiveState == nil || original.ArchiveState.Version != 1) {
+	if original.FormatVersion == 5 && (original.ArchiveState == nil || original.ArchiveState.Version != 1 && original.ArchiveState.Version != 2) {
 		return Manifest{}, errConfig("archive reconstruction evidence is missing or unsupported")
 	}
-	if s := original.ArchiveState; s != nil && (s.Version != 1 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
+	if s := original.ArchiveState; s != nil && ((s.Version != 1 && s.Version != 2) || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
 		return Manifest{}, errConfig("archive reconstruction checksums are missing or invalid")
 	}
 	o := input.Options
@@ -390,7 +390,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 	if err := r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
-	r.reconcileEventPersonAssociationEdges()
+	r.reconcileAssociationEdges()
 	if err := r.preparePeople(); err != nil {
 		return r.manifest, err
 	}

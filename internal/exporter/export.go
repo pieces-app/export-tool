@@ -58,6 +58,7 @@ type Issue struct {
 	Code     string `json:"code"`
 }
 type Manifest struct {
+	Junctions               []JunctionCoverage       `json:"junction_reads,omitempty"`
 	CaptureReplay           *CaptureReplayInfo       `json:"capture_replay,omitempty"`
 	FileWorkers             int                      `json:"file_workers,omitempty"`
 	LocalPerformance        *LocalPerformanceReport  `json:"local_performance,omitempty"`
@@ -108,6 +109,7 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	JunctionFields                                                 map[string]bool
 	AssociationEndpoints                                           []Edge
 	ArchivePlaceholder                                             bool
 	ArchiveDataSHA256                                              string
@@ -125,27 +127,29 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
-	priorDecisions      []archiveRecord
-	legacySignalPrivacy bool
-	rebuilding          bool
-	ctx                 context.Context
-	client              *Client
-	opts                Options
-	stage               string
-	manifest            Manifest
-	meta                map[string]*Meta
-	coverage            map[string]*Coverage
-	inventory           map[string][]string
-	people              map[string]*PersonFacts
-	userPersonIDs       map[string]bool
-	derivedEdges        map[Edge]bool
-	associationEdges    map[Edge]string
-	cachedEdges         map[Edge]CacheEvidence
-	progress            *Progress
-	local               *localMeasurements
-	performanceWritten  bool
-	finalized           bool
-	documentMetadata    map[string]*DocumentMetadata
+	junctionFamiliesRead  map[string]bool
+	junctionIdentityBytes int
+	priorDecisions        []archiveRecord
+	legacySignalPrivacy   bool
+	rebuilding            bool
+	ctx                   context.Context
+	client                *Client
+	opts                  Options
+	stage                 string
+	manifest              Manifest
+	meta                  map[string]*Meta
+	coverage              map[string]*Coverage
+	inventory             map[string][]string
+	people                map[string]*PersonFacts
+	userPersonIDs         map[string]bool
+	derivedEdges          map[Edge]bool
+	associationEdges      map[Edge]string
+	cachedEdges           map[Edge]CacheEvidence
+	progress              *Progress
+	local                 *localMeasurements
+	performanceWritten    bool
+	finalized             bool
+	documentMetadata      map[string]*DocumentMetadata
 }
 
 func opaque(t, id string) string {
@@ -359,9 +363,9 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 
 	r.manifest = Manifest{Naming: o.Naming, Relationships: o.Relationships, Metadata: o.Metadata, Scope: scopeFor(o), RelatedOrder: o.RelatedOrder, RelatedLimit: o.RelatedLimit, Format: o.Format, FormatVersion: 5, ToolVersion: o.Version, Mode: o.Mode, Status: "running", Started: time.Now().UTC(), Timezone: o.Timezone, Coverage: []*Coverage{}, Issues: []Issue{}, Limitations: []string{
 		"Retained local HTTP data only; not an atomic database backup or deleted history.",
-		"Association metadata covers observed pairs and bounded event/person pages for selected persons/events. This is not a global association inventory or atomic snapshot; missing endpoint inventories and projections can still hide records. Supplementary analysis/settings views and fingerprint audio downloads are not implemented.",
+		"Current junction traversal covers selected summary/profile owners and summary origins; older association reads cover observed pairs and event/person pages. This is not a global association inventory or atomic snapshot. Missing endpoints, unselected families and equal-count changes can still hide records. Supplementary analysis/settings views and fingerprint audio downloads are not implemented.",
 		"Server projections can omit vectors and internal data. Binary attachments are not extracted; preserve mode retains exposed byte/encoded fields in JSON.",
-		"The dedicated summary-hierarchy endpoints recover direct parent/child edges when available. Summary annotation bodies and person/pipeline memberships still require relationship projections or an enumerable association API. A person association can mean authorship or involvement, not exclusive subject matter.",
+		"Dedicated summary-hierarchy endpoints recover direct parent/child edges. Current junction reads recover summary bodies/person/pipeline memberships when supported; unsupported sides keep older projections or historical cache fallback and unresolved coverage. A person association can mean authorship or involvement, not exclusive subject matter.",
 		"Selected scope controls which collections are read. Unselected relationships have no local links; event-derived source/person/website connections cannot be recovered when events are omitted. Domain filtering checks exposed URLs and known dependencies, not unseen origins.",
 		"IDs and graph metadata are held in memory; record bodies are staged on disk. Large deployments need sizing validation.",
 		"Final ID reconciliation detects set changes, not all in-place edits; pause capture/editing for a quieter export interval.",
@@ -394,6 +398,11 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 		r.manifest.Coverage = append(r.manifest.Coverage, cov)
 		if o.ReferenceOnly[m.Type] {
 			cov.InventoryMode = "references"
+			continue
+		}
+		if o.Scope == "summaries" && o.Associations != "off" && m.Type == "ANNOTATIONS" {
+			// First try current summary/person junctions. Inventorying every
+			// unrelated annotation is the expensive older-server fallback.
 			continue
 		}
 		ids, err := r.inventoryMaterial(m, cov)
@@ -431,6 +440,12 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	if err := r.resolveUserPeople(); err != nil {
 		return r.manifest, err
 	}
+	if err := r.resolveCurrentSummaryJunctions(); err != nil {
+		return r.manifest, err
+	}
+	if err := r.finishSummaryAnnotations(); err != nil {
+		return r.manifest, err
+	}
 	if err := r.loadPersonEvidence(); err != nil {
 		return r.manifest, err
 	}
@@ -451,10 +466,11 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	if err = r.resolveReferences(); err != nil {
 		return r.manifest, err
 	}
+	r.attachAssociationDependencies()
 	r.progress.Stage("Reconcile inventories", 0)
 	// A second identity pass makes concurrent additions/deletions explicit; no snapshot claim.
 	for _, m := range o.Materials {
-		if m.SnapshotOnly || o.ReferenceOnly[m.Type] {
+		if m.SnapshotOnly || r.opts.ReferenceOnly[m.Type] {
 			continue
 		}
 		cov := r.coverage[m.Type]
@@ -494,7 +510,7 @@ func (r *run) processCaptured(destination string) (Manifest, error) {
 	if err = r.filterGraph(); err != nil {
 		return r.manifest, err
 	}
-	r.reconcileEventPersonAssociationEdges()
+	r.reconcileAssociationEdges()
 	r.progress.Stage("Select people and build persona navigation", 0)
 	if err = r.preparePeople(); err != nil {
 		return r.manifest, err

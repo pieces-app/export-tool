@@ -71,7 +71,12 @@ func TestCaptureReplayPreservesPrivacyProfilesAndMovedLinks(t *testing.T) {
 	const late = "plain-late-capture-credential"
 	const excluded = "private-excluded-capture-title"
 	f.data["ANNOTATIONS"][0]["text"] = "Actual summary narrative contains " + late + ". [Profile](pieces://persons/person)."
-	f.data["TAGS"][0]["api_key"] = late
+	// This source is reachable only after reading the annotation body, so the
+	// credential is late on both linked-body and older-inventory paths.
+	f.data["ANNOTATIONS"][0]["sources"] = refs("late-credential-source")
+	lateSource := record("late-credential-source", "")
+	lateSource["api_key"] = late
+	f.data["WORKSTREAM_PATTERN_ENGINE_SOURCES"] = append(f.data["WORKSTREAM_PATTERN_ENGINE_SOURCES"], lateSource)
 	private := record("private-capture-annotation", "")
 	private["text"] = excluded + " https://bank.example/private"
 	f.data["ANNOTATIONS"] = append(f.data["ANNOTATIONS"], private)

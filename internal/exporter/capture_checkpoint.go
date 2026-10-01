@@ -335,6 +335,9 @@ func loadCapture(ctx context.Context, s *recovery.Store) (*run, uint64, error) {
 				return errConfig("recovery record metadata is invalid")
 			}
 			m := p.Record.Meta // Do not retain the sibling body allocation.
+			if err := validateJunctionFields(m.Type, m.JunctionFields); err != nil {
+				return err
+			}
 			if m.State == "included" {
 				var v map[string]any
 				if err := decodeArchiveJSON(p.Record.Data, &v); err != nil || fieldString(v, "id") != m.ID {

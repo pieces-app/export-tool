@@ -174,6 +174,14 @@ func (r *run) loadPersonEvidence() error {
 	annotationMaterial, _ := materialByType("ANNOTATIONS")
 	for _, m := range projected {
 		p := &PersonFacts{ID: m.ID, UnknownSummaries: true}
+		if m.JunctionFields["annotations"] && r.opts.PeopleMode == "profiles" {
+			// All annotation IDs were already enumerated and hydrated. The
+			// filtered history endpoint would repeat this source/body work.
+			p.UnknownConnections = true
+			m.PersonEvidence = p
+			r.progress.Add(1)
+			continue
+		}
 		records, err := personEvidence(r.ctx, r.client, p, true, r.opts.PeopleMode != "profiles")
 		if err != nil {
 			return err
@@ -198,7 +206,7 @@ func (r *run) loadPersonEvidence() error {
 		r.progress.Add(1)
 	}
 	if len(projected) > 0 {
-		r.manifest.Warnings = append(r.manifest.Warnings, "Person snapshots omit embedded relationships on this OS. Persona histories were queried directly. Person-to-summary associations remain incomplete; connected mode conservatively retains people with unknown summary connectivity. Profiles mode selects a narrower people export.")
+		r.manifest.Warnings = append(r.manifest.Warnings, "Person snapshots omit embedded relationships on this OS. Profile evidence comes from reconciled current junctions or direct persona-history queries. See relationship coverage for unresolved memberships. Connected mode conservatively retains unknown connectivity; profiles mode selects a narrower people export.")
 	}
 	return nil
 }

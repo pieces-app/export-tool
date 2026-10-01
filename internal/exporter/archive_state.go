@@ -23,6 +23,7 @@ type ArchiveState struct {
 // Excluded/withheld identities remain opaque. Original body/projection evidence
 // cannot be inferred from JSON after the renderer has pruned private references.
 type archiveRecord struct {
+	JunctionFields                map[string]bool   `json:"junction_fields,omitempty"`
 	Ref                           string            `json:"record_ref"`
 	Material                      string            `json:"material"`
 	State                         string            `json:"state"`
@@ -88,6 +89,7 @@ func (r *run) writeArchiveState() (result error) {
 			return err
 		}
 	}
+	version := 1
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err
@@ -103,6 +105,12 @@ func (r *run) writeArchiveState() (result error) {
 			}
 			rec.Redactions = m.Redactions
 			rec.ProjectionStates = m.ProjectionStates
+			rec.JunctionFields = m.JunctionFields
+			if len(m.JunctionFields) > 0 {
+				// Older rebuilders must refuse this archive instead of dropping
+				// current-empty evidence and reviving historical cache links.
+				version = 2
+			}
 			rec.SupplementableFields = m.SupplementableFields
 			rec.RelationshipProjectionUnknown = m.RelationshipProjectionUnknown
 			rec.PersonProjection = m.PersonProjection
@@ -130,6 +138,6 @@ func (r *run) writeArchiveState() (result error) {
 	if err != nil {
 		return err
 	}
-	r.manifest.ArchiveState = &ArchiveState{Version: 1, StateSHA256: hex.EncodeToString(h.Sum(nil)), GraphSHA256: graph, LinkMapSHA256: links}
+	r.manifest.ArchiveState = &ArchiveState{Version: version, StateSHA256: hex.EncodeToString(h.Sum(nil)), GraphSHA256: graph, LinkMapSHA256: links}
 	return nil
 }

@@ -48,6 +48,13 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 		}
 		m.Redactions += row.Redactions
 		m.ProjectionStates = row.ProjectionStates
+		if len(row.JunctionFields) > 0 && state.Version < 2 {
+			return errConfig("archive current junction evidence requires reconstruction version 2")
+		}
+		if err := validateJunctionFields(m.Type, row.JunctionFields); err != nil {
+			return err
+		}
+		m.JunctionFields = row.JunctionFields
 		m.SupplementableFields = row.SupplementableFields
 		// Missing eligibility stays unknown, including on repeated rebuilds.
 		// Older rebuilders also wrote synthetic "absent" projection states;
@@ -97,7 +104,7 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 	associationProofs := map[string]*Meta{}
 	r.associationEdges = map[Edge]string{}
 	for _, m := range byPath {
-		if m.Type == "WORKSTREAM_EVENT_TO_PERSON_ASSOCIATIONS" {
+		if _, ok := associationFamilyByType(m.Type); ok {
 			associationProofs[opaque(m.Type, m.ID)] = m
 		}
 	}
@@ -122,7 +129,7 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 				return errConfig("archive association edge proof is missing or contradictory")
 			}
 			valid := false
-			for _, expected := range eventPersonEvidenceEdges(proof) {
+			for _, expected := range associationEvidenceEdges(proof) {
 				valid = valid || expected == e
 			}
 			if !valid {

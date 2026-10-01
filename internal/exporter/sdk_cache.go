@@ -272,6 +272,11 @@ func (r *run) recoverSDKCacheRelationships() error {
 			// Keep excluded/withheld targets in the private graph until privacy
 			// propagation. Skipping them here could leave derived text exposed.
 			source := r.meta[key.key]
+			inverse := inverseAttachmentField(source.Type, meta.Type, key.relation)
+			if source.JunctionFields[key.relation] || meta.JunctionFields[inverse] {
+				r.manifest.SDKCache.InversePrecedence++
+				continue
+			}
 			if source.State == "included" && meta.State == "included" {
 				inverse := inverseAttachmentField(source.Type, meta.Type, key.relation)
 				if eligible, known := meta.SupplementableFields[inverse]; inverse != "" && known && !eligible {
@@ -456,7 +461,7 @@ func (r *run) readSDKCacheTable(ctx context.Context, tx *sql.Tx, table cacheTabl
 			if !known {
 				r.manifest.SDKCache.UnknownFields++
 			}
-			if !eligible {
+			if !eligible || m.JunctionFields[relation] {
 				continue
 			}
 			ids := references(v[relation])

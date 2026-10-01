@@ -45,7 +45,7 @@ func (f associationFamily) material() Material {
 
 var associationTypes = func() map[string]associationFamily {
 	out := map[string]associationFamily{}
-	for _, family := range associationFamilies {
+	for _, family := range junctionFamilies {
 		out[family.material().Type] = family
 	}
 	return out
@@ -166,6 +166,11 @@ func (r *run) exportAssociations() error {
 	for _, family := range families {
 		// Scope never expands to obtain metadata for an unselected endpoint.
 		if r.coverage[family.leftType] == nil || r.coverage[family.rightType] == nil {
+			continue
+		}
+		// A successful current-side enumeration already retained these records.
+		// Re-reading observed pairs would duplicate them and lose provenance.
+		if r.junctionFamiliesRead[family.name] {
 			continue
 		}
 		pairs, err := r.associationPairs(family)

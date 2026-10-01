@@ -2,6 +2,12 @@
 
 Updated 2026-09-30. This document defines the requested product. [TODO.md](TODO.md) is the execution and acceptance checklist; checked items require implementation and evidence. [EXPORT_GUIDE.md](EXPORT_GUIDE.md) remains the source-backed API reference, and [PRIVACY_FILTERING.md](PRIVACY_FILTERING.md) explains privacy tradeoffs. The canonical folder map and naming contract are in [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md). A requirement in this specification is not a claim that it already works.
 
+## Current summary traversal update — 2026-09-30 working tree
+
+The exporter now uses the current association count/list/bulk APIs for nine summary/profile families, rather than relying on omitted embedded ObjectBox fields. [JUNCTION_API.md](JUNCTION_API.md) defines the exact traversal, bounds, source revisions and remaining acceptance. Direct summary/person annotation reads must all reconcile before summaries scope switches annotations to referenced-only retrieval. Unsupported servers retain the full inventory fallback; all-data/custom scope remains unchanged. The four-collection preflight estimate remains conservative until this capability is known.
+
+Current read evidence stays separate from original projection shapes and survives offline rebuilding and encrypted completed-source recovery. Current empty/positive relationships override historical cache attachments. Privacy includes excluded owners and shared bodies; unstable reads stop before finalization. The recovery compatibility binding is v2; older development captures need their original executable. These changes are newer than the `0.15.0-dev` packages and both active exports. Live full-history speed, body/graph reconciliation, and reduction in annotations/persons still require measurement. File creation and per-file sync behavior are unchanged.
+
 ## Product outcome
 
 A user downloads one executable, starts an export, reviews a local inventory and approximate duration, chooses Markdown or PDFs, and opens a portable folder in Finder/Explorer/a Linux file manager. Newest summaries appear first when sorting by filename ascending. Summaries, persons, tags, sources, and websites remain navigable after Pieces is unavailable. A readable, explicit coverage report distinguishes intentional privacy exclusions from missing data or errors.

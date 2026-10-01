@@ -69,7 +69,7 @@ func (s Selection) InventoryMaterials() []Material {
 func (s Selection) Print(w io.Writer) {
 	fmt.Fprintf(w, "Export scope: %s\n", s.Name)
 	if s.Name == "summaries" {
-		fmt.Fprintln(w, "Inventory summaries, annotations, persons, and pipelines. Fetch tags, websites, sources, applications, ranges, and anchors only when referenced.")
+		fmt.Fprintln(w, "Inventory summaries, persons, and pipelines. Use verified current relationships to fetch linked annotations; older servers fall back to the full annotation inventory. Fetch tags, websites, sources, applications, ranges, and anchors only when referenced.")
 		fmt.Fprintln(w, "Event bodies, signals, hints, source-window history, and other unselected collections are skipped. Graph and website-origin coverage are reduced; secret and visible-URL filtering still apply.")
 		fmt.Fprintln(w, "Estimates cover the four inventoried collections; referenced supporting records and direct persona-history reads add work. Profiles mode skips event-count queries; all/connected people modes can query association totals without reading event bodies.")
 	}
@@ -121,7 +121,8 @@ func validateScope(o Options) error {
 		return errConfig("materials do not match the selected scope")
 	}
 	for _, m := range plan.Materials {
-		if !selected[m.Type] || o.ReferenceOnly[m.Type] != plan.ReferenceOnly[m.Type] {
+		linkedAnnotations := o.Scope == "summaries" && m.Type == "ANNOTATIONS" && o.ReferenceOnly[m.Type]
+		if !selected[m.Type] || !linkedAnnotations && o.ReferenceOnly[m.Type] != plan.ReferenceOnly[m.Type] {
 			return errConfig("materials do not match the selected scope")
 		}
 	}

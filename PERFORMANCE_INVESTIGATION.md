@@ -150,3 +150,36 @@ The prior staging-launch question was a precaution rather than a new authorizati
 Preflight counted 11,745 summaries, 74,093 annotations, 4,413 persons and 13 pipelines: 90,264 core records before referenced/history expansion. Summary fetching completed in roughly three minutes. At 17m12s in annotation fetching, 70,709/74,093 annotations had been processed, with cumulative file-sync time of 11m19.731s across source-stage writes. Recent HTTP p95 was 9 ms, but several outlier reads took seconds and triggered 22 adaptive backoffs; zero retries had occurred. These observations exclude later graph/render/validation work and are not final archive counts.
 
 A three-second native sample of staging OS showed ObjectBox loaded. Refreshed repository refs then revealed the missing current read contract: 87 association servers with per-side count/list/bulk APIs. The September SDK already uses these junctions to retrieve summary bodies, because migration leaves embedded relationship maps absent. This is a source-research correction, not a completed exporter optimization: the running baseline still uses the earlier embedded/cache route. The exact contracts, bounds, current source revisions and integration gates are in [JUNCTION_API.md](JUNCTION_API.md). After verifying current junction closure, summaries scope can avoid unrelated annotation inventory; that change must preserve profiles, all attached bodies, privacy dependencies and graph links.
+
+## Linked annotation retrieval — current working tree
+
+The current junction API investigation exposed the reason a summaries-focused export still inventoried roughly 74,000 annotations: the older traversal could not identify all body/profile attachments from snapshots. The new exporter traverses current summary/person association endpoints and fetches only referenced annotations once both owner sets reconcile. Older servers retain the full fallback. Nine association families also supply summary labels/origins and person/pipeline memberships. No event bodies are introduced. See [the source and implementation contract](JUNCTION_API.md).
+
+Synthetic acceptance retains both required body/profile annotations while omitting 20 unrelated annotations, with complete current core relationship evidence, valid links and repeated offline rebuilding/recovery. This is a behavioral check, not a live reduction estimate. Canonical association records add their own writes, so fewer annotation records alone cannot establish a net runtime win. First-write sync, generated Markdown/metadata files, privacy audit volume and final archive checks remain separate bottlenecks.
+
+The older `0.15.0-dev` focused baseline completed Markdown and the first output audit, then entered native/portable metadata. It had about 195,000 measured writes before metadata, compared with about 91,000 staged material records. It still uses historical cache recovery and the full annotation inventory. Its shared disk load includes the original all-data export; neither run has been replaced or interrupted. Final timings and acceptance remain pending.
+
+A bounded live cardinality probe subsequently completed 320 ID/count requests in **0.88 s**, zero retries/backoffs, recent p95 roughly **4 ms**. Its 30-summary sample implies substantial supporting association volume; extrapolation is unreliable but sufficient to reject the assumption that adding one JSON plus one Markdown file per association is free. The candidate has correct graph traversal in synthetic package acceptance, but has not proved a faster live export. Consolidated association evidence and a better persistence strategy remain immediate performance work.
+
+## Finalized summaries-focused baseline — 2026-09-30
+
+The actual `0.15.0-dev` executable finished in **3,944.609 seconds (65m45s)**, exit **2**, with a finalized **partial** archive at `exports/live-summaries-20260930-attempt2`. No partial sibling remains. The original all-data exporter was still writing to the same disk; timings are not an isolated benchmark. The optional encrypted recovery workspace was disabled, so checkpoint duplication does not explain this run.
+
+| Measured phase | Wall time |
+| --- | ---: |
+| Fetch summary records (including persistence) | 2m49s |
+| Fetch annotations (including persistence) | 18m01s |
+| Markdown rendering | 14m00s |
+| Both filtered-output audits combined | 20m43s |
+| Native and portable metadata | 5m40s |
+| Privacy reconciliation | 1m26s |
+| Link validation | 1m05s |
+| Reconstruction evidence | 32s |
+
+Other source, cache and graph phases account for the remaining time. The report measured **218,956 writes and 218,956 syncs**, about **964 MB** of logical output, and **36m39s summed sync time**. Sync time overlaps writes and concurrent writers and must not be added to wall time. There were 232,405 canonical JSON reads (about 488 MB); 91,071 privacy rewrites and 87,998 rendering rewrites were correctly skipped as unchanged. Peak RSS was **980,172,800 bytes (about 935 MiB)**. The final manifest timestamp precedes its closing audit; the wrapper elapsed time and phase report measure the longer actual run.
+
+Independent finalized-archive acceptance passed in **79.85 s**: 87,998 included records reconcile with all stored decisions/hashes; Markdown local links resolve; 24,992 attached annotation bodies match rendered text. Retained summaries: **11,742**; with nonempty summary-type bodies: **10,515**; with any nonempty annotation: **10,867**. Every summary-type body link in this baseline came from historical cache evidence. The graph has 92,188 edges, including 75,279 historical edges. Consistency does not establish complete current source coverage.
+
+Person selection retained **1,381 of 4,413**, a **68.7% reduction** (3,032 intentional omissions). All retained persons have profile history, with 5,171 history links. This is selection, not deduplication/merging. Three summaries and 39 annotations were withheld; 43 person references were unavailable; the annotation inventory grew by 13 during the read interval. Historical links and absent core projections also keep this archive partial. The original all-data export is still running and has not acquired these changes.
+
+The next acceptance target is a current-junction export with fewer supporting artifacts, improved persistence and less repeated audit work. The junction integration passed the full race suite (exporter 534.994 s). Candidate `0.16.1-dev` adds a reconstruction-state compatibility guard, verified by focused export/rebuild/capture/archive checks (141.306 s), vet, six ZIP/hash checks and available Mac package tests, but per-file sync and full audits remain. **Do not claim this candidate is already a fast or complete live migration.**

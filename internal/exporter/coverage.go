@@ -25,13 +25,15 @@ func projectionFields(material string) []string {
 }
 
 type RelationshipCoverage struct {
-	Material string `json:"material"`
-	Field    string `json:"field"`
-	Included int    `json:"included_records"`
-	Absent   int    `json:"absent"`
-	Invalid  int    `json:"invalid"`
-	Empty    int    `json:"explicit_empty"`
-	Linked   int    `json:"with_active_references"`
+	JunctionReconciled int    `json:"reconciled_from_current_junctions"`
+	Unresolved         int    `json:"unresolved"`
+	Material           string `json:"material"`
+	Field              string `json:"field"`
+	Included           int    `json:"included_records"`
+	Absent             int    `json:"absent"`
+	Invalid            int    `json:"invalid"`
+	Empty              int    `json:"explicit_empty"`
+	Linked             int    `json:"with_active_references"`
 }
 
 func projectionState(value any) string {
@@ -117,6 +119,11 @@ func (r *run) collectRelationshipCoverage() {
 					continue
 				}
 				row.Included++
+				if m.JunctionFields[field] {
+					row.JunctionReconciled++
+				} else if m.ProjectionStates[field] != "empty" && m.ProjectionStates[field] != "linked" {
+					row.Unresolved++
+				}
 				switch m.ProjectionStates[field] {
 				case "empty":
 					row.Empty++
@@ -132,7 +139,7 @@ func (r *run) collectRelationshipCoverage() {
 				continue
 			}
 			r.manifest.RelationshipCoverage = append(r.manifest.RelationshipCoverage, row)
-			if row.Absent+row.Invalid > 0 {
+			if row.Unresolved > 0 {
 				r.issue(material, "", "unverified_"+field+"_projection")
 			}
 		}
@@ -143,6 +150,13 @@ func (r *run) renderCoverage() error {
 	var b strings.Builder
 	scope := r.manifest.Scope
 	b.WriteString("# Export coverage\n\n[Export index](index.md) · [Manifest](manifest.json)\n\n## Selected export scope\n\n")
+	if len(r.manifest.Junctions) > 0 {
+		b.WriteString("Current summary/profile junctions were read with per-owner counts, bounded bulk reads or pages, and count reconciliation. Missing routes fall back to older projections; they never establish an empty set. These are live reads, not an atomic snapshot: equal-count substitutions can escape detection. Source field shapes below remain unchanged.\n\n| Current association family | Side | Owners | Reconciled | Rows | Count reads | Bulk reads | Page reads | Unavailable |\n|---|---|---:|---:|---:|---:|---:|---:|---|\n")
+		for _, c := range r.manifest.Junctions {
+			fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d | %d | %t |\n", md(c.Family), md(c.Side), c.Owners, c.Reconciled, c.Rows, c.CountReads, c.BulkReads, c.PageReads, c.Unsupported)
+		}
+		b.WriteByte('\n')
+	}
 	if a := r.manifest.Associations; a != nil {
 		fmt.Fprintf(&b, "Association metadata mode: `%s`. Reads cover observed typed pairs and bounded event/person pages when both material types are selected. Both endpoints must survive filtering. Global enumeration is unknown; zero observed pairs does not prove an empty collection. A 404 can mean a missing record or an unavailable route. Offline rebuild retains original lookup coverage without contacting OS.\n\n", a.Mode)
 		b.WriteString("| Association family | Observed pairs | Lookups | 404/unknown | Unsupported | Failed | Not attempted |\n|---|---:|---:|---:|---:|---:|---:|\n")
@@ -187,14 +201,14 @@ func (r *run) renderCoverage() error {
 	for _, c := range r.manifest.Coverage {
 		fmt.Fprintf(&b, "| %s | %d | %d | %d | %d | %d | %d | %d | %d |\n", c.Material, c.InitialCount, c.Inventoried, c.Fetched, c.Included, c.Excluded, c.Withheld, c.Omitted, c.FinalCount)
 	}
-	b.WriteString("\nA count of -1 means unavailable. Fetched can exceed the initial inventory when reference traversal discovers additional records.\n\n## Core relationship projections\n\nThese counts examine the original HTTP field shapes of included records, before pruning private references. An explicit empty collection differs from an absent/null or malformed collection. Present projections still do not prove internal database completeness. Derived reverse edges can recover individual links without proving that every link was returned.\n\n| Material | Field | Included | Absent/null | Invalid | Explicit empty | Active references |\n| --- | --- | ---: | ---: | ---: | ---: | ---: |\n")
+	b.WriteString("\nA count of -1 means unavailable. Fetched can exceed the initial inventory when reference traversal discovers additional records.\n\n## Core relationship projections\n\nThese counts examine the original HTTP field shapes of included records, before pruning private references. An explicit empty collection differs from an absent/null or malformed collection. Present projections still do not prove internal database completeness. Derived reverse edges can recover individual links without proving that every link was returned.\n\n| Material | Field | Included | Absent/null | Invalid | Explicit empty | Active references | Current junction reads | Unresolved |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n")
 	for _, c := range r.manifest.RelationshipCoverage {
-		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d |\n", c.Material, c.Field, c.Included, c.Absent, c.Invalid, c.Empty, c.Linked)
+		fmt.Fprintf(&b, "| %s | %s | %d | %d | %d | %d | %d | %d | %d |\n", c.Material, c.Field, c.Included, c.Absent, c.Invalid, c.Empty, c.Linked, c.JunctionReconciled, c.Unresolved)
 	}
 	if len(r.manifest.RelationshipCoverage) == 0 {
 		b.WriteString("\nNo included records use the core summary/person/pipeline/signal projections checked here.\n")
 	}
-	b.WriteString("\nAny absent or invalid core projection makes this export partial. Unknown body attachments cannot be reconstructed from titles, timestamps, or hierarchy enums. Persona history and hierarchy reads are separate evidence; they do not fill every body/person/pipeline projection. See the manifest for all issues, hierarchy coverage, warnings, privacy settings, and limitations.\n")
+	b.WriteString("\nAn absent or invalid core projection remains unresolved unless its current owner-side junction read reconciled. Any unresolved core projection makes this export partial. Unknown body attachments cannot be reconstructed from titles, timestamps, or hierarchy enums. Persona history and hierarchy reads are separate evidence; they do not fill every body/person/pipeline projection. See the manifest for all issues, hierarchy coverage, warnings, privacy settings, and limitations.\n")
 	if d := r.manifest.SignalDigest; d != nil {
 		b.WriteString("\n## Consolidated signals\n\n")
 		switch {

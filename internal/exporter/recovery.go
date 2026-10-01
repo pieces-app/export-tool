@@ -17,7 +17,7 @@ import (
 
 // This explicit compatibility contract must change with incompatible capture,
 // privacy or rendering semantics. A development version label is insufficient.
-var captureBinding = sha256.Sum256([]byte("pieces-export/completed-source-replay/2026-09-30/v1"))
+var captureBinding = sha256.Sum256([]byte("pieces-export/completed-source-replay/2026-09-30/v2-current-junctions"))
 
 // RecoveryOptions is opt-in. Parents must exist; the workspace must be new.
 // Keys stay outside archives and workspaces. Neither is deleted automatically.

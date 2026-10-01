@@ -35,7 +35,7 @@ type finalArchiveCounts struct {
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
 	report := finalArchiveCounts{States: map[string]int{}}
 	manifest, err := InspectArchive(source)
-	if err != nil || manifest.FormatVersion != 5 || manifest.ArchiveState == nil || manifest.ArchiveState.Version != 1 {
+	if err != nil || manifest.FormatVersion != 5 || manifest.ArchiveState == nil || manifest.ArchiveState.Version != 1 && manifest.ArchiveState.Version != 2 {
 		return report, errConfig("acceptance requires a finalized format-5 archive with reconstruction evidence")
 	}
 	report.ArchiveStatus = manifest.Status

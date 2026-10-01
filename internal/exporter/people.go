@@ -306,6 +306,9 @@ func (r *run) preparePeople() error {
 		}
 		p := personFacts(v)
 		p.User = r.userPersonIDs[m.ID]
+		if m.JunctionFields["summaries"] {
+			p.UnknownSummaries = false
+		}
 		if evidence := m.PersonEvidence; evidence != nil {
 			p.UnknownConnections = evidence.UnknownConnections
 			p.SourceEventConnections = evidence.SourceEventConnections
@@ -395,7 +398,7 @@ func (r *run) preparePeople() error {
 			}
 		}
 		p.ProfileSummaries = unique(p.ProfileSummaries)
-		if p.Projected && (m.PersonEvidence == nil || m.PersonEvidence.UnknownAnnotations) {
+		if p.Projected && !m.JunctionFields["annotations"] && (m.PersonEvidence == nil || m.PersonEvidence.UnknownAnnotations) {
 			p.UnknownAnnotations = true
 		}
 	}
