@@ -2,6 +2,21 @@
 
 Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
 
+## Current outcome and immediate fixes — 2026-10-01
+
+Both live processes have now exited with code 1 and left `.partial` directories. Neither was stopped or replaced. The original all-data run reached all 1,907,456 record renders but did not finalize; its terminal error was not retained in the aggregate checkpoint. The newer default summaries/profile run failed after **46m31s** with `secret scan did not finish` while auditing its approximately 20 MB root index. This is a failed run, not a faster successful export. The last independently reconciled live archive remains the **65m45s partial baseline** described in PERFORMANCE_INVESTIGATION.md.
+
+- [x] Identify why 43 unavailable person snapshots forced full annotation fallback despite supported current junctions. Read indexed relationships for missing owners; retain their missing status and any available linked annotations. Do not invent empty evidence or body content. Source/replay/rebuild regressions and actual compiled default CLI/recovery checks pass.
+- [x] Reproduce the failed index scan read-only: 20,017,932 bytes failed after 56.213 s; profiling attributes approximately 97% of sampled CPU to regular-expression matching.
+- [x] Replace huge generated record/day/summary/shared-relationship indexes with linked pages of at most 250 entries and 64 KiB. Keep a compact landing page and all record destinations. Tests cover 62,501 entries, byte limits, Unicode, relocation, cancellation, privacy rechecks and PDFs.
+- [x] Re-render the failed index's 110,745 list entries into disposable private pages: all retained in 447 files, largest 57,084 bytes; content audit passed in 15.124 s. The source partial folder was not modified. This diagnostic does not certify the full archive or reproduce learned credentials.
+- [x] Finish full regression and actual packaged paginated export/rebuild acceptance for the combined forward fixes. Full source-package race suite passed (exporter 489.702 s); actual Mac ARM64 package checks passed (33.645 s with race checks) and Rosetta package checks passed (33.963 s). These exercise 253 linked summary bodies through paginated export, relocation and offline rebuild, plus missing-owner replay. Six binary-only `0.17.1-dev` ZIP layouts/hashes/embedded files and vet/diff checks pass. A final read-only doctor check found staging OS ready. No upload or Actions run.
+- [ ] Complete a new live summaries/profile export with these fixes; independently reconcile bodies, persons, pipelines, graph links and exclusions. Report fetch/render/audit/metadata times and peak memory. A passing index diagnostic alone does not close this gate.
+- [ ] Reduce remaining ordinary per-record syncs and approximately 210,000 junction HTTP requests using measured, bounded changes. The failed current-junction run still performed 243,174 public writes/syncs before metadata/finalization; grouped association storage alone is insufficient.
+- [ ] Provide a usable interrupted-fetch checkpoint and crash cleanup; verify current native Windows/Linux and viewer behavior; finish attachments/supplemental coverage and hosting. GitHub Actions remains on the billing hold.
+
+The earlier checkpoints below are historical observations; they do not imply that either process remains active.
+
 ## Grouped association integration — 2026-10-01
 
 - [x] Select encrypted bounded transactions for association staging, retaining the ordinary-file backend for user documents. Make pending replacements/removals visible to source/privacy/graph/capture readers.

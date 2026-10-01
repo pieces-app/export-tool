@@ -22,6 +22,8 @@ The CLI scans inventory, shows a rough duration estimate, offers Markdown/PDF ou
 
 Exports default to summary documents and persona profiles (`--scope summaries --people profiles`).
 
+The landing page links to summaries, personas, pipelines, chronology and `markdown/records/index.md` for other included records. Long navigation lists use adjacent `.pages/` folders with at most 250 entries and 64 KiB per page. All entries remain linked; long index labels may abbreviate, while full titles and bodies stay in their documents. Moving the whole export preserves relative navigation.
+
 Optional recovery can save completed source collection for offline replay:
 
 ```sh

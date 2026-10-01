@@ -399,6 +399,7 @@ func (r *run) render() (result error) {
 	if err := writes.Close(); err != nil {
 		return err
 	}
+	r.progress.Stage("Write graph and navigation indexes", 0)
 	if err := writeJSONL(filepath.Join(r.stage, "relationships.jsonl"), edges, r.local); err != nil {
 		return err
 	}
@@ -419,27 +420,28 @@ func (r *run) render() (result error) {
 	sort.Strings(dayNames)
 	var chronology strings.Builder
 	chronology.WriteString("# Chronological record index\n\nThis index covers every included dated material record, ordered by its record creation timestamp. It is separate from the workstream-summary timeline, which organizes summary documents.\n\n[Chronological JSONL](records.jsonl) · [Export index](../index.md)\n\n## Days\n\n")
+	dayLinks := []navigationEntry{}
 	var index strings.Builder
-	index.WriteString("# Pieces export\n\nChronology uses record creation time, not necessarily activity time. Summary ranges and calendar context remain in record JSON.\n\n[Manifest](manifest.json) · [Chronological JSONL](timeline/records.jsonl) · [Undated records](markdown/undated.md)\n\n## Days\n\n")
+	index.WriteString("# Pieces export\n\nChronology uses record creation time, not necessarily activity time. Summary ranges and calendar context remain in record JSON.\n\n[Manifest](manifest.json) · [Chronological JSONL](timeline/records.jsonl) · [Undated records](markdown/undated.md)\n\n")
 	fmt.Fprintf(&index, "Selected scope: **%s**. Read [coverage and intentional omissions](coverage.md) before treating this as a full migration.\n\n", md(r.manifest.Scope.Name))
 	for _, day := range dayNames {
 		path := "markdown/days/" + day + ".md"
 		var b strings.Builder
 		fmt.Fprintf(&b, "# %s\n\nTimezone: %s\n\n", day, md(r.opts.Timezone))
+		items := make([]navigationEntry, 0, len(days[day]))
 		for _, e := range days[day] {
 			t, _ := time.Parse(time.RFC3339Nano, e.Created)
-			fmt.Fprintf(&b, "- %s — [%s](%s) (%s)\n", t.In(zone).Format("15:04:05 -07:00"), md(e.Title), relative(path, e.Path), e.Type)
+			items = append(items, navigationEntry{label: e.Title, path: e.Path, detail: t.In(zone).Format("15:04:05 -07:00") + " · " + e.Type})
 		}
-		if err := r.writeFile(filepath.Join(r.stage, path), []byte(b.String())); err != nil {
+		if err := r.writeNavigationIndex(path, b.String(), items); err != nil {
 			return err
 		}
-		fmt.Fprintf(&index, "- [%s](%s) (%d records)\n", day, path, len(days[day]))
-		fmt.Fprintf(&chronology, "- [%s](%s) (%d records)\n", day, relative("timeline/index.md", path), len(days[day]))
+		dayLinks = append(dayLinks, navigationEntry{label: day, path: path, detail: fmt.Sprintf("%d records", len(days[day]))})
 	}
 	if len(dayNames) == 0 {
 		chronology.WriteString("No included records have a valid creation timestamp.\n")
 	}
-	if err := r.writeFile(filepath.Join(r.stage, "timeline/index.md"), []byte(chronology.String())); err != nil {
+	if err := r.writeNavigationIndex("timeline/index.md", chronology.String(), dayLinks); err != nil {
 		return err
 	}
 	if r.opts.Format != "markdown" {
@@ -463,9 +465,10 @@ func (r *run) render() (result error) {
 	index.WriteString("\n[Export coverage and relationship gaps](coverage.md)\n")
 	index.WriteString("\n[Chronological record index](timeline/index.md) · [All workstream summaries](workstream_summaries/index.md) · [Single-click summaries](workstream_summaries/single_click_summaries/index.md)\n")
 	index.WriteString("\n[Personas, profiles, and people](workstream_summaries/personas/index.md) · [Known pipeline associations](workstream_summaries/pipeline_associations/index.md)\n")
-	index.WriteString("\n## All included records\n\n")
+	index.WriteString("\n[Browse all included records](markdown/records/index.md)\n")
 	links := map[string]string{}
 	indexed := map[string]bool{}
+	recordLinks := []navigationEntry{}
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err
@@ -476,11 +479,14 @@ func (r *run) render() (result error) {
 				if g := groups[m.Path]; g != nil {
 					label = fmt.Sprintf("%s (%d association records)", m.Type, len(g.members))
 				}
-				fmt.Fprintf(&index, "- [%s](%s) (%s)\n", md(label), uriPath(m.Path), m.Type)
+				recordLinks = append(recordLinks, navigationEntry{label: label, path: m.Path, detail: m.Type})
 				indexed[m.Path] = true
 			}
 			links[opaque(m.Type, m.ID)] = m.Path
 		}
+	}
+	if err := r.writeNavigationIndex("markdown/records/index.md", "# All included documents\n\n[Export index](../../index.md)\n\nAssociation pages contain multiple records; every record remains individually addressable in link-map.json and canonical JSONL.\n\n", recordLinks); err != nil {
+		return err
 	}
 	if err := r.writeJSON(filepath.Join(r.stage, "link-map.json"), links); err != nil {
 		return err
@@ -490,10 +496,11 @@ func (r *run) render() (result error) {
 	}
 	var b strings.Builder
 	b.WriteString("# Undated records\n\nThese records have missing or invalid creation timestamps.\n\n")
+	undatedLinks := make([]navigationEntry, 0, len(undated))
 	for _, m := range undated {
-		fmt.Fprintf(&b, "- [%s](%s) (%s)\n", md(m.Title), relative("markdown/undated.md", m.Path), m.Type)
+		undatedLinks = append(undatedLinks, navigationEntry{label: m.Title, path: m.Path, detail: m.Type})
 	}
-	return r.writeFile(filepath.Join(r.stage, "markdown", "undated.md"), []byte(b.String()))
+	return r.writeNavigationIndex("markdown/undated.md", b.String(), undatedLinks)
 }
 
 func writeJSONL[T any](path string, items []T, measurements ...*localMeasurements) (result error) {

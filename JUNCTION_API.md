@@ -2,6 +2,16 @@
 
 Investigated 2026-09-30. **This supersedes the earlier claim that summary/person association enumeration is unavailable.** That claim described older local checkouts. Refreshed source exposes 87 read servers and the current SDK uses them. The installed staging OS must still pass capability and full-history checks; source availability alone is not live coverage. No source repository working tree was switched or edited; `origin/main` was fetched for read-only inspection.
 
+## Missing owners and annotation fallback — 2026-10-01
+
+The live `0.17.0-dev` run encountered 43 referenced persons whose snapshots were unavailable. It skipped their junction reads, then interpreted the missing annotation coverage as requiring a full annotation inventory. This expanded the initially referenced 28,359 annotation set to a full 74,118-ID fallback. Initial linked-set reduction was therefore not an achieved export reduction.
+
+At the recorded server revision, `lib/utils/associations_read_server_base.dart` forwards count/list calls directly to the indexed association facade using the owner ID. It does not fetch the owner's core snapshot first. At the recorded database-facade revision, `lib/objectbox/facades/common/association_facade.dart` likewise delegates indexed `countBySideA`/`countBySideB` reads. A missing snapshot is not evidence of absent associations.
+
+The forward fix includes missing owners in the usual closure traversal. Successful empty/positive counts must reconcile just as for present or excluded owners. Available targets remain exportable, the unavailable owner remains missing with no invented path/body, and indexed evidence survives completed-source replay and rebuild. Only that verified annotation evidence permits referenced-only retrieval; actual count/list failures remain failures. Tests include missing persons with no annotations, retained profile annotations attached to missing persons, missing summaries, invalid counts, compiled CLI export and offline replay.
+
+The internal facade also exposes batch-count methods, but the inspected HTTP association server does not expose a bulk-count route. Internal methods are not callable API contracts for this closed-source download.
+
 ## Source evidence
 
 | Repository | Inspected revision | Finding |

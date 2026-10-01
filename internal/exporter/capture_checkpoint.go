@@ -495,9 +495,10 @@ func loadCapture(ctx context.Context, s *recovery.Store) (*run, uint64, error) {
 			return nil, 0, errConfig("recovery record paths or material identity are invalid")
 		}
 		if m.State == "missing" {
-			// Inverse relationship evidence can point from a failed read, but
-			// it does not provide a body, title, or path for that identity.
-			if !reflect.DeepEqual(*m, Meta{Key: m.Key, ID: m.ID, Type: m.Type, State: "missing", Edges: m.Edges}) {
+			// Indexed current junctions and inverse evidence can exist even
+			// when the owner's snapshot is unavailable. Neither supplies a
+			// body, title, or path for that missing identity.
+			if !reflect.DeepEqual(*m, Meta{Key: m.Key, ID: m.ID, Type: m.Type, State: "missing", Edges: m.Edges, JunctionFields: m.JunctionFields, RelationshipProjectionUnknown: m.RelationshipProjectionUnknown}) {
 				return nil, 0, errConfig("unavailable recovery record contains unexpected evidence")
 			}
 		} else if m.Folder != material.Folder || m.DataPath != prefix+material.Folder+"/"+name+".json" || m.Path != "markdown/"+material.Folder+"/"+name+".md" {

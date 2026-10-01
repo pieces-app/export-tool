@@ -2,6 +2,12 @@
 
 Updated 2026-10-01. The working tree writes **archive format 6** when association records are included, otherwise format 5. Format 6 groups supporting association evidence; summary/profile files keep their existing layout. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest is included starting with `0.9.0-dev`; live completeness still requires acceptance.
 
+## Bounded navigation indexes
+
+`index.md` is the landing page. It links to summaries, personas, pipelines, coverage and chronology, plus `markdown/records/index.md` for all included documents. It does not repeat every supporting record. Large record lists, individual day lists, summary indexes and full shared-tag/person/source/website indexes paginate at **250 entries or 64 KiB**, whichever comes first. A list at `workstream_summaries/index.md`, for example, links to `workstream_summaries/index.pages/page-000001.md`, `page-000002.md`, etc. Pages link back to their parent index and the export root. Larger page directories have an additional linked index level.
+
+All entries and their ordering remain available. Long display labels abbreviate after 160 Unicode characters; full titles and contents remain in the canonical documents. Summary filenames and persona/pipeline folders do not change. PDF conversion covers these pages using the existing local-link rules. Privacy and target validation apply to every page. The 20 MB landing index in the failed `0.17.0-dev` live run motivated this change; it is not an accepted final archive.
+
 ## Where the export goes
 
 Association evidence now shares `group-000000.jsonl`, `group-000001.jsonl`, etc. under each `data/associations/<family>/` directory (`raw/` in preservation mode). Each chunk has at most 50 records and 7 MiB of compact JSON plus newlines; a larger single record is stored alone, below the canonical record bound. Matching `markdown/associations/<family>/group-000000.md` pages retain approved metadata and links to both endpoints. These are supporting graph records, not summary/profile documents. For example, 123 ordinary-sized associations require three JSONL files and three Markdown pages rather than 246 individual files.

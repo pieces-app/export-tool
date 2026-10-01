@@ -1,6 +1,37 @@
 # Live export performance investigation
 
-**Current result:** the newer summaries-focused baseline finished in **65m45s**, still too slow. Summary retrieval/persistence took **2m49s**; annotation retrieval took **18m01s**, Markdown writing **14m00s**, and repeated audits **20m43s**. [Final counts and phase evidence](#finalized-summaries-focused-baseline--2026-09-30) are below. The original all-data run remains a separate unfinished older process. Historical checkpoints in this document must not be read as the latest status.
+**Current result, 2026-10-01:** both the original all-data process and the newer `0.17.0-dev` current-junction process have exited with errors and left unfinished folders. Neither was stopped or replaced. The newer run failed after **46m31s** while scanning a 20 MB generated index. The **65m45s partial historical-cache baseline** remains the last independently reconciled live archive. [The failed run and forward fixes](#failed-current-junction-run-and-forward-fixes) are documented below. Earlier progress checkpoints are historical.
+
+## Failed current-junction run and forward fixes
+
+The actual packaged `0.17.0-dev` default summaries/profile export ran from 14:44:59 to 15:31:30 UTC on 2026-10-01, **2,790.759 s**, exit **1**. No SDK caches or retained recovery workspace were used. Its original all-data counterpart shared the filesystem. The failed folder is `exports/live-summaries-20261001-current-junctions.partial`; no final archive or independently accepted counts exist.
+
+| Measured completed/failed phase | Wall time |
+| --- | ---: |
+| Fetch 11,746 summary records, including persistence | 2m56s |
+| Fetch 4,338 person records | 54s |
+| Eleven current-junction owner traversals combined | 13m26s |
+| Fetch initial 28,359 referenced annotations | 3m38s |
+| Full annotation fallback, covering 74,118 IDs | 5m42s |
+| Privacy reconciliation | 1m59s |
+| Group 131,510 approved association records | 20s |
+| Record rendering plus graph/index generation | 12m21s |
+| Output audit before failure | 2m47s |
+
+The diagnostic reports **243,174 public writes/syncs**, about **2.07 GB logical bytes written**, **30m24s summed public sync time**, and **2,778 encrypted transactions / 4m07s summed transaction time**. These operation times overlap and must not be added to wall time. The source client made **210,162 requests**, zero retries and 15 adaptive backoffs; final recent HTTP p95 was about 7 ms. Peak RSS was **1,966,899,200 bytes (1.83 GiB)**. Native metadata, closing audit and finalization did not run. Grouping association files alone does not establish acceptable performance.
+
+Two specific defects were isolated:
+
+1. **Missing owners caused unnecessary annotation expansion.** The initial referenced set had 28,359 annotations, but 43 unavailable person snapshots caused the exporter to inventory all 74,118 annotations. Any earlier percentage based on the initial set is not the achieved reduction. Current indexed junction routes do not require the owner snapshot. The forward fix enumerates those owner IDs, retains available linked annotations and leaves the owner marked missing. Actual reconciliation is still required before skipping unrelated annotations; failed/unsupported reads do not become empty evidence. Focused source/replay/rebuild tests passed (94.094 s and 14.899 s), and compiled CLI/current-junction/recovery checks passed (7.229 s).
+2. **Unbounded navigation produced a pathological scan input.** The audit completed 110,303 files and then failed on `index.md` (20,017,932 bytes). A read-only single-file reproduction failed after **56.213 s** with the same scanner deadline error. CPU profiling attributed approximately **97%** of sampled CPU to regular-expression matching; the detector checks cancellation between rules, so an individual regex can run beyond its nominal deadline. The forward fix generates compact landing navigation and pages large generated lists at 250 entries / 64 KiB, preserving every destination. It does not weaken or bypass the scanner.
+
+Re-rendering the real failed index's **110,745 list entries** into disposable private pages retained all entries in **447 files**, maximum **57,084 bytes**. Their default-policy content scans passed in **15.124 s**, with **17.89 s** for the full diagnostic test. The failed source folder was not modified. This is a navigation diagnostic only: it does not reproduce the original process's learned credentials, copy target documents, validate the entire archive, or establish a new whole-export time. Focused pagination/source/rebuild/graph tests passed in **20.293 s** with race checks, including 62,501-entry navigation, byte bounds, Unicode, relocation, cancellation, PDF links and post-audit secret injection.
+
+The original `0.4.1-dev` process also exited **1** after its record-render counter reached 1,907,456/1,907,456. Its terminal error was not retained in the aggregate checkpoint, so its exact failure is not established. Its failed root index is **282,558,289 bytes**, demonstrating the same unbounded navigation design, but that observation alone does not establish its exit cause. Both partial folders remain intact; neither supports completed-source CLI recovery because those runs did not enable a retained checkpoint.
+
+Candidate `0.17.1-dev` contains both fixes. The full source-package race suite passed (exporter **489.702 s**). Actual Mac ARM64 CLI checks passed (**33.645 s**, with race checks), as did the Rosetta executable (**33.963 s**): missing-owner export/recovery and 253 linked summary bodies through paginated export, relocation and offline rebuild. All six binary-only ZIP checksums, exact four-file layouts and embedded bytes match the checked build inputs. Vet/diff checks pass. A final read-only doctor check found staging OS ready. Current native Windows/Linux execution and publication remain unverified; no Actions or upload occurred.
+
+Next acceptance requires the combined fixes in an actual full live run, final counts/bodies/links/privacy reconciliation and complete phase/resource measurements. Remaining ordinary file sync volume, junction count traffic, profile/native metadata cost and source-fetch recovery are separate work. No new accepted end-to-end speed claim is made.
 
 Observed 2026-09-30 against the original running `0.4.1-dev` export. The user requested that this run finish; it was not stopped, restarted, signalled, or replaced. The investigation used one five-second native stack sample, read-only process/resource counters, existing source/history, and filesystem-capacity checks. No OS HTTP reader or source mutation was added. Stack/resource artifacts are ignored local files under `exports/`; no record bodies, names or identifiers are included in this document.
 

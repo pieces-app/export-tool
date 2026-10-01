@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/bits"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -258,10 +257,11 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 				if !g.Written[path] {
 					var group strings.Builder
 					fmt.Fprintf(&group, "# Summaries sharing %s: %s\n\nAll %d included summaries, newest first. Related-list cutoffs and limits do not apply here.\n\n", d, md(label), len(members))
+					entries := make([]navigationEntry, 0, len(members))
 					for _, member := range members {
-						fmt.Fprintf(&group, "- [%s](%s)\n", md(member.Title), relative(path, member.Path))
+						entries = append(entries, navigationEntry{label: member.Title, path: member.Path})
 					}
-					if err := r.writeFile(filepath.Join(r.stage, path), []byte(group.String())); err != nil {
+					if err := r.writeNavigationIndex(path, group.String(), entries); err != nil {
 						return "", err
 					}
 					g.Written[path] = true

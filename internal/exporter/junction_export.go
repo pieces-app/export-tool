@@ -91,8 +91,11 @@ func (r *run) resolveCurrentSummaryJunctions() error {
 			}
 			owners := []string{}
 			for _, m := range r.meta {
-				// Excluded owners also matter: shared text must inherit denials.
-				if m.Type == p.owner && m.State != "missing" && !visited[p][m.ID] {
+				// Indexed junction reads do not require the owner's snapshot to
+				// exist. Missing owners can still have retained associations; read
+				// them rather than forcing a global annotation inventory. Their
+				// canonical records remain missing, and exclusions still propagate.
+				if m.Type == p.owner && !visited[p][m.ID] {
 					owners = append(owners, m.ID)
 				}
 			}

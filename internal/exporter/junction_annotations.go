@@ -16,7 +16,7 @@ func (r *run) finishSummaryAnnotations() error {
 			complete = false
 		}
 		for _, m := range r.meta {
-			if m.Type == typ && (m.State == "missing" || !m.JunctionFields["annotations"]) {
+			if m.Type == typ && !m.JunctionFields["annotations"] {
 				complete = false
 			}
 		}
@@ -48,7 +48,7 @@ func (r *run) finishSummaryAnnotations() error {
 	}
 	cov.InventoryMode = "full"
 	material, _ := materialByType("ANNOTATIONS")
-	r.progress.Stage("Inventory ANNOTATIONS (older relationship fallback)", 0)
+	r.progress.Stage("Inventory ANNOTATIONS (incomplete relationship coverage)", 0)
 	ids, err := r.inventoryMaterial(material, cov)
 	if err != nil {
 		if errors.Is(err, ErrOSBusy) || r.ctx.Err() != nil {
@@ -59,7 +59,7 @@ func (r *run) finishSummaryAnnotations() error {
 	}
 	r.inventory[material.Type] = ids
 	cov.Inventoried = len(ids)
-	r.progress.Stage("Fetch ANNOTATIONS (older relationship fallback)", len(ids))
+	r.progress.Stage("Fetch ANNOTATIONS (incomplete relationship coverage)", len(ids))
 	for start := 0; start < len(ids); {
 		end := min(start+r.client.BatchSize(material, r.opts.BatchSize), len(ids))
 		if err := r.fetch(material, ids[start:end]); err != nil {
