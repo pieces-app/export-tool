@@ -421,6 +421,9 @@ func TestPackagedCurrentJunctionCLI(t *testing.T) {
 	if err != nil || report.Summaries != 1 || report.SummariesWithBody != 1 || report.PersonsWithProfile != 1 || report.HistoricalEdges != 0 {
 		t.Fatal("packaged final archive did not reconcile", err, report)
 	}
+	if report.CurrentSummaryAnnotations != 1 || report.CurrentPersonAnnotations != 1 || report.CurrentPersonSummaries != 1 || report.VerifiedProfileDocuments != 1 || report.SummaryPipelineLinks != 1 || report.PipelinesWithSummaries != 1 {
+		t.Fatal("packaged current relationship or profile-body acceptance did not reconcile", report)
+	}
 	for _, call := range f.calls {
 		if strings.Contains(call, " /workstream_event/") || strings.Contains(call, " /workstream_events/") || strings.Contains(call, " /person/person/annotations") {
 			t.Fatal("packaged current traversal read unnecessary event/profile history", call)

@@ -1,5 +1,11 @@
 # Installer acceptance
 
+## Current local package — 2026-10-01
+
+The actual `0.17.1-dev` ZIP and CLI passed the complete selected Mac packaged suite in **108.829 s** with race checks. This includes Bash local-HTTPS and PowerShell 7 substituted-file-transport complete/remove, complete/keep, partial/remove and recovery/remove cases. The private workspace and keys remain outside utility cleanup. All compiled CLI cases, including current junctions, missing-owner recovery and paginated navigation, were included. This is local fixture acceptance; native Windows, public GCP downloads, PowerShell end-to-end HTTPS and installed-OS migration remain separate gates.
+
+The published two-file Gist was fetched again and matched the tested local scripts by SHA-256. The prepared native workflow now selects all `TestPackaged.*CLI` tests and passed actionlint. No GitHub Actions job or binary upload occurred.
+
 Recorded 2026-09-29–30 using the existing, unmodified `0.8.6-dev` release ZIPs. These checks execute the downloaded application binary, not the small fixture executable used by the installer unit tests. They do not read, launch, or stop the installed Pieces OS. The active live export remains independent.
 
 ## Verified behavior

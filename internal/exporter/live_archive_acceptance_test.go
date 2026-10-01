@@ -30,6 +30,12 @@ type finalArchiveCounts struct {
 	PersonHistoryLinks         int            `json:"person_profile_history_links"`
 	Edges                      int            `json:"graph_edges"`
 	HistoricalEdges            int            `json:"historical_graph_edges"`
+	VerifiedProfileDocuments   int            `json:"verified_profile_history_documents"`
+	CurrentSummaryAnnotations  int            `json:"summaries_with_current_annotation_evidence"`
+	CurrentPersonAnnotations   int            `json:"persons_with_current_annotation_evidence"`
+	CurrentPersonSummaries     int            `json:"persons_with_current_summary_evidence"`
+	SummaryPipelineLinks       int            `json:"summary_pipeline_memberships"`
+	PipelinesWithSummaries     int            `json:"pipelines_with_summary_memberships"`
 }
 
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
@@ -126,6 +132,10 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		}
 		md.Close()
 		m := &Meta{Type: row.Material, ID: fieldString(v, "id"), Path: links[row.Ref], DataPath: dataPath, State: "included", AnnotationType: fieldString(v, "type")}
+		if err := validateJunctionFields(m.Type, row.JunctionFields); err != nil || len(row.JunctionFields) > 0 && manifest.ArchiveState.Version < 2 {
+			return errConfig("invalid archived current-relationship evidence")
+		}
+		m.JunctionFields = row.JunctionFields
 		m.DataOffset, m.DataLength, m.ArchiveDataSHA256 = row.DataOffset, row.DataLength, row.DataSHA256
 		m.Key = m.Type + "\x00" + m.ID
 		byRef[row.Ref], byPath[m.Path], byKey[m.Key] = m, m, m
@@ -174,6 +184,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		}
 	}
 	cacheBodies := map[string]bool{}
+	pipelineMembers, pipelines := map[Edge]bool{}, map[string]bool{}
 	err = archiveLines(ctx, root, "relationships.jsonl", manifest.ArchiveState.GraphSHA256, func(edge PublicEdge) error {
 		a, b := byPath[edge.Source], byPath[edge.Target]
 		if manifest.FormatVersion >= 6 {
@@ -189,6 +200,11 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 			return errConfig("graph relation points to the wrong material type")
 		}
 		a.Edges = append(a.Edges, Edge{a.Key, b.Key, edge.Relation})
+		if a.Type == "WORKSTREAM_SUMMARIES" && b.Type == "PIPELINES" && edge.Relation == "pipelines" {
+			pipelineMembers[Edge{a.Key, b.Key, "pipelines"}], pipelines[b.Key] = true, true
+		} else if a.Type == "PIPELINES" && b.Type == "WORKSTREAM_SUMMARIES" && edge.Relation == "summaries" {
+			pipelineMembers[Edge{b.Key, a.Key, "pipelines"}], pipelines[a.Key] = true, true
+		}
 		report.Edges++
 		historical := edge.Provenance == "historical_client_cache" || edge.Provenance == "historical_client_cache_derived_inverse"
 		if historical {
@@ -202,6 +218,8 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 	if err != nil {
 		return report, errConfig("graph evidence failed acceptance")
 	}
+	report.SummaryPipelineLinks, report.PipelinesWithSummaries = len(pipelineMembers), len(pipelines)
+	verifiedProfiles := map[string]bool{}
 	for _, m := range byKey {
 		if err := ctx.Err(); err != nil {
 			return report, err
@@ -212,12 +230,21 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		var document []byte
 		if m.Type == "WORKSTREAM_SUMMARIES" {
 			report.Summaries++
+			if m.JunctionFields["annotations"] {
+				report.CurrentSummaryAnnotations++
+			}
 			document, err = archiveRead(root, m.Path, 128<<20)
 			if err != nil {
 				return report, errConfig("summary Markdown cannot be read")
 			}
 		} else {
 			report.Persons++
+			if m.JunctionFields["annotations"] {
+				report.CurrentPersonAnnotations++
+			}
+			if m.JunctionFields["summaries"] {
+				report.CurrentPersonSummaries++
+			}
 		}
 		body, anyAnnotation, profile := false, false, false
 		for _, e := range m.Edges {
@@ -229,6 +256,20 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 				if a.AnnotationType == "HIERARCHICAL_PROFILE_SUMMARY" || a.AnnotationType == "PROFILE_DESCRIPTION" {
 					profile = true
 					report.PersonHistoryLinks++
+					if !verifiedProfiles[a.Key] {
+						canonical, err := archiveRead(root, a.DataPath, 128<<20)
+						var v map[string]any
+						if err != nil || decodeArchiveJSON(canonical, &v) != nil {
+							return report, errConfig("profile history canonical annotation cannot be read")
+						}
+						expected := rewriteMarkdown(fieldString(v, "text"), a.Path, byKey)
+						doc, err := archiveRead(root, a.Path, 128<<20)
+						if err != nil || strings.TrimSpace(expected) != "" && !strings.Contains(string(doc), expected) {
+							return report, errConfig("profile history Markdown omits or truncates its canonical body")
+						}
+						verifiedProfiles[a.Key] = true
+						report.VerifiedProfileDocuments++
+					}
 				}
 				continue
 			}
@@ -293,7 +334,7 @@ func TestFinalArchiveAcceptanceDetectsDamage(t *testing.T) {
 		t.Fatal(err)
 	}
 	report, err := inspectFinalArchive(context.Background(), out)
-	if err != nil || report.Summaries != 1 || report.SummariesWithBody != 1 || report.PersonsWithProfile != 1 || report.RenderedAnnotationBodies != 1 {
+	if err != nil || report.Summaries != 1 || report.SummariesWithBody != 1 || report.PersonsWithProfile != 1 || report.RenderedAnnotationBodies != 1 || report.VerifiedProfileDocuments != 1 {
 		t.Fatal("intact fixture did not reconcile", err, report)
 	}
 	var links map[string]string
@@ -305,6 +346,7 @@ func TestFinalArchiveAcceptanceDetectsDamage(t *testing.T) {
 		data       []byte
 	}{
 		{"truncated-body", mdPath, []byte("# Body removed\n")},
+		{"truncated-profile", filepath.Join(out, links[opaque("ANNOTATIONS", "profile")]), []byte("# Profile body removed\n")},
 		{"broken-index-link", filepath.Join(out, "index.md"), []byte("[missing](missing.md)\n")},
 		{"changed-canonical", filepath.Join(out, "data/annotations/"+opaque("ANNOTATIONS", "body")+".json"), []byte("{}\n")},
 	} {
