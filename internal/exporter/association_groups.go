@@ -30,12 +30,12 @@ func (r *run) prepareAssociationGroups() error {
 	}
 	count := 0
 	for _, m := range r.meta {
-		if _, ok := associationFamilyByType(m.Type); ok && m.State == "included" {
+		if groupedCanonicalMaterial(m.Type) && m.State == "included" {
 			count++
 		}
 	}
 	if count > 0 {
-		r.progress.Stage("Group association evidence", count)
+		r.progress.Stage("Group canonical evidence", count)
 	}
 	var data bytes.Buffer
 	var members []*Meta
@@ -54,18 +54,26 @@ func (r *run) prepareAssociationGroups() error {
 		if err := r.writeFile(filepath.Join(r.stage, g.dataPath), data.Bytes()); err != nil {
 			return err
 		}
+		_, association := associationFamilyByType(typ)
 		for _, m := range members {
-			m.Path, m.DataPath = g.path, g.dataPath
+			m.DataPath = g.dataPath
+			if association {
+				m.Path = g.path
+			}
 		}
-		fmt.Fprintf(&g.markdown, "# Association evidence: %s\n\n%d records. Each record retains its identity and metadata in [canonical JSONL](%s).\n\n[Export index](%s)\n\n", md(typ), len(members), relative(g.path, g.dataPath), relative(g.path, "index.md"))
-		r.associationGroups = append(r.associationGroups, g)
-		r.manifest.FormatVersion = 6
+		if association {
+			fmt.Fprintf(&g.markdown, "# Association evidence: %s\n\n%d records. Each record retains its identity and metadata in [canonical JSONL](%s).\n\n[Export index](%s)\n\n", md(typ), len(members), relative(g.path, g.dataPath), relative(g.path, "index.md"))
+			r.associationGroups = append(r.associationGroups, g)
+			r.manifest.FormatVersion = max(r.manifest.FormatVersion, 6)
+		} else {
+			r.manifest.FormatVersion = 7
+		}
 		number++
 		members, data = nil, bytes.Buffer{}
 		return nil
 	}
 	for _, m := range r.sortedMeta() {
-		if _, ok := associationFamilyByType(m.Type); !ok || m.State != "included" {
+		if !groupedCanonicalMaterial(m.Type) || m.State != "included" {
 			continue
 		}
 		if err := r.ctx.Err(); err != nil {
@@ -90,7 +98,7 @@ func (r *run) prepareAssociationGroups() error {
 		}
 		row = append(row, '\n')
 		if len(row) > canonicalPayloadLimit {
-			return errConfig("association row exceeds its public storage bound")
+			return errConfig("canonical row exceeds its public storage bound")
 		}
 		if len(members) > 0 && (len(members) == associationChunkRecords || data.Len()+len(row) > associationChunkBytes) {
 			if err := flush(); err != nil {

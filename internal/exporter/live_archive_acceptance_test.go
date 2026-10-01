@@ -42,8 +42,8 @@ type finalArchiveCounts struct {
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
 	report := finalArchiveCounts{States: map[string]int{}}
 	manifest, err := InspectArchive(source)
-	if err != nil || manifest.FormatVersion != 5 && manifest.FormatVersion != 6 || manifest.ArchiveState == nil || manifest.ArchiveState.Version < 1 || manifest.ArchiveState.Version > 3 {
-		return report, errConfig("acceptance requires a finalized format-5/6 archive with reconstruction evidence")
+	if err != nil || manifest.FormatVersion != 5 && manifest.FormatVersion != 6 && manifest.FormatVersion != 7 || manifest.ArchiveState == nil || manifest.ArchiveState.Version < 1 || manifest.ArchiveState.Version > 4 {
+		return report, errConfig("acceptance requires a finalized format-5/6/7 archive with reconstruction evidence")
 	}
 	report.ArchiveStatus = manifest.Status
 	root, err := os.OpenRoot(source)
@@ -108,7 +108,13 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		var body []byte
 		if row.DataLength > 0 {
 			dataPath = row.DataPath
-			if manifest.FormatVersion != 6 || manifest.ArchiveState.Version != 3 || !strings.HasPrefix(dataPath, prefix+material.Folder+"/") || links[row.Ref] != groupedDocumentPath(dataPath) {
+			_, association := associationFamilyByType(row.Material)
+			validVersion := manifest.FormatVersion == 6 && manifest.ArchiveState.Version == 3 || manifest.FormatVersion == 7 && manifest.ArchiveState.Version == 4
+			validType := association || manifest.FormatVersion == 7 && row.Material == "RANGES"
+			if !validVersion || !validType || !strings.HasPrefix(dataPath, prefix+material.Folder+"/") {
+				return errConfig("invalid grouped record storage")
+			}
+			if association && links[row.Ref] != groupedDocumentPath(dataPath) || !association && (strings.HasPrefix(links[row.Ref], "markdown/associations/") || byPath[links[row.Ref]] != nil) {
 				return errConfig("invalid grouped record navigation")
 			}
 			f, e := openCanonicalSection(ctx, source, &Meta{DataPath: dataPath, DataOffset: row.DataOffset, DataLength: row.DataLength})

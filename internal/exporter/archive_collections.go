@@ -21,7 +21,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 	}
 	folder := prefix + material.Folder
 	_, association := associationFamilyByType(material.Type)
-	grouped := format >= 6 && association
+	grouped := format >= 6 && association || format >= 7 && groupedCanonicalMaterial(material.Type)
 	seen := map[int]bool{}
 	err := archiveDirectory(root, folder, func(entry fs.DirEntry) error {
 		if err := ctx.Err(); err != nil {
@@ -44,7 +44,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 		}
 		index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(entry.Name(), "group-"), ".jsonl"))
 		if err != nil || index < 0 || entry.Name() != fmt.Sprintf("group-%06d.jsonl", index) || seen[index] {
-			return errConfig("unexpected or duplicate association chunk")
+			return errConfig("unexpected or duplicate canonical chunk")
 		}
 		seen[index] = true
 		f, err := archiveOpen(root, file)
@@ -59,7 +59,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 				return i + 1, data[:i+1], nil
 			}
 			if atEOF && len(data) > 0 {
-				return 0, nil, errConfig("association chunk has an unterminated row")
+				return 0, nil, errConfig("canonical chunk has an unterminated row")
 			}
 			return 0, nil, nil
 		})
@@ -72,11 +72,11 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 			b := s.Bytes()
 			count++
 			if len(b) > canonicalPayloadLimit || count > associationChunkRecords || count > 1 && offset+int64(len(b)) > associationChunkBytes {
-				return errConfig("association chunk exceeds its record or byte bounds")
+				return errConfig("canonical chunk exceeds its record or byte bounds")
 			}
 			var v map[string]any
 			if decodeArchiveJSON(b, &v) != nil || fieldString(v, "id") == "" {
-				return errConfig("association chunk contains an invalid canonical row")
+				return errConfig("canonical chunk contains an invalid canonical row")
 			}
 			if err := visit(opaque(material.Type, fieldString(v, "id")), b, file, offset); err != nil {
 				return err
@@ -84,7 +84,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 			offset += int64(len(b))
 		}
 		if s.Err() != nil || count == 0 {
-			return errConfig("association chunk is empty, truncated, or unreadable")
+			return errConfig("canonical chunk is empty, truncated, or unreadable")
 		}
 		return nil
 	})
@@ -93,7 +93,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 	}
 	for i := 0; i < len(seen); i++ {
 		if !seen[i] {
-			return errConfig("association chunk sequence is incomplete")
+			return errConfig("canonical chunk sequence is incomplete")
 		}
 	}
 	return nil

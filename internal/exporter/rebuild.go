@@ -66,7 +66,7 @@ func InspectArchive(source string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	var m Manifest
-	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5 && m.FormatVersion != 6) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
+	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5 && m.FormatVersion != 6 && m.FormatVersion != 7) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
 		return Manifest{}, errConfig("source manifest is unfinished or unsupported")
 	}
 	for _, c := range m.Coverage {
@@ -111,7 +111,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 		return Manifest{}, err
 	}
 	var original Manifest
-	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5 && original.FormatVersion != 6) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
+	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5 && original.FormatVersion != 6 && original.FormatVersion != 7) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
 		return Manifest{}, errConfig("source manifest is unfinished or uses an unsupported archive format")
 	}
 	if original.FormatVersion == 5 && (original.ArchiveState == nil || original.ArchiveState.Version != 1 && original.ArchiveState.Version != 2) {
@@ -120,7 +120,10 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 	if original.FormatVersion == 6 && (original.ArchiveState == nil || original.ArchiveState.Version != 3) {
 		return Manifest{}, errConfig("grouped archives require reconstruction version 3")
 	}
-	if s := original.ArchiveState; s != nil && ((s.Version != 1 && s.Version != 2 && s.Version != 3) || s.Version == 3 && original.FormatVersion != 6 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
+	if original.FormatVersion == 7 && (original.ArchiveState == nil || original.ArchiveState.Version != 4) {
+		return Manifest{}, errConfig("grouped canonical archive requires reconstruction version 4")
+	}
+	if s := original.ArchiveState; s != nil && ((s.Version < 1 || s.Version > 4) || s.Version == 3 && original.FormatVersion != 6 || s.Version == 4 && original.FormatVersion != 7 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
 		return Manifest{}, errConfig("archive reconstruction checksums are missing or invalid")
 	}
 	o := input.Options
@@ -315,7 +318,9 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 				return errConfig("archive record directory contains unexpected or duplicate files")
 			}
 			grouped := strings.HasSuffix(file, ".jsonl")
-			if grouped && links[ref] != groupedDocumentPath(file) || !grouped && (byPath[links[ref]] != nil || original.FormatVersion >= 6 && strings.HasPrefix(links[ref], "markdown/associations/")) {
+			_, association := associationFamilyByType(material.Type)
+			sharedDocument := grouped && association
+			if sharedDocument && links[ref] != groupedDocumentPath(file) || !sharedDocument && (byPath[links[ref]] != nil || original.FormatVersion >= 6 && strings.HasPrefix(links[ref], "markdown/associations/")) {
 				return errConfig("archive navigation conflicts with canonical storage")
 			}
 			v := map[string]any{}

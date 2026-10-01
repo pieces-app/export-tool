@@ -96,6 +96,9 @@ func (r *run) writeArchiveState() (result error) {
 	if r.manifest.FormatVersion >= 6 {
 		version = 3
 	}
+	if r.manifest.FormatVersion >= 7 {
+		version = 4
+	}
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err

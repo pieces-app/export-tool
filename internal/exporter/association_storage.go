@@ -11,8 +11,8 @@ import (
 	"github.com/pieces-app/export-tool/internal/recovery"
 )
 
-// Ordinary user documents retain their individual files. Association evidence
-// is private until selection finishes, then becomes bounded public JSONL chunks.
+// User-facing documents retain their individual files. Selected canonical
+// records remain private until selection finishes, then become bounded JSONL.
 // This temporary database is never a source recovery checkpoint.
 type associationCanonicalRecords struct {
 	run          *run
@@ -58,7 +58,7 @@ func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 	// including Windows ACLs, before storing keys or encrypted data.
 	s.store, err = recovery.CreateStore(ctx, recovery.Options{
 		Directory: filepath.Join(parent, "records"), KeyDirectory: filepath.Join(parent, "keys"),
-		Binding: sha256.Sum256([]byte("pieces-export transient association storage v1")),
+		Binding: sha256.Sum256([]byte("pieces-export transient canonical storage v2")),
 	}, []byte(canonicalTransactionState))
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (s *associationCanonicalRecords) Open(ctx context.Context, m *Meta) (io.Rea
 		return openCanonicalSection(ctx, s.run.stage, m)
 	}
 	if m != nil {
-		if _, ok := associationFamilyByType(m.Type); ok {
+		if groupedCanonicalMaterial(m.Type) {
 			if err := s.ensure(ctx); err != nil {
 				return nil, err
 			}
@@ -84,10 +84,10 @@ func (s *associationCanonicalRecords) Open(ctx context.Context, m *Meta) (io.Rea
 
 func (s *associationCanonicalRecords) Write(ctx context.Context, m *Meta, v map[string]any, replace bool) error {
 	if m != nil && m.DataLength > 0 {
-		return errConfig("cannot rewrite a published association row")
+		return errConfig("cannot rewrite a published canonical row")
 	}
 	if m != nil {
-		if _, ok := associationFamilyByType(m.Type); ok {
+		if groupedCanonicalMaterial(m.Type) {
 			if err := s.ensure(ctx); err != nil {
 				return err
 			}
@@ -99,10 +99,10 @@ func (s *associationCanonicalRecords) Write(ctx context.Context, m *Meta, v map[
 
 func (s *associationCanonicalRecords) Remove(ctx context.Context, m *Meta) error {
 	if m != nil && m.DataLength > 0 {
-		return errConfig("cannot remove a published association row")
+		return errConfig("cannot remove a published canonical row")
 	}
 	if m != nil {
-		if _, ok := associationFamilyByType(m.Type); ok {
+		if groupedCanonicalMaterial(m.Type) {
 			if err := s.ensure(ctx); err != nil {
 				return err
 			}
@@ -198,4 +198,13 @@ func (r *run) cleanupCanonicalStage(resultErr ...*error) {
 	if err := r.closeCanonicalStage(); err != nil && len(resultErr) == 1 {
 		*resultErr[0] = errors.Join(*resultErr[0], err)
 	}
+}
+
+// Format 7 extends grouped canonical storage to ranges. Their Markdown
+// documents keep distinct paths; association pages alone share document paths.
+func groupedCanonicalMaterial(typ string) bool {
+	if _, ok := associationFamilyByType(typ); ok {
+		return true
+	}
+	return typ == "RANGES"
 }
