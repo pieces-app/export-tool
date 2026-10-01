@@ -174,3 +174,11 @@ Each family below supports the shared route templates above in the inspected sou
 | `workstream_summary_to_workstream_event_associations` | `workstream_summary` → `workstreamSummary` | `workstream_event` → `workstreamEvent` |
 | `workstream_summary_to_workstream_pattern_engine_source_associations` | `workstream_summary` → `workstreamSummary` | `source` → `source_` |
 | `workstream_summary_to_workstream_summaries_associations` | `workstream_summary` → `x` | `additional_workstream_summary` → `y` |
+
+## Request-volume cost observed during the format-6 live run
+
+The 2026-10-01 summaries/profile run passed 98,000 HTTP requests while OS responses remained around 2 ms p95 and no retries occurred. Most calls in these phases are per-owner counts and final reconciliation; grouped transaction staging kept public file writes unchanged during association collection. With eight summary-owner plans, two person-owner plans and one pipeline-owner plan, the initial owner inventory implies roughly 205,000 count requests before bulk reads/reference closure. This is an estimate from the traversal shape, not a finalized request total or a throughput guarantee.
+
+At inspected isomorphic_server revision `d4e9d488a071e509ea5e7eda1fd4a0a38c17d15d`, `lib/utils/material_handlers/data_handlers/material_data_handler_registry.dart` registers core material collections but no association families. `/materials/metrics` and `/materials/identifiers` therefore cannot simply replace these owner reads with a generic association inventory. `lib/utils/associations_read_server_base.dart` exposes the eight reads described above; no bulk-count endpoint is present in that contract. No invalid capability probes were sent alongside the active exporter.
+
+Next optimization work should measure count latency versus association filtering/transaction cost, then test bounded count concurrency or a reconciled bulk strategy against the same graph/body evidence. Retain the server-work bound: bulk owner count alone does not limit returned rows. Any replacement must still reject truncated/partial/changing collections, preserve empty-owner evidence, stop on overload and prove no lost privacy dependency. Do not remove reconciliation just to lower a request counter.

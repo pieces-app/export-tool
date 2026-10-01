@@ -74,6 +74,39 @@ func requireNoTransientAssociationStorage(t *testing.T, parent string) {
 	}
 }
 
+func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
+	parent := t.TempDir()
+	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial")}
+	s := r.canonicalRecords().(*associationCanonicalRecords)
+	if err := s.ensure(r.ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer r.cleanupCanonicalStage()
+	original := s.parent + "-moved"
+	if err := os.Rename(s.parent, original); err != nil {
+		t.Skip("platform does not allow moving this open directory")
+	}
+	if err := os.MkdirAll(filepath.Join(s.parent, "records"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(s.parent, "records", "unrelated.txt")
+	if err := os.WriteFile(keep, []byte("keep this unrelated file"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.closeCanonicalStage(); err == nil {
+		t.Fatal("replacement directory identity was accepted")
+	}
+	b, err := os.ReadFile(keep)
+	if err != nil || string(b) != "keep this unrelated file" {
+		t.Fatal("cleanup touched the replacement directory", err)
+	}
+	for _, name := range []string{"records", "keys"} {
+		if _, err := os.Stat(filepath.Join(original, name)); !os.IsNotExist(err) {
+			t.Fatal("held original storage was not cleaned")
+		}
+	}
+}
+
 func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testing.T) {
 	f := groupedJunctionFixture(123)
 	srv := junctionServer(t, f, nil)

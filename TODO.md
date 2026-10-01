@@ -12,6 +12,7 @@ Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/name
 - [ ] Measure the actual current-junction summaries/profile export end to end, reconcile body/person/pipeline coverage, omissions, file counts, sync/audit costs and peak memory, and compare against the 65m45s historical-cache baseline. Never turn a subset file-count reduction into a whole-export speed claim.
 - [ ] Verify current native Windows/Linux lifecycle, filesystem failure and viewer behavior when runtimes are available. Do not retry Actions under the billing hold.
 - [ ] Add safe explicit cleanup of crash-leftover transient workspaces and implement interrupted-source-fetch recovery. These are not supplied by transient association staging.
+- [ ] Reduce current-junction request overhead after measuring the active run: about 205,000 per-owner count calls are implied by this inventory. Research bounded count concurrency or bulk reconciliation with equivalent completeness/overload tests; the inspected server has no bulk-count or generic association-material inventory endpoint. See JUNCTION_API.md.
 
 ## Storage integration checkpoint — 2026-10-01
 
