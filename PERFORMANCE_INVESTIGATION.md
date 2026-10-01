@@ -1,6 +1,42 @@
 # Live export performance investigation
 
-**Current result, 2026-10-01:** both the original all-data process and the newer `0.17.0-dev` current-junction process have exited with errors and left unfinished folders. Neither was stopped or replaced. The newer run failed after **46m31s** while scanning a 20 MB generated index. The **65m45s partial historical-cache baseline** remains the last independently reconciled live archive. [The failed run and forward fixes](#failed-current-junction-run-and-forward-fixes) are documented below. Earlier progress checkpoints are historical.
+**Current result, 2026-10-01:** the corrected `0.17.1-dev` summaries/profile export finalized in **51m23s**, exit **2 / partial**, and passed independent archive consistency/body/link acceptance. It fetched all 11,746 summary snapshots in **1m36s**; supporting traversal, file output and privacy auditing dominate the complete runtime. This is still unacceptable default-export performance. Complete migration and production readiness are not established.
+
+Both prior processes—the original all-data export and `0.17.0-dev` current-junction attempt—exited with errors and left unfinished folders. Neither was stopped or replaced. The latter failed after **46m31s** while scanning a 20 MB generated index. The **65m45s historical-cache baseline** is an earlier partial archive; the new archive uses current junction evidence without historical caches. Different captured graphs, source inventories and host contention prevent treating this as a controlled speed comparison. [The failed run and forward fixes](#failed-current-junction-run-and-forward-fixes) are documented below. Older process checkpoints are historical.
+
+## Finalized corrected summaries/profile export
+
+The actual `0.17.1-dev` macOS ARM64 executable ran from 15:54:22 to 16:45:45 UTC, **3,082.832 s**, with default summaries/profile selection, Markdown, automatic metadata and retained encrypted recovery. The finalized archive is `exports/live-summaries-20261001-recovery`. No historical SDK caches were supplied. Both earlier failed processes had exited, so they were no longer competing for disk writes. Some bounded package tests and read-only diagnostics ran on the same development machine; this is not an isolated benchmark.
+
+Source collection reached **200,672 captured records**, including the supporting graph, after fetching 11,746 summaries and **28,359 referenced annotations**. Unlike the prior attempt, the 43 unavailable person snapshots did not trigger a full annotation inventory. Referenced annotation fetching was **61.7% smaller than the 74,121-annotation preflight inventory**; this is a selection comparison, not a whole-run speedup.
+
+| Measured phase | Wall time |
+| --- | ---: |
+| Fetch 11,746 summary snapshots | 1m36s |
+| Fetch 4,343 person snapshots | 28s |
+| Current-junction owner traversals combined | 10m52s |
+| Fetch 28,359 referenced annotations | 3m35s |
+| Retained source checkpoint | 1m48s |
+| Privacy reconciliation | 1m22s |
+| Group approved association evidence | 22s |
+| Render Markdown | 7m19s |
+| Write graph and navigation indexes | 36s |
+| Both output audits combined | 17m39s |
+| Native and portable metadata | 2m27s |
+| Validate local links | 41s |
+| Write reconstruction evidence | 15s |
+
+The table omits smaller reference/inventory stages and preflight; the full diagnostic remains in the archive. Final HTTP totals are **208,770 requests**, zero retries and four adaptive backoffs, with **4m15s pacing waits**, recent p95 2.24 ms and peak request 8.00 s. All **102,753 owner-side traversals** reconciled. Local totals are **176,080 public writes/syncs**, **19m25s summed sync time**, about **1.95 GB logical writes**, and **2,778 encrypted transactions / 1m18s summed transaction time**. Operation durations overlap and must not be added to wall time. Peak RSS was **1,718,419,456 bytes (1.60 GiB)**. Before metadata/finalization, a directory count found 61,910 JSON files, 2,636 JSONL files and 84,862 Markdown files; record counts and file counts are different.
+
+A five-second passive sample of the first audit, symbolicated using the running binary's Go PC table, shows Gitleaks detection and regular-expression matching. Observed CPU was approximately one core. This confirms a CPU scanning bottleneck during that sample, distinct from durable-write cost. The closing audit reused **149,408 approvals only after hashing their full bytes**; new metadata/reconstruction files still underwent content scanning. No privacy validation was bypassed.
+
+Independent archive acceptance passed in **68.452 s** including test startup. It reconciled **193,419 included records**, 43 missing records, 2,962 intentionally omitted people and 4,248 withheld records. Included output contains **11,559 summaries**, **1,381 persons**, **5,142 profile-history documents**, **531,712 graph edges**, **263,020 verified canonical association edges**, and **31 summary/pipeline memberships across four pipelines**. Every included summary/person has current annotation evidence; all included persons also have current summary-association evidence. The reader verified 26,784 attached summary-annotation body occurrences, 5,142 profile-history documents and all local Markdown targets. Historical graph/body evidence count is zero.
+
+Person selection retained **1,381 of 4,343** inventoried people and omitted **2,962 (68.2%)**; this is meaningful selection, not identity merging. Read-only macOS verification independently decoded both stored attributes for **all 23,118 metadata-bearing documents** and matched their portable sidecars. This verifies stored tags/comments, not Finder indexing or viewer behavior.
+
+Remaining content gaps must stay visible: **187 summaries** and **403 annotations** were withheld during dependency/privacy processing. The manifest's explicit issues are 43 unavailable person references; the precise withholding chains still need analysis from retained capture. Among included summaries, **11,183** have a nonempty standard summary-type body and **11,184** have a nonempty annotation of any type. Of the other standard-body cases, **375 have no retained annotation edges**, and one has a nonempty hierarchical profile annotation. All 376 have summary kind `UNKNOWN`. A valid archive does not prove absent source text never existed or establish full-history migration.
+
+Authenticated recovery inspection passed in **7.380 s**, confirming a complete 200,672-record capture. Actual packaged replay started at **16:47:04 UTC** into `exports/live-summaries-20261001-recovery-replayed`; it is still running. After finalization it must independently pass archive acceptance, preserve coverage/privacy decisions and match document/evidence bytes except execution diagnostics, with zero current OS requests. Source fetching is not repeated to test local processing. Ignored aggregate logs, reports and the passive sample remain under `exports/`.
 
 ## Failed current-junction run and forward fixes
 
@@ -49,7 +85,7 @@ On 2026-09-30 the development CLI default changed to `--scope summaries --people
 - The older reconciliation loop reads, sanitizes and rewrites every retained JSON record, even if sanitization leaves it unchanged. `rewriteJSON` writes a temporary file, calls the ordinary synced writer, then renames it over the record. Older Markdown rendering also repeats a canonical rewrite after reference pruning even when no references changed.
 - Go 1.27.1's macOS `os.File.Sync` goes through `internal/poll.FD.Fsync`, which uses `fcntl(F_FULLFSYNC)` with an `fsync` fallback for unsupported filesystems. Each ordinary successful file write requests durable storage. Multiplying small flush latency by millions of files is expensive: **10 ms × 1.9 million files is approximately 5.3 hours for one pass**, before scanning/rendering costs. This is arithmetic illustrating the scale, not a measured whole-run attribution or ETA.
 
-## Evidence from the active process
+## Historical evidence from the original process
 
 | Observation | Result | Interpretation and limit |
 | --- | --- | --- |
@@ -164,7 +200,7 @@ The old export was confirmed in local rendering, with no open TCP connection and
 
 Logs are ignored local aggregate reports: `exports/summary-default-live-dry-run.log`, `exports/profile-reads-live-preview.log`, and `exports/profile-history-live-comparison.log`. These measurements support a smaller, less wasteful source-read path. They do not prove full narrative attachment coverage, final privacy omissions, archive speed, or production readiness.
 
-## Latest status and recovery boundary (2026-09-30)
+## Historical status and recovery boundary (2026-09-30)
 
 At about 25 h 32 min total, the original export had written 978,243/1,907,456 Markdown records (51.3%), averaging 71.5 records/second. Its rendering-only estimate was another 3 h 37 min, excluding later metadata/link/audit work. HTTP counts stayed unchanged; RSS was about 4.92 GiB and the recent capacity check found approximately 195 GiB free. The run remains active and unfinalized. This is unacceptable summary-export performance, explained by excessive default scope and local file-processing costs; increasing OS request concurrency cannot accelerate this phase.
 
@@ -184,7 +220,7 @@ Preflight counted 11,745 summaries, 74,093 annotations, 4,413 persons and 13 pip
 
 A three-second native sample of staging OS showed ObjectBox loaded. Refreshed repository refs then revealed the missing current read contract: 87 association servers with per-side count/list/bulk APIs. The September SDK already uses these junctions to retrieve summary bodies, because migration leaves embedded relationship maps absent. This is a source-research correction, not a completed exporter optimization: the running baseline still uses the earlier embedded/cache route. The exact contracts, bounds, current source revisions and integration gates are in [JUNCTION_API.md](JUNCTION_API.md). After verifying current junction closure, summaries scope can avoid unrelated annotation inventory; that change must preserve profiles, all attached bodies, privacy dependencies and graph links.
 
-## Linked annotation retrieval — current working tree
+## Linked annotation retrieval — earlier implementation checkpoint
 
 The current junction API investigation exposed the reason a summaries-focused export still inventoried roughly 74,000 annotations: the older traversal could not identify all body/profile attachments from snapshots. The new exporter traverses current summary/person association endpoints and fetches only referenced annotations once both owner sets reconcile. Older servers retain the full fallback. Nine association families also supply summary labels/origins and person/pipeline memberships. No event bodies are introduced. See [the source and implementation contract](JUNCTION_API.md).
 
