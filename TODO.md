@@ -1,6 +1,19 @@
 # Export tool execution checklist
 
-Updated 2026-09-30. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+
+## Storage integration checkpoint — 2026-10-01
+
+The original process remains alive and untouched. Its latest observed Markdown count is **1,739,512/1,907,456 (91.2%)**, with phase elapsed 7h17m and rendering-only ETA about 42m. HTTP counts remain 54,121/0 retries/381 backoffs. Process wall elapsed is about 41h32m after a large overnight host-time gap; phase and process clocks differ. Neither this observation nor the ETA establishes completion; metadata, link checks and final audits remain.
+
+- [x] Route source/filtered canonical data, summary/profile/signal reads, removal, pruning, hashing, capture and replay through a common record-store interface. Preserve ordinary file output and sync semantics while replacing direct filename assumptions.
+- [x] Verify a deferred-storage fixture with no canonical files until the validation boundary: late credentials, person omissions, summary/profile graph, signals, PDFs, offline rebuild and flush failure all behave correctly (8.975 s with race checks).
+- [x] Add bounded indexed reads to the encrypted store with current-generation/digest/binding checks, caller-owned bytes, and distinct missing/closed/canceled/failed states. Corruption/ownership tests pass (2.628 s with race checks).
+- [x] Implement a bounded transaction-backed canonical adapter: 50 identities / 7 MiB ordinary batches, large records alone, read-your-writes, pending replacement, explicit tombstones, and stop-after-failed-commit behavior. Adapter tests pass (3.212 s with race checks); real encrypted export/capture/offline replay passes (9.103 s), including late-secret removal and no plaintext staging markers.
+- [x] Measure capture/read cost through the actual adapters: 128 records, median 1.822 s with individual synced files versus 0.128 s with three encrypted transactions. Initialization and public output materialization are excluded; no whole-export speed claim.
+- [ ] Finish grouped public association data/navigation, integrate private workspace lifecycle/cleanup, then enable the backend in the CLI. The current default remains per-file; the adapter is not an interrupted-source resume implementation. Follow [the remaining format and storage tasks](RECOVERY_DESIGN.md#next-performance-gate-association-storage-and-presentation).
+- [x] Complete the available adapter/compiled checks: access-layer full race run passed (exporter 538.312 s); final combined canonical/storage-lookup race set passed (exporter 19.764 s, recovery 3.274 s). Actual compiled Mac ARM64 default/current-junction/rebuild/recovery checks passed (21.519 s), and Rosetta canonical adapter/export/capture/replay cases passed. Windows AMD64/ARM64 and Linux ARM64 test executables compile. Vet/diff checks passed. Native Windows/current Linux runtime execution remains unverified; no new download release was packaged or published for this internal integration step.
+- [ ] Measure a complete current-junction live export after grouped public output is implemented; retain current relationship/body/profile evidence, valid links, omissions and actual total runtime/resource counts.
 
 ## Current checkpoint — 2026-09-30
 

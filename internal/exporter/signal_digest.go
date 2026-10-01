@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -109,11 +108,11 @@ func (b *signalTextBuffer) Write(p []byte) (int, error) {
 }
 func (b *signalTextBuffer) WriteString(s string) (int, error) { return b.Write([]byte(s)) }
 
-func (r *run) readSignalRecord(root *os.Root, m *Meta) (map[string]any, error) {
+func (r *run) readSignalRecord(m *Meta) (map[string]any, error) {
 	if err := r.ctx.Err(); err != nil {
 		return nil, err
 	}
-	data, err := archiveRead(root, m.DataPath, 128<<20)
+	data, err := r.readCanonicalBytes(m, 128<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +126,9 @@ func (r *run) readSignalRecord(root *os.Root, m *Meta) (map[string]any, error) {
 	return v, r.ctx.Err()
 }
 
-func (r *run) signalDigestEntry(root *os.Root, m *Meta, rank int, path string, limit int) ([]byte, signalEntryCoverage, error) {
+func (r *run) signalDigestEntry(m *Meta, rank int, path string, limit int) ([]byte, signalEntryCoverage, error) {
 	cov := signalEntryCoverage{}
-	v, err := r.readSignalRecord(root, m)
+	v, err := r.readSignalRecord(m)
 	if err != nil {
 		return nil, cov, err
 	}
@@ -191,7 +190,7 @@ func (r *run) signalDigestEntry(root *os.Root, m *Meta, rank int, path string, l
 		if a.Type != "ANNOTATIONS" {
 			continue
 		}
-		av, err := r.readSignalRecord(root, a)
+		av, err := r.readSignalRecord(a)
 		if err != nil {
 			return nil, cov, err
 		}
@@ -235,7 +234,7 @@ func (r *run) signalDigestEntry(root *os.Root, m *Meta, rank int, path string, l
 		if a.Type != "RANGES" {
 			continue
 		}
-		av, err := r.readSignalRecord(root, a)
+		av, err := r.readSignalRecord(a)
 		if err != nil {
 			return nil, cov, err
 		}
@@ -314,11 +313,6 @@ func (r *run) renderSignalDigest() error {
 		}
 		return a.meta.ID < b.meta.ID
 	})
-	root, err := os.OpenRoot(r.stage)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
 	limit := o.MaxPartMiB << 20
 	// Reserve space for document headings and previous/next navigation.
 	budget := limit - (16 << 10)
@@ -328,7 +322,7 @@ func (r *run) renderSignalDigest() error {
 	}
 	r.progress.Stage("Plan signals digest", len(entries))
 	for i := range entries {
-		data, c, err := r.signalDigestEntry(root, entries[i].meta, i, entryPath, budget)
+		data, c, err := r.signalDigestEntry(entries[i].meta, i, entryPath, budget)
 		if err != nil {
 			return err
 		}
@@ -404,7 +398,7 @@ func (r *run) renderSignalDigest() error {
 		b := &signalTextBuffer{ctx: r.ctx, limit: limit}
 		fmt.Fprintf(b, "# Signals %06d-%06d\n\n[Signals index](%s) · [Export coverage](%s)\n\nNewest-created first; occurrence ranges are reported separately. All approved description attachments are retained, not a chosen current version.\n\n", p.first, p.last, relative(p.path, stats.Index), relative(p.path, "coverage.md"))
 		for j := p.first; j <= p.last; j++ {
-			data, _, err := r.signalDigestEntry(root, entries[j].meta, j, p.path, budget)
+			data, _, err := r.signalDigestEntry(entries[j].meta, j, p.path, budget)
 			if err != nil {
 				return err
 			}

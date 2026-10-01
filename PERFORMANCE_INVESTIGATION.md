@@ -204,3 +204,11 @@ go test ./internal/exporter -run '^$' \
 PIECES_EXPORT_LIVE_AUDIT_ARCHIVE=/absolute/finalized/archive \
   go test ./internal/exporter -run '^TestLiveAuditUnchangedArchive$' -count=1 -v -timeout 26m
 ```
+
+## Canonical transaction adapter — 2026-10-01
+
+The source/privacy/render/recovery code now opens records through a shared access boundary. This removes the direct filename assumptions that prevented grouped storage. An internal encrypted transaction backend supports bounded pending writes, indexed current-record reads, replacement and explicit tombstones; it passes fixture export/capture/replay and privacy checks. It is not selected by the CLI until public grouping/navigation and workspace lifecycle are complete. The released/local `0.16.2-dev` packages and original live exporter are unchanged.
+
+The actual capture adapters wrote and reread 128 roughly 4 KiB records in a median **1.822 s** with individual synced files versus **0.128 s** with three encrypted transactions, about **93.0% less time for this capture/read workload**. Three samples of three iterations each on the development Mac; allocations rose from roughly 1.69 MB to 5.66 MB. File-helper sync counters exclude SQLite VFS flushes; SQLite's durability settings remain enabled. Initialization, key creation, public file materialization, filtering, graph work, metadata, audits and cleanup are outside this comparison. Individual public files would still incur their own writes, so grouping remains necessary before another whole-export speed claim. Full details and reproduction are in [RECOVERY_DESIGN.md](RECOVERY_DESIGN.md#canonical-record-access-and-transaction-backend-2026-10-01).
+
+The first focused access-layer regression run hit the existing scanner deadline during a large host time jump. The unchanged isolated retry passed in 8.554 s; no scanning deadline was loosened. The access-layer full race suite then passed (exporter 538.312 s). This interruption is separate from the new adapter's correctness/performance results.

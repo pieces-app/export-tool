@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -300,7 +299,7 @@ func (r *run) preparePeople() error {
 		if m.Type != "PERSONS" || m.State != "included" {
 			continue
 		}
-		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readCanonical(m)
 		if err != nil {
 			return err
 		}
@@ -412,7 +411,7 @@ func (r *run) preparePeople() error {
 		}
 		m := r.meta["PERSONS\x00"+id]
 		m.State = "omitted"
-		if err := os.Remove(filepath.Join(r.stage, m.DataPath)); err != nil && !os.IsNotExist(err) {
+		if err := r.removeCanonical(m); err != nil {
 			return err
 		}
 	}
@@ -511,7 +510,7 @@ func (r *run) renderPersonas() error {
 					body.WriteString("No included records.\n")
 				}
 				if len(items) > 0 && items[0].Type == "ANNOTATIONS" {
-					v, err := r.readRecord(filepath.Join(r.stage, items[0].DataPath))
+					v, err := r.readCanonical(items[0])
 					if err != nil {
 						return err
 					}

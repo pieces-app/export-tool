@@ -127,6 +127,7 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
+	records               canonicalRecordStore
 	auditCache            *outputAuditCache
 	junctionFamiliesRead  map[string]bool
 	junctionIdentityBytes int
@@ -192,18 +193,6 @@ func writeFileMeasured(path string, b []byte, metrics *localMeasurements) (resul
 		_ = os.Remove(path)
 	}
 	return closeErr
-}
-func readRecord(path string) (map[string]any, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	d := json.NewDecoder(f)
-	d.UseNumber()
-	var v map[string]any
-	err = d.Decode(&v)
-	return v, err
 }
 func fieldString(v map[string]any, key string) string { s, _ := v[key].(string); return s }
 func timestamp(v map[string]any, key string) string {
@@ -491,6 +480,9 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 			r.issue(m.Type, "", "inventory_changed_during_export")
 		}
 	}
+	if err := r.canonicalRecords().Flush(ctx); err != nil {
+		return r.manifest, err
+	}
 	if o.captureCheckpoint != nil {
 		if err := o.captureCheckpoint(r); err != nil {
 			return r.manifest, err
@@ -563,6 +555,9 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 	r.collectScopeOmissions()
 	r.collectRelationshipCoverage()
 	if err = r.render(); err != nil {
+		return r.manifest, err
+	}
+	if err = r.canonicalRecords().Flush(r.ctx); err != nil {
 		return r.manifest, err
 	}
 	if o.Mode == "filtered" {
@@ -834,7 +829,7 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 	meta.SummaryKind = fieldString(v, "parentHierarchicalType")
 	meta.SummaryDescriptor = fieldString(v, "parentHierarchicalTypeDescriptor")
 	if meta.State == "included" {
-		if err := r.writeJSON(filepath.Join(r.stage, meta.DataPath), v); err != nil {
+		if err := r.writeCanonical(meta, v, false); err != nil {
 			meta.State = "withheld"
 			r.issue(m.Type, id, "record_write_failed")
 			r.meta[key] = meta
@@ -1042,7 +1037,7 @@ func (r *run) filterGraph() error {
 	}
 	for _, m := range r.meta {
 		if m.State != "included" && m.DataPath != "" {
-			if err := os.Remove(filepath.Join(r.stage, m.DataPath)); err != nil && !os.IsNotExist(err) {
+			if err := r.removeCanonical(m); err != nil {
 				return errConfig("cannot remove withheld content; export was not finalized")
 			}
 		}
@@ -1064,7 +1059,7 @@ func (r *run) rescanKnownCredentials() error {
 		if m.State != "included" {
 			continue
 		}
-		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readCanonical(m)
 		if err != nil {
 			return err
 		}
@@ -1094,7 +1089,7 @@ func (r *run) rescanKnownCredentials() error {
 		// and domain checks, but retain the already-synced file when its value
 		// is identical. Redaction counts alone cannot establish equivalence.
 		if !reflect.DeepEqual(v, clean) {
-			if err := r.rewriteJSON(filepath.Join(r.stage, m.DataPath), clean); err != nil {
+			if err := r.writeCanonical(m, clean, true); err != nil {
 				return err
 			}
 		} else {

@@ -62,7 +62,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 		for _, d := range dimensions {
 			keys[d] = map[string]string{}
 		}
-		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readCanonical(m)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 			if a != nil && a.State == "included" && a.Type == "ANNOTATIONS" && strings.Contains(a.AnnotationType, "DESCRIPTION") {
 				text, loaded := descriptions[a.Key]
 				if !loaded {
-					value, err := r.readRecord(filepath.Join(r.stage, a.DataPath))
+					value, err := r.readCanonical(a)
 					if err != nil {
 						return nil, err
 					}
@@ -108,7 +108,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 			case "WEBSITES":
 				host, loaded := hosts[node.Key]
 				if !loaded {
-					website, err := r.readRecord(filepath.Join(r.stage, node.DataPath))
+					website, err := r.readCanonical(node)
 					if err != nil {
 						return err
 					}

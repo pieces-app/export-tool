@@ -169,15 +169,13 @@ func (r *run) saveCapture(s *recovery.Store) error {
 	if err := add(capturePart{Kind: "core", Core: &core}); err != nil {
 		return err
 	}
-	root, err := os.OpenRoot(r.stage)
-	if err != nil {
-		return errConfig("capture staging directory is unavailable")
+	if err := r.canonicalRecords().Flush(r.ctx); err != nil {
+		return err
 	}
-	defer root.Close()
 	for _, m := range r.sortedMeta() {
 		row := captureRecord{Meta: *m}
 		if m.State == "included" {
-			row.Data, err = archiveRead(root, m.DataPath, 128<<20)
+			row.Data, err = r.readCanonicalBytes(m, 128<<20)
 			if err != nil {
 				return err
 			}
@@ -604,7 +602,7 @@ func replayLoadedCapture(r *run, s *recovery.Store, generation uint64, output st
 		if err := decodeArchiveJSON(p.Record.Data, &v); err != nil {
 			return errConfig("captured canonical record is invalid")
 		}
-		if err := r.writeJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
+		if err := r.writeCanonical(m, v, false); err != nil {
 			return err
 		}
 		r.progress.Add(1)

@@ -99,7 +99,7 @@ func (r *run) writeArchiveState() (result error) {
 		}
 		rec := archiveRecord{Ref: opaque(m.Type, m.ID), Material: m.Type, State: m.State}
 		if m.State == "included" {
-			rec.DataSHA256, err = fileDigest(r.ctx, filepath.Join(r.stage, m.DataPath))
+			rec.DataSHA256, err = r.canonicalDigest(m)
 			if err != nil {
 				return err
 			}

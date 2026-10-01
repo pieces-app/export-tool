@@ -150,22 +150,6 @@ func (w *countedWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (r *run) readRecord(path string) (v map[string]any, err error) {
-	started := time.Now()
-	reader := &countedReader{}
-	defer func() { r.local.record("canonical_json_read", time.Since(started), reader.bytes, err) }()
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	reader.Reader = f
-	d := json.NewDecoder(reader)
-	d.UseNumber()
-	err = d.Decode(&v)
-	return v, err
-}
-
 func (r *run) sanitizeRecord(v map[string]any) (map[string]any, ScanResult, error) {
 	started := time.Now()
 	clean, stats, err := r.opts.Scanner.Sanitize(r.ctx, v)

@@ -32,7 +32,7 @@ func readLocalPerformance(t *testing.T, directory string) *LocalPerformanceRepor
 }
 
 func TestLocalPerformanceIOAndFailures(t *testing.T) {
-	r := &run{stage: t.TempDir(), local: newLocalMeasurements()}
+	r := &run{ctx: context.Background(), stage: t.TempDir(), local: newLocalMeasurements()}
 	p := filepath.Join(r.stage, "record.json")
 	if err := r.writeJSON(p, map[string]any{"number": json.Number("123456789012345678")}); err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestLocalPerformanceIOAndFailures(t *testing.T) {
 	if err := r.writeJSON(p, nil); !errors.Is(err, os.ErrExist) {
 		t.Fatal("exclusive write behavior changed")
 	}
-	v, err := r.readRecord(p)
+	v, err := r.readCanonical(&Meta{DataPath: "record.json"})
 	if err != nil || v["number"] != json.Number("123456789012345678") {
 		t.Fatal("measured read lost numeric precision")
 	}

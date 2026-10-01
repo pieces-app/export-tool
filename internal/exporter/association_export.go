@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -264,7 +262,7 @@ func (r *run) withholdAssociation(key string) error {
 	if prior := r.meta[key]; prior != nil {
 		prior.State = "withheld"
 		if prior.DataPath != "" {
-			if err := os.Remove(filepath.Join(r.stage, prior.DataPath)); err != nil && !os.IsNotExist(err) {
+			if err := r.removeCanonical(prior); err != nil {
 				return err
 			}
 		}
@@ -290,7 +288,7 @@ func (r *run) filterAssociationRecords() error {
 				if target != nil && target.State == "omitted" {
 					m.State = "omitted"
 				}
-				if err := os.Remove(filepath.Join(r.stage, m.DataPath)); err != nil && !os.IsNotExist(err) {
+				if err := r.removeCanonical(m); err != nil {
 					return errConfig("cannot remove association with unavailable endpoint; export was not finalized")
 				}
 				break

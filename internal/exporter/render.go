@@ -244,7 +244,7 @@ func (r *run) render() (result error) {
 			r.progress.Add(1)
 			continue
 		}
-		v, err := r.readRecord(filepath.Join(r.stage, m.DataPath))
+		v, err := r.readCanonical(m)
 		if err != nil {
 			return err
 		}
@@ -253,7 +253,7 @@ func (r *run) render() (result error) {
 				if err := writes.Flush(); err != nil {
 					return err
 				}
-				if err = r.rewriteJSON(filepath.Join(r.stage, m.DataPath), v); err != nil {
+				if err = r.writeCanonical(m, v, true); err != nil {
 					return err
 				}
 			} else {
@@ -292,7 +292,7 @@ func (r *run) render() (result error) {
 				if e.Relation != "annotations" || a == nil || a.State != "included" {
 					continue
 				}
-				av, err := r.readRecord(filepath.Join(r.stage, a.DataPath))
+				av, err := r.readCanonical(a)
 				if err != nil {
 					return err
 				}
@@ -592,7 +592,7 @@ func (r *run) transcript(b *strings.Builder, m *Meta) error {
 		if e.Relation != "messages" || n == nil || n.State != "included" {
 			continue
 		}
-		v, err := r.readRecord(filepath.Join(r.stage, n.DataPath))
+		v, err := r.readCanonical(n)
 		if err != nil {
 			return err
 		}
