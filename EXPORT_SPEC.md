@@ -126,7 +126,7 @@ After rendering, walk every Markdown local-link target and every PDF link annota
 
 For each included summary, build inverted indexes by canonical tag ID, source ID, person ID, and normalized website hostname. Include relevant explicit relations and provenance-derived relations through included events/source windows, with documented hop limits. Do not connect every node transitively through generic “related” edges. By-source grouping is application/source identity; by-website grouping is hostname, so they are intentionally different. Strip URL credentials, query parameters, and fragments before deriving website keys; normalize case/IDNA/default ports. Keep full allowed source URLs in content only when policy permits them.
 
-Emit these exact sections at the bottom and/or in its sibling according to `--relationships inline|sidecar|both` (default both):
+The default writes the ranked lists once in the `.relationships_graph.md` sibling and links to it from the summary footer. `both` explicitly opts into duplicating those lists. Completed-source replay and offline rebuild inherit the recorded layout rather than silently changing existing captures. Emit these exact sections at the bottom and/or in its sibling according to `--relationships inline|sidecar|both` (default sidecar):
 
 ```md
 #### Related Summaries by Tags

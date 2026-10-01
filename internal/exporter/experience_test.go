@@ -53,7 +53,7 @@ func TestReadableSummaryGraphPDFAndMetadata(t *testing.T) {
 	if path := os.Getenv("PIECES_EXPORT_FIXTURE_OUTPUT"); path != "" {
 		out = path
 	}
-	manifest, err := Export(context.Background(), client, Options{Output: out, Mode: "filtered", Timezone: "UTC", Materials: materials, BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, DefaultPolicy()), Format: "both", Metadata: "auto"})
+	manifest, err := Export(context.Background(), client, Options{Output: out, Mode: "filtered", Timezone: "UTC", Materials: materials, BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, DefaultPolicy()), Format: "both", Metadata: "auto", Relationships: "both"})
 	if err != nil {
 		t.Fatal(err)
 	}

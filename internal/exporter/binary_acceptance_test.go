@@ -203,6 +203,18 @@ func testPackagedSummaryCLI(t *testing.T, scopeFlags []string, projected bool) {
 	if err != nil || !strings.Contains(string(b), "Actual summary narrative") {
 		t.Fatal("packaged summaries export lost its annotation body")
 	}
+	if manifest.Relationships != "sidecar" || strings.Contains(string(b), "## Related summaries") || !strings.Contains(string(b), "[Relationship graph](") {
+		t.Fatal("default summary duplicated suggestions or lost the relationship link")
+	}
+	sibling, err := os.ReadFile(filepath.Join(out, relationshipPath(paths[opaque("WORKSTREAM_SUMMARIES", "summary")])))
+	if err != nil {
+		t.Fatal("default relationship sibling is unavailable", err)
+	}
+	for _, dimension := range dimensions {
+		if !strings.Contains(string(sibling), "#### Related Summaries by "+dimension) {
+			t.Fatal("default relationship sibling lost a dimension")
+		}
+	}
 	moved := out + "-moved"
 	if err := os.Rename(out, moved); err != nil {
 		t.Fatal(err)

@@ -291,7 +291,7 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 		o.Naming = "readable"
 	}
 	if o.Relationships == "" {
-		o.Relationships = "both"
+		o.Relationships = "sidecar"
 	}
 	if o.Metadata == "" {
 		o.Metadata = "off"

@@ -124,7 +124,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		pdfLimits := pdfLimitFlags(fs)
 		signalDigest := signalDigestFlags(fs, false)
 		naming := fs.String("naming", "readable", "readable summary names or opaque")
-		relationships := fs.String("relationships", "both", "inline, sidecar, or both")
+		relationships := fs.String("relationships", "sidecar", "sidecar (linked from summary), inline, or both")
 		relatedOrder := fs.String("related-order", "relevance", "rank related summaries by relevance or recent")
 		relatedLimit := fs.Int("related-limit", 50, "maximum related summaries per dimension (1–500)")
 		relatedSince := fs.String("related-since", "", "related-list cutoff: YYYY-MM-DD (UTC) or RFC3339; all records still exported")
