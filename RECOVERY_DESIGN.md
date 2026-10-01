@@ -1,6 +1,8 @@
 # Resumable export and durable staging
 
-Updated 2026-10-01. **Completed-source recovery is available through opt-in CLI commands in `0.15.0-dev`; interrupted-fetch recovery remains pending.** Explicit workspace/key directories are required; automatic key locations and cleanup are unfinished. The current CLI still rejects an existing `.partial` destination, and the active `0.4.1-dev` export cannot acquire checkpoints in place. Keep its process and files intact. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+Updated 2026-10-01. **Completed-source recovery is available through opt-in CLI commands; interrupted-fetch recovery remains pending.** Explicit workspace/key directories are required; automatic key locations and cleanup are unfinished. The current CLI rejects an existing `.partial` destination. The original `0.4.1-dev` export exited with an error and has no retained recovery capture; preserve its partial files. This work must preserve the full export scope, privacy checks, graph evidence, filenames, and finalization rules in [EXPORT_SPEC.md](EXPORT_SPEC.md).
+
+The real `0.17.1-dev` completed-source replay finalized in 38m06s with the source archive's partial status, independently passed consistency/body/graph/link checks, reproduced 172,527 document/evidence files byte-for-byte and made zero current OS requests. That proves replay of this complete capture, not interrupted-fetch recovery. A later `0.17.3-dev` attempt failed during its first audit after low-power sleep; the new `0.17.5-dev` attempt is running. See [current measured outcomes](PERFORMANCE_INVESTIGATION.md) for timing, corrected navigation and acceptance boundaries.
 
 ## Current association integration — 2026-10-01
 

@@ -1,6 +1,6 @@
 # Failed exports and finalization tests
 
-A completed export appears at the requested output path only after writing, link/privacy validation, and finalization succeed. Work before that point stays in the sibling `.partial` directory. A partial directory is never a completed archive, even when a provisional `manifest.json` has already been written. `rebuild` rejects it. Resume remains unimplemented; a retry needs a new output path.
+A completed export appears at the requested output path only after writing, link/privacy validation, and finalization succeed. Work before that point stays in the sibling `.partial` directory. A partial directory is never a completed archive, even when a provisional `manifest.json` has already been written. `rebuild` rejects it. `resume` can replay an explicitly retained, authenticated completed-source capture into a new output path; it cannot resume interrupted source fetching or reuse a partial output's files. Without a complete retained capture, another export needs a new output path and source reads. See [recovery behavior](RECOVERY_DESIGN.md).
 
 The CLI exits 1 on a failed export and does not print `Export written`. Exit 2 is different: it identifies a finalized archive with explicitly recorded coverage/privacy limitations. An interrupted or disk-full `.partial` folder is not an exit-2 archive.
 
