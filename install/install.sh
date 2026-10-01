@@ -3,7 +3,9 @@
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 
-main() {
+# Keep EXIT cleanup in this function's subshell so its local state is still
+# available when an unchecked command (such as curl) fails under errexit.
+main() (
   local base_url='' version='' output='' cleanup='ask' install_only=false
   local install_dir='' verified=false archive executable os_name arch expected actual entries code=0
   local -a cli_args=()
@@ -110,6 +112,6 @@ main() {
   fi
   # Preserve CLI status: 0 complete, 2 partial, 1 failure, 130 interrupted.
   exit "$code"
-}
+)
 
 main "$@"

@@ -100,6 +100,18 @@ func fixtureRelease(t *testing.T, binary []byte, scenario string) string {
 	if err := os.WriteFile(filepath.Join(dir, "SHA256SUMS.txt"), []byte(checksums), 0600); err != nil {
 		t.Fatal(err)
 	}
+	missing := ""
+	switch scenario {
+	case "missing-checksums":
+		missing = "SHA256SUMS.txt"
+	case "missing-archive":
+		missing = name
+	}
+	if missing != "" {
+		if err := os.Remove(filepath.Join(dir, missing)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return root
 }
 
@@ -141,7 +153,7 @@ func TestBashInstaller(t *testing.T) {
 	}
 	binary := fixtureBinary(t)
 	script, _ := filepath.Abs("install.sh")
-	for _, scenario := range []string{"complete", "partial", "failure", "cancel", "keep", "install-only", "corrupt", "duplicate-checksum", "traversal"} {
+	for _, scenario := range []string{"complete", "partial", "failure", "cancel", "keep", "install-only", "corrupt", "duplicate-checksum", "traversal", "missing-checksums", "missing-archive"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := fixtureRelease(t, binary, scenario)
 			srv := httptest.NewTLSServer(http.FileServer(http.Dir(root)))
@@ -164,6 +176,8 @@ func TestBashInstaller(t *testing.T) {
 				cleanup, keep = "--keep", true
 			case "install-only":
 				cleanup, keep, ran = "--install-only", true, false
+			case "missing-checksums", "missing-archive":
+				code, ran = 22, false // curl HTTP failure, with temporary files removed.
 			}
 			if scenario == "corrupt" || scenario == "duplicate-checksum" || scenario == "traversal" {
 				ran = false

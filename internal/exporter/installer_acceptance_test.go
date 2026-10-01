@@ -114,7 +114,11 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 				}
 				args = append(args, cleanup)
 			}
-			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", "both", "--metadata", "off")
+			format := "both"
+			if scenario == "recovery-remove" {
+				format = "markdown"
+			}
+			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", format, "--metadata", "off")
 			var work, keys string
 			if scenario == "recovery-remove" {
 				cfg := recoveryOptionsFixture(t)
@@ -216,8 +220,12 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 					}
 				}
 			}
-			if _, err := os.Stat(filepath.Join(out, "index.pdf")); err != nil {
-				t.Fatal("PDF output missing after installer cleanup")
+			if format == "both" {
+				if _, err := os.Stat(filepath.Join(out, "index.pdf")); err != nil {
+					t.Fatal("PDF output missing after installer cleanup")
+				}
+			} else if _, err := os.Stat(filepath.Join(out, "index.md")); err != nil {
+				t.Fatal("Markdown output missing after installer cleanup")
 			}
 			moved := out + "-moved"
 			if err := os.Rename(out, moved); err != nil {
@@ -263,7 +271,9 @@ function Get-PiecesReleaseFile {
  if ((Get-Item -LiteralPath $source).Length -gt $MaxBytes) { throw 'Fixture exceeds download limit.' }
  Copy-Item -LiteralPath $source -Destination $Destination
 }
-$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--format','both','--metadata','off')}
+$exportFormat='both'
+if ($env:PIECES_TEST_RECOVERY_WORK) { $exportFormat='markdown' }
+$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--format',$exportFormat,'--metadata','off')}
 if ($env:PIECES_TEST_RECOVERY_WORK) { $options.ExportArgs += @('--work',$env:PIECES_TEST_RECOVERY_WORK,'--recovery-keys',$env:PIECES_TEST_RECOVERY_KEYS) }
 exit (Invoke-PiecesBootstrap @options)
 `
