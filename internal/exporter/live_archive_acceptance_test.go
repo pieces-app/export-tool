@@ -36,6 +36,7 @@ type finalArchiveCounts struct {
 	CurrentPersonSummaries     int            `json:"persons_with_current_summary_evidence"`
 	SummaryPipelineLinks       int            `json:"summary_pipeline_memberships"`
 	PipelinesWithSummaries     int            `json:"pipelines_with_summary_memberships"`
+	VerifiedAssociationEdges   int            `json:"verified_canonical_association_edges"`
 }
 
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
@@ -76,6 +77,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 	seen := map[string]bool{}
 	states := map[string]map[string]int{}
 	annotationNonempty := map[string]bool{}
+	associationPairs := map[string][2]string{}
 	err = archiveLines(ctx, root, archiveStateFile, manifest.ArchiveState.StateSHA256, func(row archiveRecord) error {
 		if !validDigest(row.Ref) || seen[row.Ref] || coverage[row.Material] == nil {
 			return errConfig("duplicate or unsupported reconstruction record")
@@ -138,6 +140,9 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		m.JunctionFields = row.JunctionFields
 		m.DataOffset, m.DataLength, m.ArchiveDataSHA256 = row.DataOffset, row.DataLength, row.DataSHA256
 		m.Key = m.Type + "\x00" + m.ID
+		if family, ok := associationFamilyByType(m.Type); ok {
+			associationPairs[row.Ref] = [2]string{family.leftType + "\x00" + fieldString(v, family.leftField), family.rightType + "\x00" + fieldString(v, family.rightField)}
+		}
 		byRef[row.Ref], byPath[m.Path], byKey[m.Key] = m, m, m
 		report.Included++
 		if m.Type == "ANNOTATIONS" {
@@ -185,6 +190,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 	}
 	cacheBodies := map[string]bool{}
 	pipelineMembers, pipelines := map[Edge]bool{}, map[string]bool{}
+	provedPairs := map[[2]string]bool{}
 	err = archiveLines(ctx, root, "relationships.jsonl", manifest.ArchiveState.GraphSHA256, func(edge PublicEdge) error {
 		a, b := byPath[edge.Source], byPath[edge.Target]
 		if manifest.FormatVersion >= 6 {
@@ -198,6 +204,16 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		}
 		if edge.Relation != "embedded_markdown" && referenceTypes[edge.Relation] != b.Type {
 			return errConfig("graph relation points to the wrong material type")
+		}
+		if edge.Provenance == "association_record" {
+			pair, ok := associationPairs[edge.AssociationRef]
+			if !ok || !(a.Key == pair[0] && b.Key == pair[1] || a.Key == pair[1] && b.Key == pair[0]) {
+				return errConfig("graph edge differs from its canonical association endpoints")
+			}
+			report.VerifiedAssociationEdges++
+			provedPairs[[2]string{a.Key, b.Key}] = true
+		} else if edge.AssociationRef != "" {
+			return errConfig("graph association reference lacks matching provenance")
 		}
 		a.Edges = append(a.Edges, Edge{a.Key, b.Key, edge.Relation})
 		if a.Type == "WORKSTREAM_SUMMARIES" && b.Type == "PIPELINES" && edge.Relation == "pipelines" {
@@ -217,6 +233,11 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 	})
 	if err != nil {
 		return report, errConfig("graph evidence failed acceptance")
+	}
+	for _, pair := range associationPairs {
+		if byKey[pair[0]] != nil && byKey[pair[1]] != nil && (!provedPairs[pair] || !provedPairs[[2]string{pair[1], pair[0]}]) {
+			return report, errConfig("graph omits an included canonical association binding")
+		}
 	}
 	report.SummaryPipelineLinks, report.PipelinesWithSummaries = len(pipelineMembers), len(pipelines)
 	verifiedProfiles := map[string]bool{}
@@ -320,6 +341,65 @@ func TestLiveFinalArchiveAcceptance(t *testing.T) {
 	b, _ := json.Marshal(report)
 	t.Log(string(b))
 	t.Log("Archive consistency and rendered-body checks passed; these do not certify missing source relationships, unseen history or source text completeness.")
+}
+
+func TestFinalArchiveAcceptanceReconcilesAssociationProofs(t *testing.T) {
+	srv := junctionServer(t, junctionFixture(), nil)
+	client, _ := NewClient(srv.URL, time.Second, 8<<20)
+	o := junctionExportOptions(t)
+	m, err := Export(context.Background(), client, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Close()
+	report, err := inspectFinalArchive(context.Background(), o.Output)
+	if err != nil || report.VerifiedAssociationEdges != 8 {
+		t.Fatal("fixture canonical associations did not reconcile", err)
+	}
+	graphPath := filepath.Join(o.Output, "relationships.jsonl")
+	original, err := os.ReadFile(graphPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mutation := range []string{"wrong-proof", "missing-edge"} {
+		t.Run(mutation, func(t *testing.T) {
+			var changed strings.Builder
+			mutated := false
+			for _, line := range strings.Split(strings.TrimSpace(string(original)), "\n") {
+				var edge PublicEdge
+				if json.Unmarshal([]byte(line), &edge) != nil {
+					t.Fatal("invalid fixture graph")
+				}
+				if edge.SourceRef == opaque("WORKSTREAM_SUMMARIES", "summary") && edge.TargetRef == opaque("ANNOTATIONS", "body") && edge.Provenance == "association_record" {
+					mutated = true
+					if mutation == "missing-edge" {
+						continue
+					}
+					edge.AssociationRef = opaque("PERSON_TO_ANNOTATION_ASSOCIATIONS", "association-3")
+				}
+				row, _ := json.Marshal(edge)
+				changed.Write(row)
+				changed.WriteByte('\n')
+			}
+			if !mutated {
+				t.Fatal("required edge absent before mutation")
+			}
+			if err := os.WriteFile(graphPath, []byte(changed.String()), 0600); err != nil {
+				t.Fatal(err)
+			}
+			m.ArchiveState.GraphSHA256, err = fileDigest(context.Background(), graphPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifest, _ := json.Marshal(m)
+			if err := os.WriteFile(filepath.Join(o.Output, "manifest.json"), manifest, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := inspectFinalArchive(context.Background(), o.Output); err == nil {
+				t.Fatal("consistent checksums hid incorrect canonical association evidence")
+			}
+		})
+	}
 }
 
 func TestFinalArchiveAcceptanceDetectsDamage(t *testing.T) {
