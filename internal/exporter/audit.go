@@ -140,6 +140,10 @@ func (a *outputAuditor) file(path string) (result error) {
 		}
 		decoder := json.NewDecoder(a.jsonReader)
 		decoder.UseNumber()
+		// Scanner inputs are immutable during a file audit. Every input byte
+		// still reaches the decoder and digest; only identical approved token
+		// scans repeat less often. Never retain approvals in the worker itself.
+		tokens := auditTokenCache{}
 		depth := 0
 		for {
 			token, err := decoder.Token()
@@ -164,11 +168,11 @@ func (a *outputAuditor) file(path string) (result error) {
 					depth--
 				}
 			case string:
-				if err := r.auditText(value); err != nil {
+				if err := tokens.check(r.ctx, value, r.auditText); err != nil {
 					return err
 				}
 			case json.Number:
-				if err := r.auditText(string(value)); err != nil {
+				if err := tokens.check(r.ctx, string(value), r.auditText); err != nil {
 					return err
 				}
 			}
