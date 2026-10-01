@@ -2,10 +2,10 @@ package exporter
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,8 +15,8 @@ const auditReadBytes = 1 << 20
 const auditOverlapBytes = 4096
 const auditJSONReadBytes = 32 << 10
 
-// One auditor belongs to one sequential traversal. Allocate I/O buffers lazily
-// and reuse them only within that traversal; JSON/PDF keep fresh decoders.
+// One auditor belongs to one worker. Allocate I/O buffers lazily and reuse them
+// only within that worker; JSON/PDF keep fresh decoders.
 // File-local scan state (especially the overlap tail) must never live here.
 type outputAuditor struct {
 	run        *run
@@ -40,25 +40,21 @@ func (r *run) auditOutput() (result error) {
 	if err != nil {
 		return err
 	}
-	auditor := outputAuditor{run: r, cache: cache}
-	if err := filepath.WalkDir(r.stage, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if err := r.ctx.Err(); err != nil {
-			return err
-		}
-		if d.IsDir() {
+	workers := r.opts.FileWorkers
+	if workers == 0 {
+		workers = defaultFileWorkers
+	}
+	if err := auditOutputFiles(r.ctx, r.stage, workers, func(ctx context.Context) func(string) error {
+		worker := &run{ctx: ctx, stage: r.stage, opts: r.opts, local: r.local}
+		worker.opts.Scanner = r.opts.Scanner.forkForAudit()
+		auditor := outputAuditor{run: worker, cache: cache}
+		return func(path string) error {
+			if err := auditor.file(path); err != nil {
+				return err
+			}
+			r.progress.Add(1)
 			return nil
 		}
-		if d.Type()&os.ModeSymlink != 0 {
-			return errConfig("unexpected symlink in export output")
-		}
-		if err := auditor.file(path); err != nil {
-			return err
-		}
-		r.progress.Add(1)
-		return nil
 	}); err != nil {
 		return err
 	}
@@ -103,7 +99,7 @@ func (a *outputAuditor) file(path string) (result error) {
 	}
 	defer f.Close()
 	if a.cache != nil {
-		if previous, ok := a.cache.entries[relative]; ok {
+		if previous, ok := a.cache.lookup(relative); ok {
 			digest, size, err := a.hashFile(f)
 			if err != nil {
 				return err

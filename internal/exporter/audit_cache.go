@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"hash"
 	"sort"
+	"sync"
 )
 
 // Private, process-local acceleration, never reconstruction/recovery evidence.
@@ -20,6 +21,7 @@ type auditedContent struct {
 }
 
 type outputAuditCache struct {
+	mu       sync.Mutex // entries/keyBytes; traversal identity changes only after workers join
 	scanner  *Scanner
 	policy   [32]byte
 	entries  map[string]auditedContent
@@ -106,6 +108,8 @@ func (c *outputAuditCache) remember(path string, digest [32]byte) {
 	if c == nil {
 		return
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if _, exists := c.entries[path]; !exists {
 		if len(c.entries) >= maxAuditCacheEntries || len(path) > maxAuditCacheKeyBytes-c.keyBytes {
 			return
@@ -113,4 +117,11 @@ func (c *outputAuditCache) remember(path string, digest [32]byte) {
 		c.keyBytes += len(path)
 	}
 	c.entries[path] = auditedContent{digest: digest, pass: c.pass}
+}
+
+func (c *outputAuditCache) lookup(path string) (auditedContent, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	previous, ok := c.entries[path]
+	return previous, ok
 }

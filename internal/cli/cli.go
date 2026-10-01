@@ -120,7 +120,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		fs.BoolVar(yes, "y", false, "approve export without interactive prompts")
 		format := fs.String("format", "", "markdown, pdf (with Markdown companions), or both")
 		pdfFont := fs.String("pdf-font", "", "optional local TrueType font for additional Unicode coverage")
-		fileWorkers := fs.Int("file-workers", 2, "local Markdown file writers (1–4); 1 keeps writes serial; OS reads remain serialized")
+		fileWorkers := fs.Int("file-workers", 2, "local Markdown writers and text auditors (1–4); 1 keeps both serial; OS reads remain serialized")
 		pdfLimits := pdfLimitFlags(fs)
 		signalDigest := signalDigestFlags(fs, false)
 		naming := fs.String("naming", "readable", "readable summary names or opaque")
@@ -375,7 +375,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			fmt.Fprintf(stdout, ", since %s", since.UTC().Format(time.RFC3339))
 		}
 		fmt.Fprintln(stdout)
-		fmt.Fprintf(stdout, "Local Markdown writers: %d (file sync retained).\n", *fileWorkers)
+		fmt.Fprintf(stdout, "Local file workers: %d (Markdown writes and text audits; file sync retained; PDF audits serial).\n", *fileWorkers)
 		fmt.Fprintf(stdout, "Performance: %s, ≤1 outstanding data request, batch ceiling %d, target %s | People: %s\n", *performance, *batch, *targetLatency, *people)
 		fmt.Fprintln(stdout, "Website categories apply only if domain lists are configured in the policy.")
 		if recoveryOptions != nil {

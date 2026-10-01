@@ -60,6 +60,22 @@ type Scanner struct {
 
 var quietOnce sync.Once
 
+// Auditing never discovers credentials or changes policy. Workers share these
+// immutable inputs, but each owns detector state. Build from the configured
+// rules, not NewDetectorDefaultConfig (which uses process-global Viper state).
+// Scanner mutation and traversal are sequential phases of a run.
+func (s *Scanner) forkForAudit() *Scanner {
+	fork := *s
+	d := detect.NewDetector(s.detector.Config)
+	d.IgnoreGitleaksAllow = s.detector.IgnoreGitleaksAllow
+	d.MaxDecodeDepth = s.detector.MaxDecodeDepth
+	d.MaxTargetMegaBytes = s.detector.MaxTargetMegaBytes
+	d.Redact = s.detector.Redact
+	d.Verbose = false
+	fork.detector = d
+	return &fork
+}
+
 func NewScanner(p Policy, baseDir string) (*Scanner, error) {
 	if p.Version != 1 {
 		return nil, errConfig("unsupported policy version")

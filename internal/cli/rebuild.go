@@ -28,7 +28,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	relationships := fs.String("relationships", "", "inline, sidecar, or both; default inherits the archive setting")
 	metadata := fs.String("metadata", "", "auto or off; default inherits the archive setting; sidecars always retained")
 	font := fs.String("pdf-font", "", "optional local TrueType font")
-	fileWorkers := fs.Int("file-workers", 2, "local Markdown file writers (1–4); 1 keeps writes serial")
+	fileWorkers := fs.Int("file-workers", 2, "local Markdown writers and text auditors (1–4); 1 keeps both serial")
 	pdfLimits := pdfLimitFlags(fs)
 	signalDigest := signalDigestFlags(fs, true)
 	people := fs.String("people", "", "inherit original selection, or narrow an all-people archive to profiles/connected")
@@ -81,7 +81,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	}
 	fmt.Fprintf(stdout, "Offline rebuild: %d included records; privacy mode %s; %d original coverage issues.\nDestination: %s\n", included, m.Mode, len(m.Issues), *out)
 	fmt.Fprintln(stdout, "No OS connection, launch, or Desktop closure. Source omissions remain; missing records cannot be downloaded offline.")
-	fmt.Fprintf(stdout, "Local Markdown writers: %d (file sync retained).\n", *fileWorkers)
+	fmt.Fprintf(stdout, "Local file workers: %d (Markdown writes and text audits; file sync retained; PDF audits serial).\n", *fileWorkers)
 	digestMode := signalDigest.Mode
 	if digestMode == "" {
 		digestMode = "split"

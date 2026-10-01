@@ -13,6 +13,52 @@ import (
 	"testing"
 )
 
+// Distinct summary-like Markdown and decoded JSON, with a cold audit cache on
+// every iteration. All worker counts scan identical content under the same
+// policy. Fixture creation and scanner initialization are outside the timer.
+func BenchmarkFinalAuditWorkerCounts(b *testing.B) {
+	for _, workers := range []int{1, 2, 4} {
+		b.Run(fmt.Sprintf("workers_%d", workers), func(b *testing.B) {
+			scanner, err := NewScanner(DefaultPolicy(), "")
+			if err != nil {
+				b.Fatal(err)
+			}
+			r := &run{ctx: context.Background(), stage: b.TempDir(), opts: Options{Scanner: scanner, FileWorkers: workers}}
+			var bytes int64
+			for i := 0; i < 128; i++ {
+				var document strings.Builder
+				fmt.Fprintf(&document, "# Synthetic summary %d\n\n", i)
+				document.WriteString(strings.Repeat("An ordinary paragraph describes the project discussion and follow-up work.\n\n", 64))
+				for j := 0; j < 200; j++ {
+					fmt.Fprintf(&document, "- [Related summary %d with useful project context](../timeline/summary-%06d.fixture.2026-10-01.md)\n", j, i*200+j)
+				}
+				for _, ext := range []string{"md", "json"} {
+					body := []byte(document.String())
+					if ext == "json" {
+						body, err = json.Marshal(map[string]any{"id": fmt.Sprintf("synthetic-%04d", i), "text": document.String(), "type": "SUMMARY"})
+						if err != nil {
+							b.Fatal(err)
+						}
+					}
+					if err := os.WriteFile(filepath.Join(r.stage, fmt.Sprintf("document-%04d.%s", i, ext)), body, 0600); err != nil {
+						b.Fatal(err)
+					}
+					bytes += int64(len(body))
+				}
+			}
+			b.ReportAllocs()
+			b.SetBytes(bytes)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				r.auditCache = nil
+				if err := r.auditOutput(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 type auditReadCounter struct {
 	io.Reader
 	calls int
