@@ -224,7 +224,7 @@ All pathname/content checks still execute. JSON/JSONL scan every decoded string 
 
 In the bounded 512-document benchmark, total allocated bytes fell from about 551.18 MB to 14.75 MB per audit (about 97.3% less). Median elapsed time fell from 168.15 ms to 159.11 ms, about 5.4%, on warm synthetic files. These are allocated-byte totals, not peak RSS or evidence of comparable whole-history runtime. Strings, JSON/PDF decoders, directory entries and scanner work still allocate and still require profiling at real scale. A separate token-reader fixture reduced underlying reads (including EOF probes) from 4 to 2 for one small JSONL row, and from 24 to 3 for 512 rows. The full 512-record JSON audit measured approximately 76–78 ms with or without buffering; no material whole-audit speedup is established. See [the measured investigation](PERFORMANCE_INVESTIGATION.md).
 
-### Reusing unchanged final-audit results (working tree)
+### Reusing unchanged final-audit results (`0.16.2-dev`)
 
 Filtered exports, rebuilds and completed-source replays retain both output-validation passes. The first successful content scan hashes the exact bytes it consumes. A later pass can reuse that content result only after rereading the entire file and matching its SHA-256, with the same scanner instance and unchanged actual privacy policy, loaded domain entries and learned credential values. File size and modification time are never sufficient evidence. The embedded detector configuration is immutable for a scanner's lifetime; replacing the scanner invalidates reuse. Any future mutable detector settings must join this invalidation contract.
 
