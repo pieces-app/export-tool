@@ -41,6 +41,54 @@ func TestDiagnosticAuditFile(t *testing.T) {
 	}
 }
 
+// Recheck a bounded, explicitly selected window with the actual captured
+// privacy policy and learned credentials. Only aggregate results are logged.
+func TestDiagnosticCapturedAuditWindow(t *testing.T) {
+	list := os.Getenv("PIECES_EXPORT_DIAGNOSTIC_AUDIT_WINDOW")
+	if list == "" {
+		t.Skip("explicit private audit-window file is required")
+	}
+	var input struct {
+		Root, Work, Keys string
+		Paths            []string
+	}
+	b, err := os.ReadFile(list)
+	if err != nil || json.Unmarshal(b, &input) != nil || len(input.Paths) == 0 || len(input.Paths) > 1000 {
+		t.Fatal("invalid diagnostic window")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	session, err := OpenRecovery(ctx, RecoveryOptions{Directory: input.Work, KeyDirectory: input.Keys})
+	if err != nil {
+		t.Fatal("cannot authenticate captured scanner state")
+	}
+	defer session.Close()
+	if !session.info.CanResume || session.r.opts.Mode != "filtered" {
+		t.Fatal("diagnostic requires a complete filtered capture")
+	}
+	r := &run{ctx: ctx, stage: input.Root, opts: session.r.opts}
+	r.opts.Scanner = session.r.opts.Scanner.forkForAudit()
+	started, maxScan := time.Now(), time.Duration(0)
+	var bytes int64
+	for _, path := range input.Paths {
+		if !safeArchivePath(path) {
+			t.Fatal("unsafe diagnostic path")
+		}
+		file := filepath.Join(input.Root, path)
+		st, err := os.Lstat(file)
+		if err != nil || !st.Mode().IsRegular() {
+			t.Fatal("diagnostic file unavailable")
+		}
+		now := time.Now()
+		if err := r.auditOutputFile(file); err != nil {
+			t.Fatal("captured-state diagnostic audit failed")
+		}
+		maxScan = max(maxScan, time.Since(now))
+		bytes += st.Size()
+	}
+	t.Logf("captured_policy=true files=%d bytes=%d elapsed_ms=%d max_file_ms=%d; read-only diagnostic, not archive acceptance", len(input.Paths), bytes, time.Since(started).Milliseconds(), maxScan.Milliseconds())
+}
+
 // Re-render only list navigation from an explicitly selected index into a
 // disposable private directory, leaving the source (including partial exports)
 // untouched. Only content scans are measured: target documents are not copied.

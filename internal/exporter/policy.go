@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/logging"
+	"github.com/zricethezav/gitleaks/v8/report"
 	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
 )
@@ -267,6 +268,7 @@ func credentialField(key string) bool {
 type ScanResult struct {
 	Redactions, WithheldRepresentations int
 	Denied                              bool
+	TimeoutRetries                      int
 }
 
 func (s *Scanner) Sanitize(ctx context.Context, record map[string]any) (map[string]any, ScanResult, error) {
@@ -414,11 +416,20 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 			stats.Denied = true
 		}
 	}
-	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	findings := s.detector.DetectContext(deadline, detect.Fragment{Raw: key + "=" + value})
-	if deadline.Err() != nil {
-		return "", errConfig("secret scan did not finish")
+	fragment := detect.Fragment{Raw: key + "=" + value}
+	findings, retried, err := completeSecretScan(ctx, 10*time.Second, func(deadline context.Context, attempt int) []report.Finding {
+		detector := s.detector
+		if attempt > 0 {
+			// Never carry partial detector state into the complete retry.
+			detector = s.forkForAudit().detector
+		}
+		return detector.DetectContext(deadline, fragment)
+	})
+	if retried {
+		stats.TimeoutRetries++
+	}
+	if err != nil {
+		return "", err
 	}
 	secrets := map[string]bool{}
 	for _, f := range findings {

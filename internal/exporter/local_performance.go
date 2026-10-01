@@ -154,6 +154,9 @@ func (r *run) sanitizeRecord(v map[string]any) (map[string]any, ScanResult, erro
 	started := time.Now()
 	clean, stats, err := r.opts.Scanner.Sanitize(r.ctx, v)
 	r.local.record("record_scan", time.Since(started), 0, err)
+	for i := 0; i < stats.TimeoutRetries; i++ {
+		r.local.record("secret_scan_timeout_retry", 0, 0, err)
+	}
 	return clean, stats, err
 }
 
