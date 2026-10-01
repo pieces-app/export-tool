@@ -109,10 +109,14 @@ type Edge struct {
 	Relation string `json:"relation"`
 }
 type Meta struct {
+	// Grouped canonical rows are assigned only after all privacy/selection work.
+	DataOffset, DataLength                                         int64
 	JunctionFields                                                 map[string]bool
 	AssociationEndpoints                                           []Edge
 	ArchivePlaceholder                                             bool
 	ArchiveDataSHA256                                              string
+	ArchiveDataPath                                                string
+	ArchiveDataOffset, ArchiveDataLength                           int64
 	SupplementableFields                                           map[string]bool
 	ProjectionStates                                               map[string]string
 	RelationshipProjectionUnknown                                  bool
@@ -127,6 +131,8 @@ type Meta struct {
 	Redactions                                                     int
 }
 type run struct {
+	canonicalStage        *associationCanonicalRecords
+	associationGroups     []*associationGroup
 	records               canonicalRecordStore
 	auditCache            *outputAuditCache
 	junctionFamiliesRead  map[string]bool
@@ -343,6 +349,7 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 		return Manifest{}, errConfig("partial directory already exists or cannot be created; choose a new output path")
 	}
 	r := &run{ctx: ctx, client: client, opts: o, stage: stage, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}}
+	defer r.cleanupCanonicalStage(&resultErr)
 	r.local = newLocalMeasurements()
 	r.progress = startMeasuredProgress(o.Progress, client, r.local)
 	defer r.progress.Close()
@@ -558,6 +565,9 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 		return r.manifest, err
 	}
 	if err = r.canonicalRecords().Flush(r.ctx); err != nil {
+		return r.manifest, err
+	}
+	if err = r.closeCanonicalStage(); err != nil {
 		return r.manifest, err
 	}
 	if o.Mode == "filtered" {

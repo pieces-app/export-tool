@@ -23,6 +23,9 @@ type ArchiveState struct {
 // Excluded/withheld identities remain opaque. Original body/projection evidence
 // cannot be inferred from JSON after the renderer has pruned private references.
 type archiveRecord struct {
+	DataPath                      string            `json:"data_path,omitempty"`
+	DataOffset                    int64             `json:"data_offset,omitempty"`
+	DataLength                    int64             `json:"data_length,omitempty"`
 	JunctionFields                map[string]bool   `json:"junction_fields,omitempty"`
 	Ref                           string            `json:"record_ref"`
 	Material                      string            `json:"material"`
@@ -90,6 +93,9 @@ func (r *run) writeArchiveState() (result error) {
 		}
 	}
 	version := 1
+	if r.manifest.FormatVersion >= 6 {
+		version = 3
+	}
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err
@@ -99,6 +105,9 @@ func (r *run) writeArchiveState() (result error) {
 		}
 		rec := archiveRecord{Ref: opaque(m.Type, m.ID), Material: m.Type, State: m.State}
 		if m.State == "included" {
+			if m.DataLength > 0 {
+				rec.DataPath, rec.DataOffset, rec.DataLength = m.DataPath, m.DataOffset, m.DataLength
+			}
 			rec.DataSHA256, err = r.canonicalDigest(m)
 			if err != nil {
 				return err
@@ -106,7 +115,7 @@ func (r *run) writeArchiveState() (result error) {
 			rec.Redactions = m.Redactions
 			rec.ProjectionStates = m.ProjectionStates
 			rec.JunctionFields = m.JunctionFields
-			if len(m.JunctionFields) > 0 {
+			if len(m.JunctionFields) > 0 && version < 2 {
 				// Older rebuilders must refuse this archive instead of dropping
 				// current-empty evidence and reviving historical cache links.
 				version = 2

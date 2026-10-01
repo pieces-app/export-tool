@@ -41,7 +41,8 @@ func (r *canonicalFileReader) Close() error {
 
 func (r *run) canonicalRecords() canonicalRecordStore {
 	if r.records == nil {
-		r.records = &fileCanonicalRecords{run: r}
+		s := &associationCanonicalRecords{run: r, files: fileCanonicalRecords{run: r}}
+		r.records, r.canonicalStage = s, s
 	}
 	return r.records
 }

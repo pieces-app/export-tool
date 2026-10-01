@@ -52,7 +52,7 @@ New builds default to `--scope summaries --people profiles` for summaries and pe
 ./pieces-export export --scope all --output ./exports/all-data
 ```
 
-Summary narrative text is stored in **annotations**, not in event bodies. Summaries scope inventories summaries, persons, and pipelines, then traverses current association endpoints for bodies, profiles and related labels. When all summary/person annotation reads reconcile, only referenced annotations are fetched; older servers fall back to the full annotation inventory and direct persona-history reads. The explicit summary hierarchy is also retained. Current relationships take precedence over historical SDK caches. See [current traversal and verification status](JUNCTION_API.md). Local `0.16.2-dev` candidate packages include this traversal and repeated-audit optimization; full live coverage/speed and publication remain pending.
+Summary narrative text is stored in **annotations**, not in event bodies. Summaries scope inventories summaries, persons, and pipelines, then traverses current association endpoints for bodies, profiles and related labels. When all summary/person annotation reads reconcile, only referenced annotations are fetched; older servers fall back to the full annotation inventory and direct persona-history reads. The explicit summary hierarchy is also retained. Current relationships take precedence over historical SDK caches. See [current traversal and verification status](JUNCTION_API.md). Local `0.17.0-dev` candidate packages include this traversal, repeated-audit optimization and grouped association storage; full live coverage/speed and publication remain pending.
 
 Events are useful for raw activity history, event-derived source/website/person graph connections, connectivity evidence, and privacy propagation from excluded activity to dependent summaries. They are optional for a document-focused export. This scope skips event bodies, source-window history, hints, signals, conversations, and other unselected collections. It can use a bounded person/event-association count query; it does not download the underlying events. Preflight and benchmark also respect the selected scope.
 
@@ -126,7 +126,7 @@ Every configured list is a deny list; `category` is its report label. The import
 ./pieces-export export --related-order relevance --related-limit 25 --related-since 2026-01-01 --output ./exports/ranked
 ```
 
-Open [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete archive-format-5 tree. `workstream_summaries/` contains `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/daily_standups/` plus the other descriptor-based folders. Person folders have `profile.md`, `profile_summaries/`, and `related_workstream_summaries/index.md`. Exact user-to-person endpoint mappings establish user folders. Other explicit hierarchy types have `hierarchical_summaries/<type>/` folders. Shared documents keep one canonical file with links from each relevant index.
+Open [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for the complete archive-format-5/6 tree. `workstream_summaries/` contains `timeline/`, `personas/users/`, `personas/related_persons/`, and `single_click_summaries/daily_standups/` plus the other descriptor-based folders. Person folders have `profile.md`, `profile_summaries/`, and `related_workstream_summaries/index.md`. Exact user-to-person endpoint mappings establish user folders. Other explicit hierarchy types have `hierarchical_summaries/<type>/` folders. Shared documents keep one canonical file with links from each relevant index.
 
 Summary filenames are `000000.safe_title.YYYY-MM-DD.uuid.md`, starting with the newest creation timestamp globally across summary folders. Gaps within an individual folder are expected. Six-digit minimum padding keeps ascending filename order chronological from newest to oldest. Titles are sanitized before naming; `--naming opaque` hides titles in filenames. Relationship siblings use the same basename plus `.relationships_graph.md`; `--relationships inline|sidecar|both` controls placement.
 
@@ -147,10 +147,10 @@ Descriptions, tags, normalized source tags, persons, and website hosts appear in
 ## Build binary-only downloads
 
 ```sh
-go run ./cmd/release --version 0.16.2-dev --output dist/0.16.2-dev
+go run ./cmd/release --version 0.17.0-dev --output dist/0.17.0-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.16.2-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.17.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 

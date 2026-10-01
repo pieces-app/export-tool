@@ -1,8 +1,14 @@
 # Export folders, naming, and navigation
 
-Updated 2026-09-30. This is the implemented **archive format 5** contract. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest is included starting with `0.9.0-dev`; live completeness still requires acceptance.
+Updated 2026-10-01. The working tree writes **archive format 6** when association records are included, otherwise format 5. Format 6 groups supporting association evidence; summary/profile files keep their existing layout. See [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior, [TODO.md](TODO.md) for release acceptance, and [EXPORT_GUIDE.md](EXPORT_GUIDE.md#summary-classification-and-relationship-coverage) for schema and traversal evidence. The signals digest is included starting with `0.9.0-dev`; live completeness still requires acceptance.
 
 ## Where the export goes
+
+Association evidence now shares `group-000000.jsonl`, `group-000001.jsonl`, etc. under each `data/associations/<family>/` directory (`raw/` in preservation mode). Each chunk has at most 50 records and 7 MiB of compact JSON plus newlines; a larger single record is stored alone, below the canonical record bound. Matching `markdown/associations/<family>/group-000000.md` pages retain approved metadata and links to both endpoints. These are supporting graph records, not summary/profile documents. For example, 123 ordinary-sized associations require three JSONL files and three Markdown pages rather than 246 individual files.
+
+Each included record still has its own opaque identity in `link-map.json` and `rebuild-state.jsonl`. Multiple association identities may point to the same group page. Format-6 graph rows carry `source_ref` and `target_ref` as well as navigation paths, so shared pages cannot merge records. Reconstruction evidence records each canonical row's file, byte offset, byte length and SHA-256. Links open the group page without an invented fragment; the page identifies each member by record reference. PDF copies use the same group-page boundaries and the existing PDF resource limits.
+
+During a run, association records use encrypted, bounded SQLite transactions in a tool-created `.pieces-export-stage-*` sibling directory, outside the shareable archive. Its private database and key directories are closed and removed before finalization and on ordinary errors/cancellation. A crash can leave this private temporary directory; it is not a resumable checkpoint. Explicit `--work`/`--recovery-keys` recovery directories have separate ownership and retention. No temporary database or key belongs in the export folder.
 
 `--output` chooses a **new folder**. Relative paths resolve from the terminal's current working directory. The CLI prints its absolute destination before `Export now? [Y/n]` and again on completion.
 
@@ -16,7 +22,7 @@ In PowerShell:
 .\pieces-export.exe export --people profiles --output "$HOME\Documents\Pieces-Export"
 ```
 
-Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder; resume is not implemented. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
+Without `--output`, the destination is `pieces-export-<timestamp>` under the current directory. The exporter stages work in `<destination>.partial` and renames it after validation. Existing output/staging directories are never overwritten. An interrupted run can leave a partial folder. Optional completed-source recovery can replay into a new destination; interrupted source fetching cannot resume yet. `export --dry-run` creates neither folder and does not close Desktop. Add `--launch-os=false` to prevent activation of an absent OS.
 
 `performance.json` is produced at finalization (or best effort after a failure), starting with `0.12.3-dev`. It contains aggregate diagnostics only and cannot certify completeness or resume a partial archive. See [measurement boundaries](EXPORT_SPEC.md#local-performance-diagnostics-0123-dev).
 
@@ -113,7 +119,7 @@ Pieces-Export/
     annotations/                            # ordinary annotations and shared profile versions
     pipelines/                              # pipeline definitions
     signals/                                # individual signals, currently implemented
-    associations/<family>/<opaque-key>.md   # source metadata linked to both canonical endpoints
+    associations/<family>/group-000000.md   # up to 50 association records with endpoint links
     events/...
     tags/...
     websites/...
@@ -121,8 +127,10 @@ Pieces-Export/
     days/YYYY-MM-DD.md                       # all-record daily indexes
     undated.md
     relationships/<dimension>/...           # complete shared-group indexes
-  data/<material>/<opaque-key>.json          # filtered records
+  data/<material>/<opaque-key>.json          # ordinary filtered records
+  data/associations/<family>/group-000000.jsonl # grouped filtered association evidence
   raw/<material>/<opaque-key>.json           # used instead of data/ in preservation mode
+  raw/associations/<family>/group-000000.jsonl # grouped association evidence in preservation mode
   pdf/                                      # when PDF requested
     workstream_summaries/...                 # mirrors nested document layout
     timeline/index.pdf
@@ -135,7 +143,7 @@ Pieces-Export/
 
 ## How summary placement is determined
 
-Placement happens after privacy processing and people selection. Every source record has one canonical document in `link-map.json`. Indexes provide extra ways to reach that file, without copying its body into every related folder.
+Placement happens after privacy processing and people selection. Every included record has a document destination in `link-map.json`. Ordinary records have individual documents; association records can share a bounded group page and retain distinct record references. Indexes provide extra ways to reach that file, without copying its body into every related folder.
 
 | Source field | Canonical placement |
 | --- | --- |

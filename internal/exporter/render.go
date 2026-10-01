@@ -148,6 +148,8 @@ type TimelineEntry struct {
 	TimeBasis string `json:"time_basis"`
 }
 type PublicEdge struct {
+	SourceRef                string `json:"source_ref,omitempty"`
+	TargetRef                string `json:"target_ref,omitempty"`
 	AssociationRef           string `json:"association_ref,omitempty"`
 	Source, Target, Relation string
 	Provenance               string         `json:"provenance,omitempty"`
@@ -156,6 +158,9 @@ type PublicEdge struct {
 
 func (r *run) render() (result error) {
 	r.assignPaths()
+	if err := r.prepareAssociationGroups(); err != nil {
+		return err
+	}
 	graph, err := r.buildSummaryGraph()
 	if err != nil {
 		return err
@@ -200,7 +205,11 @@ func (r *run) render() (result error) {
 			if proof := r.meta[r.associationEdges[e]]; proof != nil && proof.State == "included" {
 				provenance, associationRef = "association_record", opaque(proof.Type, proof.ID)
 			}
-			edges = append(edges, PublicEdge{Source: m.Path, Target: target.Path, Relation: e.Relation, Provenance: provenance, CacheEvidence: cached, AssociationRef: associationRef})
+			row := PublicEdge{Source: m.Path, Target: target.Path, Relation: e.Relation, Provenance: provenance, CacheEvidence: cached, AssociationRef: associationRef}
+			if r.manifest.FormatVersion >= 6 {
+				row.SourceRef, row.TargetRef = opaque(m.Type, m.ID), opaque(target.Type, target.ID)
+			}
+			edges = append(edges, row)
 		}
 		if created, err := time.Parse(time.RFC3339Nano, m.Created); err == nil {
 			entries = append(entries, TimelineEntry{m.Type, m.ID, m.Path, m.Title, created.UTC().Format(time.RFC3339Nano), m.Updated, "record_created"})
@@ -228,6 +237,10 @@ func (r *run) render() (result error) {
 		return err
 	}
 	writes := newMarkdownWriter(r.ctx, workers, maxAsyncMarkdownBytes, r.writeFile)
+	groups := map[string]*associationGroup{}
+	for _, g := range r.associationGroups {
+		groups[g.path] = g
+	}
 	defer func() {
 		if err := writes.Close(); result == nil {
 			result = err
@@ -262,6 +275,9 @@ func (r *run) render() (result error) {
 		}
 		var b strings.Builder
 		fmt.Fprintf(&b, "# %s\n\nType: `%s`\n\n", md(m.Title), m.Type)
+		if m.DataLength > 0 {
+			fmt.Fprintf(&b, "Record reference: `%s`\n\n", opaque(m.Type, m.ID))
+		}
 		if m.Created != "" {
 			fmt.Fprintf(&b, "Created: %s\n\n", md(m.Created))
 		}
@@ -364,6 +380,18 @@ func (r *run) render() (result error) {
 			r.documentMetadata[m.Path] = meta
 		}
 
+		if g := groups[m.Path]; g != nil {
+			g.markdown.WriteString(b.String())
+			g.markdown.WriteString("\n---\n\n")
+			if m == g.members[len(g.members)-1] {
+				if err := writes.Submit(filepath.Join(r.stage, g.path), []byte(g.markdown.String()), nil); err != nil {
+					return err
+				}
+				g.markdown.Reset()
+			}
+			r.progress.Add(1)
+			continue
+		}
 		if err = writes.Submit(filepath.Join(r.stage, m.Path), []byte(b.String()), func() { r.progress.Add(1) }); err != nil {
 			return err
 		}
@@ -437,12 +465,20 @@ func (r *run) render() (result error) {
 	index.WriteString("\n[Personas, profiles, and people](workstream_summaries/personas/index.md) · [Known pipeline associations](workstream_summaries/pipeline_associations/index.md)\n")
 	index.WriteString("\n## All included records\n\n")
 	links := map[string]string{}
+	indexed := map[string]bool{}
 	for _, m := range r.sortedMeta() {
 		if err := r.ctx.Err(); err != nil {
 			return err
 		}
 		if m.State == "included" {
-			fmt.Fprintf(&index, "- [%s](%s) (%s)\n", md(m.Title), uriPath(m.Path), m.Type)
+			if !indexed[m.Path] {
+				label := m.Title
+				if g := groups[m.Path]; g != nil {
+					label = fmt.Sprintf("%s (%d association records)", m.Type, len(g.members))
+				}
+				fmt.Fprintf(&index, "- [%s](%s) (%s)\n", md(label), uriPath(m.Path), m.Type)
+				indexed[m.Path] = true
+			}
 			links[opaque(m.Type, m.ID)] = m.Path
 		}
 	}

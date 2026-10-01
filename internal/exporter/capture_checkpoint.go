@@ -491,7 +491,7 @@ func loadCapture(ctx context.Context, s *recovery.Store) (*run, uint64, error) {
 	for _, m := range r.meta {
 		material, ok := materialByType(m.Type)
 		name := opaque(m.Type, m.ID)
-		if !ok || m.ID == "" || m.Key != m.Type+"\x00"+m.ID || r.coverage[m.Type] == nil || m.ArchivePlaceholder {
+		if !ok || m.ID == "" || m.Key != m.Type+"\x00"+m.ID || r.coverage[m.Type] == nil || m.ArchivePlaceholder || m.DataOffset != 0 || m.DataLength != 0 || m.ArchiveDataPath != "" || m.ArchiveDataOffset != 0 || m.ArchiveDataLength != 0 {
 			return nil, 0, errConfig("recovery record paths or material identity are invalid")
 		}
 		if m.State == "missing" {
@@ -552,7 +552,8 @@ func replayCapture(ctx context.Context, s *recovery.Store, output string, progre
 	return replayLoadedCapture(r, s, generation, output, progress)
 }
 
-func replayLoadedCapture(r *run, s *recovery.Store, generation uint64, output string, progress io.Writer) (Manifest, error) {
+func replayLoadedCapture(r *run, s *recovery.Store, generation uint64, output string, progress io.Writer) (result Manifest, resultErr error) {
+	defer r.cleanupCanonicalStage(&resultErr)
 	ctx := r.ctx
 	if err := ctx.Err(); err != nil {
 		return Manifest{}, err

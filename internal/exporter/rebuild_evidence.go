@@ -28,6 +28,9 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 		if m == nil || m.Type != row.Material || row.DataSHA256 != m.ArchiveDataSHA256 || !validDigest(row.DataSHA256) || row.Redactions < 0 {
 			return errConfig("archive included record is missing, altered, or has invalid evidence")
 		}
+		if row.DataPath != m.ArchiveDataPath || row.DataOffset != m.ArchiveDataOffset || row.DataLength != m.ArchiveDataLength || row.DataLength > 0 && state.Version != 3 {
+			return errConfig("archive canonical row location differs from its evidence")
+		}
 		// Earlier format-5 writers did not record signal projection evidence.
 		// Pruned canonical JSON cannot tell us whether an empty field was
 		// originally empty. Accept the old row but keep all seven fields unknown.
@@ -100,10 +103,10 @@ func (r *run) restoreArchiveState(root *os.Root, state *ArchiveState, byRef map[
 	return nil
 }
 
-func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map[string]*Meta) error {
+func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath, byRef map[string]*Meta, links map[string]string) error {
 	associationProofs := map[string]*Meta{}
 	r.associationEdges = map[Edge]string{}
-	for _, m := range byPath {
+	for _, m := range byRef {
 		if _, ok := associationFamilyByType(m.Type); ok {
 			associationProofs[opaque(m.Type, m.ID)] = m
 		}
@@ -114,6 +117,14 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 	}
 	err := archiveLines(r.ctx, root, "relationships.jsonl", expected, func(row PublicEdge) error {
 		source, target := byPath[row.Source], byPath[row.Target]
+		if state != nil && state.Version == 3 {
+			source, target = byRef[row.SourceRef], byRef[row.TargetRef]
+			if source == nil || target == nil || links[row.SourceRef] != row.Source || links[row.TargetRef] != row.Target {
+				return errConfig("archive graph record identities or paths differ")
+			}
+		} else if row.SourceRef != "" || row.TargetRef != "" {
+			return errConfig("legacy archive graph has unsupported record identities")
+		}
 		if source == nil || target == nil || row.Relation != "embedded_markdown" && referenceTypes[row.Relation] == "" {
 			return errConfig("archive graph has an unresolved or invalid edge")
 		}
@@ -180,7 +191,7 @@ func (r *run) restoreArchiveGraph(root *os.Root, state *ArchiveState, byPath map
 	if err != nil {
 		return err
 	}
-	for _, m := range byPath {
+	for _, m := range byRef {
 		if err := r.ctx.Err(); err != nil {
 			return err
 		}

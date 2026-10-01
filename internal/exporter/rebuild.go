@@ -66,7 +66,7 @@ func InspectArchive(source string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	var m Manifest
-	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
+	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5 && m.FormatVersion != 6) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
 		return Manifest{}, errConfig("source manifest is unfinished or unsupported")
 	}
 	for _, c := range m.Coverage {
@@ -79,7 +79,7 @@ func InspectArchive(source string) (Manifest, error) {
 
 // No Client is constructed: rebuilding cannot discover, launch, close, or query
 // Pieces OS. It writes a new archive and only imports canonical included JSON.
-func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
+func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, resultErr error) {
 	if input.FileWorkers == 0 {
 		input.FileWorkers = defaultFileWorkers
 	}
@@ -111,13 +111,16 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		return Manifest{}, err
 	}
 	var original Manifest
-	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
+	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5 && original.FormatVersion != 6) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
 		return Manifest{}, errConfig("source manifest is unfinished or uses an unsupported archive format")
 	}
 	if original.FormatVersion == 5 && (original.ArchiveState == nil || original.ArchiveState.Version != 1 && original.ArchiveState.Version != 2) {
 		return Manifest{}, errConfig("archive reconstruction evidence is missing or unsupported")
 	}
-	if s := original.ArchiveState; s != nil && ((s.Version != 1 && s.Version != 2) || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
+	if original.FormatVersion == 6 && (original.ArchiveState == nil || original.ArchiveState.Version != 3) {
+		return Manifest{}, errConfig("grouped archives require reconstruction version 3")
+	}
+	if s := original.ArchiveState; s != nil && ((s.Version != 1 && s.Version != 2 && s.Version != 3) || s.Version == 3 && original.FormatVersion != 6 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
 		return Manifest{}, errConfig("archive reconstruction checksums are missing or invalid")
 	}
 	o := input.Options
@@ -214,6 +217,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		return Manifest{}, err
 	}
 	r := &run{ctx: ctx, opts: o, stage: abs + ".partial", rebuilding: true, meta: map[string]*Meta{}, coverage: map[string]*Coverage{}, inventory: map[string][]string{}, userPersonIDs: map[string]bool{}, derivedEdges: map[Edge]bool{}, cachedEdges: map[Edge]CacheEvidence{}}
+	defer r.cleanupCanonicalStage(&resultErr)
 	r.manifest = original
 	r.manifest.FileWorkers = o.FileWorkers
 	r.manifest.LocalPerformance = nil
@@ -294,31 +298,25 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 			return r.manifest, errConfig("archive link map checksum differs")
 		}
 	}
-	links, err := archiveLinkMap(ctx, root, expected)
+	links, err := archiveLinkMap(ctx, root, expected, original.FormatVersion >= 6)
 	if err != nil {
 		return r.manifest, err
 	}
 	byRef, byPath := map[string]*Meta{}, map[string]*Meta{}
 	r.progress.Stage("Read included archive records", expected)
-	prefix := "data"
-	if o.Mode == "preserve" {
-		prefix = "raw"
-	}
 	for _, cov := range original.Coverage {
 		material, _ := materialByType(cov.Material)
-		folder := prefix + "/" + material.Folder
 		count := 0
-		err := archiveDirectory(root, folder, func(entry fs.DirEntry) error {
+		err := archiveCollection(ctx, root, material, o.Mode, original.FormatVersion, func(ref string, b []byte, file string, offset int64) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			ref := strings.TrimSuffix(entry.Name(), ".json")
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || !validDigest(ref) || links[ref] == "" || byRef[ref] != nil {
+			if links[ref] == "" || byRef[ref] != nil {
 				return errConfig("archive record directory contains unexpected or duplicate files")
 			}
-			b, err := archiveRead(root, folder+"/"+entry.Name(), 128<<20)
-			if err != nil {
-				return err
+			grouped := strings.HasSuffix(file, ".jsonl")
+			if grouped && links[ref] != groupedDocumentPath(file) || !grouped && (byPath[links[ref]] != nil || original.FormatVersion >= 6 && strings.HasPrefix(links[ref], "markdown/associations/")) {
+				return errConfig("archive navigation conflicts with canonical storage")
 			}
 			v := map[string]any{}
 			if decodeArchiveJSON(b, &v) != nil || fieldString(v, "id") == "" || opaque(material.Type, fieldString(v, "id")) != ref {
@@ -333,6 +331,9 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 			m.Edges = nil
 			h := sha256.Sum256(b)
 			m.ArchiveDataSHA256 = hex.EncodeToString(h[:])
+			if grouped {
+				m.ArchiveDataPath, m.ArchiveDataOffset, m.ArchiveDataLength = file, offset, int64(len(b))
+			}
 			byRef[ref], byPath[links[ref]] = m, m
 			count++
 			r.progress.Add(1)
@@ -374,7 +375,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (Manifest, error) {
 		}
 		r.manifest.Warnings = append(r.manifest.Warnings, "Legacy archive has no reconstruction checksums, original projection states, or per-record redaction/selection evidence. Verified user labels were replayed only from its existing user profile links. Coverage remains partial; unknown person evidence is retained conservatively.")
 	}
-	if err := r.restoreArchiveGraph(root, original.ArchiveState, byPath); err != nil {
+	if err := r.restoreArchiveGraph(root, original.ArchiveState, byPath, byRef, links); err != nil {
 		return r.manifest, err
 	}
 	r.restoreLegacyPersonEvidence(original, manifestBytes, byRef)
@@ -525,7 +526,7 @@ func archiveDirectory(root *os.Root, name string, visit func(fs.DirEntry) error)
 	}
 }
 
-func archiveLinkMap(ctx context.Context, root *os.Root, expected int) (map[string]string, error) {
+func archiveLinkMap(ctx context.Context, root *os.Root, expected int, shared ...bool) (map[string]string, error) {
 	f, err := archiveOpen(root, "link-map.json")
 	if err != nil {
 		return nil, errConfig("archive link map is missing or unsafe")
@@ -537,6 +538,7 @@ func archiveLinkMap(ctx context.Context, root *os.Root, expected int) (map[strin
 		return nil, errConfig("invalid archive link map")
 	}
 	links, used := map[string]string{}, map[string]bool{}
+	allowShared := len(shared) == 1 && shared[0]
 	for d.More() {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -544,7 +546,7 @@ func archiveLinkMap(ctx context.Context, root *os.Root, expected int) (map[strin
 		tok, err := d.Token()
 		key, ok := tok.(string)
 		var value string
-		if err != nil || !ok || !validDigest(key) || d.Decode(&value) != nil || !safeArchivePath(value) || !strings.HasSuffix(value, ".md") || links[key] != "" || used[strings.ToLower(value)] || len(links) >= expected {
+		if err != nil || !ok || !validDigest(key) || d.Decode(&value) != nil || !safeArchivePath(value) || !strings.HasSuffix(value, ".md") || links[key] != "" || used[strings.ToLower(value)] && !(allowShared && strings.HasPrefix(value, "markdown/associations/") && strings.HasPrefix(path.Base(value), "group-")) || len(links) >= expected {
 			return nil, errConfig("invalid, duplicate, or unsafe archive link map entry")
 		}
 		links[key], used[strings.ToLower(value)] = value, true

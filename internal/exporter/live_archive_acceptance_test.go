@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io/fs"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,8 +35,8 @@ type finalArchiveCounts struct {
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
 	report := finalArchiveCounts{States: map[string]int{}}
 	manifest, err := InspectArchive(source)
-	if err != nil || manifest.FormatVersion != 5 || manifest.ArchiveState == nil || manifest.ArchiveState.Version != 1 && manifest.ArchiveState.Version != 2 {
-		return report, errConfig("acceptance requires a finalized format-5 archive with reconstruction evidence")
+	if err != nil || manifest.FormatVersion != 5 && manifest.FormatVersion != 6 || manifest.ArchiveState == nil || manifest.ArchiveState.Version < 1 || manifest.ArchiveState.Version > 3 {
+		return report, errConfig("acceptance requires a finalized format-5/6 archive with reconstruction evidence")
 	}
 	report.ArchiveStatus = manifest.Status
 	root, err := os.OpenRoot(source)
@@ -53,7 +53,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		coverage[c.Material] = c
 		wantIncluded += c.Included
 	}
-	links, err := archiveLinkMap(ctx, root, wantIncluded)
+	links, err := archiveLinkMap(ctx, root, wantIncluded, manifest.FormatVersion >= 6)
 	if err != nil {
 		return report, errConfig("archive link map does not reconcile")
 	}
@@ -97,7 +97,21 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 			prefix = "raw/"
 		}
 		dataPath := prefix + material.Folder + "/" + row.Ref + ".json"
-		body, err := archiveRead(root, dataPath, 128<<20)
+		var body []byte
+		if row.DataLength > 0 {
+			dataPath = row.DataPath
+			if manifest.FormatVersion != 6 || manifest.ArchiveState.Version != 3 || !strings.HasPrefix(dataPath, prefix+material.Folder+"/") || links[row.Ref] != groupedDocumentPath(dataPath) {
+				return errConfig("invalid grouped record navigation")
+			}
+			f, e := openCanonicalSection(ctx, source, &Meta{DataPath: dataPath, DataOffset: row.DataOffset, DataLength: row.DataLength})
+			if e != nil {
+				return e
+			}
+			body, err = io.ReadAll(f)
+			f.Close()
+		} else {
+			body, err = archiveRead(root, dataPath, 128<<20)
+		}
 		if err != nil {
 			return errConfig("included canonical record is missing or unreadable")
 		}
@@ -112,6 +126,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		}
 		md.Close()
 		m := &Meta{Type: row.Material, ID: fieldString(v, "id"), Path: links[row.Ref], DataPath: dataPath, State: "included", AnnotationType: fieldString(v, "type")}
+		m.DataOffset, m.DataLength, m.ArchiveDataSHA256 = row.DataOffset, row.DataLength, row.DataSHA256
 		m.Key = m.Type + "\x00" + m.ID
 		byRef[row.Ref], byPath[m.Path], byKey[m.Key] = m, m, m
 		report.Included++
@@ -143,12 +158,14 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 			continue
 		}
 		count := 0
-		err := archiveDirectory(root, directory, func(entry fs.DirEntry) error {
-			ref := strings.TrimSuffix(entry.Name(), ".json")
+		checked := map[string]bool{}
+		err := archiveCollection(ctx, root, material, manifest.Mode, manifest.FormatVersion, func(ref string, b []byte, file string, offset int64) error {
 			m := byRef[ref]
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") || m == nil || m.Type != typ {
+			sum := sha256.Sum256(b)
+			if m == nil || checked[ref] || m.Type != typ || m.DataPath != file || m.DataOffset != offset || hex.EncodeToString(sum[:]) != m.ArchiveDataSHA256 || m.DataLength > 0 && m.DataLength != int64(len(b)) {
 				return errConfig("canonical directory contains an unaccounted file")
 			}
+			checked[ref] = true
 			count++
 			return ctx.Err()
 		})
@@ -159,6 +176,12 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 	cacheBodies := map[string]bool{}
 	err = archiveLines(ctx, root, "relationships.jsonl", manifest.ArchiveState.GraphSHA256, func(edge PublicEdge) error {
 		a, b := byPath[edge.Source], byPath[edge.Target]
+		if manifest.FormatVersion >= 6 {
+			a, b = byRef[edge.SourceRef], byRef[edge.TargetRef]
+			if a == nil || b == nil || a.Path != edge.Source || b.Path != edge.Target {
+				return errConfig("graph identity does not match document path")
+			}
+		}
 		if a == nil || b == nil || edge.Relation != "embedded_markdown" && referenceTypes[edge.Relation] == "" {
 			return errConfig("graph has an unresolved endpoint or unsupported relation")
 		}

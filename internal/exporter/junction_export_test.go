@@ -141,7 +141,7 @@ func TestCurrentJunctionExportAndOfflineRebuild(t *testing.T) {
 	if m.Status != "complete_for_implemented_scope" {
 		t.Fatalf("unexpected coverage gaps: %+v", m.Issues)
 	}
-	if m.ArchiveState == nil || m.ArchiveState.Version != 2 {
+	if m.FormatVersion != 6 || m.ArchiveState == nil || m.ArchiveState.Version != 3 {
 		t.Fatal("archive does not fence incompatible older rebuilders")
 	}
 	for _, typ := range f.requestedMaterials {
@@ -205,7 +205,7 @@ func TestCurrentJunctionExportAndOfflineRebuild(t *testing.T) {
 		if next.People.UnknownSummaries != 0 || len(next.Junctions) != len(m.Junctions) {
 			t.Fatal("rebuild lost current source evidence")
 		}
-		if next.ArchiveState.Version != 2 {
+		if next.FormatVersion != 6 || next.ArchiveState.Version != 3 {
 			t.Fatal("rebuild lost current-junction compatibility boundary")
 		}
 		assertJunctionArchive(out)
@@ -409,7 +409,7 @@ func TestPackagedCurrentJunctionCLI(t *testing.T) {
 		t.Fatalf("packaged junction export failed: %v\n%s", err, b)
 	}
 	m, err := InspectArchive(out)
-	if err != nil || m.Scope.Name != "summaries" || m.People.Mode != "profiles" || len(m.Junctions) != 11 || m.ArchiveState == nil || m.ArchiveState.Version != 2 {
+	if err != nil || m.Scope.Name != "summaries" || m.People.Mode != "profiles" || len(m.Junctions) != 11 || m.FormatVersion != 6 || m.ArchiveState == nil || m.ArchiveState.Version != 3 {
 		t.Fatal("packaged default selection or current traversal failed", err)
 	}
 	for _, cov := range m.Coverage {

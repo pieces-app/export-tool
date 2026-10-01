@@ -20,8 +20,8 @@ const canonicalTransactionState = "canonical-stage/v1;not-a-source-recovery-chec
 
 // This is a private capture backend, not a public archive format or a source
 // resume adapter. Its caller owns the store/key lifecycle and must materialize
-// the accepted public record set before final auditing. It is not yet selected
-// by the CLI: grouped public records/navigation must be integrated first.
+// the accepted public record set before final auditing. The association staging
+// adapter owns its lifecycle and materializes grouped public records/navigation.
 // Operations are sequential, just like source/graph/privacy processing.
 type transactionalCanonicalRecords struct {
 	store        *recovery.Store

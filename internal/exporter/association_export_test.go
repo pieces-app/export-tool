@@ -77,8 +77,7 @@ func assertAssociationArchive(t *testing.T, root string, m Manifest, policy Poli
 	t.Helper()
 	family, _ := associationFamilyByName("signal_to_annotation_associations")
 	material := family.material()
-	data := filepath.Join(root, "data", material.Folder, opaque(material.Type, "signal-body-association")+".json")
-	v, err := readRecord(data)
+	v, data, err := readArchiveFixtureRecord(root, material.Type, "signal-body-association")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -442,8 +441,7 @@ func TestAssociationPreservationRebuildNarrowsPeople(t *testing.T) {
 				t.Fatal("association selection decision lost across preservation rebuilds")
 			}
 		}
-		path := filepath.Join(next, "raw/associations/signal_to_person_associations", opaque("SIGNAL_TO_PERSON_ASSOCIATIONS", "association")+".json")
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
+		if _, _, err := readArchiveFixtureRecord(next, "SIGNAL_TO_PERSON_ASSOCIATIONS", "association"); !os.IsNotExist(err) {
 			t.Fatal("omitted person binding survived in raw association JSON")
 		}
 		if iteration == 0 && !reflect.DeepEqual(before, archiveHashes(t, out)) {
@@ -493,8 +491,7 @@ func TestAssociationLateCredentialsAndConflictingIdentity(t *testing.T) {
 					t.Fatal("late association credential survived in earlier prose")
 				}
 			} else {
-				path := filepath.Join(out, prefix, "associations/signal_to_annotation_associations", opaque("SIGNAL_TO_ANNOTATION_ASSOCIATIONS", "association-one")+".json")
-				if _, err := os.Stat(path); !os.IsNotExist(err) {
+				if _, _, err := readArchiveFixtureRecord(out, "SIGNAL_TO_ANNOTATION_ASSOCIATIONS", "association-one"); !os.IsNotExist(err) {
 					t.Fatal("conflicting association identity retained an earlier binding")
 				}
 				if m.Status != "partial" || m.Associations.Families[0].Failed != 1 {

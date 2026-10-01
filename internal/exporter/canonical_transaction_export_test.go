@@ -14,9 +14,9 @@ import (
 	"github.com/pieces-app/export-tool/internal/recovery"
 )
 
-// Test-only materialization still uses individual output files. The production
-// grouped public format is separate pending work, so this cannot claim an
-// end-to-end speedup or enable the transactional backend in the CLI yet.
+// Test-only materialization exercises the legacy individual-file boundary.
+// Production association grouping has separate acceptance tests; this fixture
+// keeps the generic transaction adapter independent of the public layout.
 type materializingTransactionFixture struct {
 	*transactionalCanonicalRecords
 	r         *run
