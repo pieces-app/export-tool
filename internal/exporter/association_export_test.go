@@ -474,16 +474,16 @@ func TestAssociationLateCredentialsAndConflictingIdentity(t *testing.T) {
 			client, _ := NewClient(srv.URL, time.Second, 8<<20)
 			materials, _ := SelectMaterials("SIGNALS,ANNOTATIONS")
 			out := filepath.Join(t.TempDir(), "archive")
-			mode, prefix := "filtered", "data"
+			mode := "filtered"
 			if scenario == "conflict-preserve" {
-				mode, prefix = "preserve", "raw"
+				mode = "preserve"
 			}
 			m, err := Export(context.Background(), client, Options{Output: out, Mode: mode, Timezone: "UTC", Materials: materials, BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, DefaultPolicy())})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if scenario == "late-credential" {
-				v, err := readRecord(filepath.Join(out, prefix, "annotations", opaque("ANNOTATIONS", "body-one")+".json"))
+				v, _, err := readArchiveFixtureRecord(out, "ANNOTATIONS", "body-one")
 				if err != nil {
 					t.Fatal(err)
 				}

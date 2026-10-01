@@ -137,7 +137,7 @@ func createLegacyProjectedArchive(t *testing.T) string {
 	c, _ := NewClient(srv.URL, time.Second, 8<<20)
 	materials, _ := SelectMaterials("PERSONS,ANNOTATIONS")
 	source := filepath.Join(t.TempDir(), "source")
-	m, err := Export(context.Background(), c, Options{Output: source, Mode: "filtered", Materials: materials, Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, DefaultPolicy())})
+	m, err := Export(context.Background(), c, Options{captureCheckpoint: useLegacyCanonicalFiles, Output: source, Mode: "filtered", Materials: materials, Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, DefaultPolicy())})
 	srv.Close()
 	if err != nil {
 		t.Fatal(err)

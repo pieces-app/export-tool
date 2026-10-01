@@ -93,7 +93,7 @@ func TestCaptureReplayPreservesPrivacyProfilesAndMovedLinks(t *testing.T) {
 	o.Format = "both"
 	var capturedMeta map[string]*Meta
 	o.captureCheckpoint = func(r *run) error {
-		body, err := readRecord(filepath.Join(r.stage, r.meta["ANNOTATIONS\x00body"].DataPath))
+		body, err := r.readCanonical(r.meta["ANNOTATIONS\x00body"])
 		if err != nil || !strings.Contains(fieldString(body, "text"), late) || !r.opts.Scanner.known[late] {
 			t.Fatal("fixture did not discover a credential after writing the earlier body", err)
 		}
@@ -509,7 +509,7 @@ func TestCaptureReplayPreservationAndWithheldDecisions(t *testing.T) {
 				if m.Coverage[0].Included != 1 {
 					t.Fatal("preserve mode discarded original")
 				}
-				body, err := readRecord(filepath.Join(dest, "raw/tags", opaque("TAGS", secret)+".json"))
+				body, _, err := readArchiveFixtureRecord(dest, "TAGS", secret)
 				if err != nil || fieldString(body, "id") != secret {
 					t.Fatal("preserved identity changed", err)
 				}

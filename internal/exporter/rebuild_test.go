@@ -52,7 +52,7 @@ func createRebuildFixture(t *testing.T) (string, Policy, Manifest) {
 	p := DefaultPolicy()
 	p.Deny = []DomainRule{{"bank.example", true}}
 	output := filepath.Join(t.TempDir(), "source")
-	m, err := Export(context.Background(), c, Options{Output: output, Scope: selection.Name, Materials: selection.Materials, ReferenceOnly: selection.ReferenceOnly, Mode: "filtered", Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, p), Version: "fixture-source"})
+	m, err := Export(context.Background(), c, Options{captureCheckpoint: useLegacyCanonicalFiles, Output: output, Scope: selection.Name, Materials: selection.Materials, ReferenceOnly: selection.ReferenceOnly, Mode: "filtered", Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, p), Version: "fixture-source"})
 	srv.Close() // Offline tests cannot consult this OS again.
 	if err != nil || m.Status != "complete_for_implemented_scope" {
 		t.Fatalf("source fixture export failed: %v %+v", err, m.Issues)
@@ -345,10 +345,9 @@ func TestRebuildPreserveKeepsOriginalsAndRejectsModeChange(t *testing.T) {
 	if err != nil || m.Mode != "preserve" {
 		t.Fatalf("preservation mode lost: %v", err)
 	}
-	name := filepath.Join("raw", "users", opaque("USERS", "user")+".json")
-	before, _ := os.ReadFile(filepath.Join(source, name))
-	after, _ := os.ReadFile(filepath.Join(out, name))
-	if string(before) != string(after) || !strings.Contains(string(after), fieldString(u, "api_key")) {
+	before, _, beforeErr := readArchiveFixtureRecord(source, "USERS", "user")
+	after, _, afterErr := readArchiveFixtureRecord(out, "USERS", "user")
+	if beforeErr != nil || afterErr != nil || !reflect.DeepEqual(before, after) || fieldString(after, "api_key") != fieldString(u, "api_key") {
 		t.Fatal("preserved original changed")
 	}
 	_, err = Rebuild(context.Background(), RebuildOptions{Source: source, Options: Options{Output: filepath.Join(t.TempDir(), "wrong-mode"), Mode: "filtered", Scanner: scanner(t, DefaultPolicy())}})

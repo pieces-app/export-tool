@@ -16,6 +16,10 @@ import (
 
 func putGraphFixtureRecord(t testing.TB, r *run, typ, id, annotationType string, v map[string]any) *Meta {
 	t.Helper()
+	// This fixture isolates graph reads using deliberately staged physical files.
+	if r.records == nil {
+		r.records = &fileCanonicalRecords{run: r}
+	}
 	m := &Meta{Type: typ, ID: id, Key: typ + "\x00" + id, State: "included", Title: id, DataPath: fmt.Sprintf("%s-%s.json", typ, id), Path: fmt.Sprintf("markdown/%s/%s.md", typ, id), Created: "2026-09-30T00:00:00Z", AnnotationType: annotationType}
 	v["id"] = id
 	b, err := json.Marshal(v)

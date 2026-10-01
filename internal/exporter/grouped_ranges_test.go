@@ -131,7 +131,7 @@ func TestGroupedRangeRecordsKeepDocumentsGraphAndExactValues(t *testing.T) {
 	o.captureCheckpoint = func(r *run) error { return r.saveCapture(checkpoint) }
 	m, err := Export(context.Background(), c, o)
 	srv.Close()
-	if err != nil || m.FormatVersion != 7 || m.ArchiveState == nil || m.ArchiveState.Version != 4 {
+	if err != nil || m.FormatVersion != 8 || m.ArchiveState == nil || m.ArchiveState.Version != 5 {
 		t.Fatal("grouped ranges did not produce the new archive contract", err)
 	}
 	before, err := inspectFinalArchive(context.Background(), o.Output)
@@ -210,7 +210,7 @@ func TestOlderPackagedRangeArchiveUpgrade(t *testing.T) {
 	}
 	destination := filepath.Join(root, "upgraded")
 	m, err = Rebuild(ctx, RebuildOptions{Source: source, Options: Options{Output: destination, Format: "both", Scanner: scanner(t, DefaultPolicy())}})
-	if err != nil || m.FormatVersion != 7 || m.ArchiveState.Version != 4 {
+	if err != nil || m.FormatVersion != 8 || m.ArchiveState.Version != 5 {
 		t.Fatal("legacy canonical ranges did not upgrade", err)
 	}
 	moved := destination + "-moved"

@@ -15,6 +15,7 @@ import (
 func TestPrivacyRescanKeepsUnchangedFileAndRewritesLateCredential(t *testing.T) {
 	material, _ := materialByType("TAGS")
 	r := &run{ctx: context.Background(), stage: t.TempDir(), opts: Options{Mode: "filtered", Scanner: scanner(t, DefaultPolicy())}, meta: map[string]*Meta{}, coverage: map[string]*Coverage{"TAGS": {Material: "TAGS"}}}
+	r.records = &fileCanonicalRecords{run: r} // Exercise unchanged-file rewrite behavior explicitly.
 	for _, id := range []string{"unchanged", "late-secret"} {
 		v := record(id, "2026-09-30T00:00:00Z")
 		v["name"] = "Ordinary synthetic topic"

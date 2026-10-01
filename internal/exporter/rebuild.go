@@ -66,7 +66,7 @@ func InspectArchive(source string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	var m Manifest
-	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5 && m.FormatVersion != 6 && m.FormatVersion != 7) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
+	if decodeArchiveJSON(b, &m) != nil || (m.FormatVersion != 4 && m.FormatVersion != 5 && m.FormatVersion != 6 && m.FormatVersion != 7 && m.FormatVersion != 8) || (m.Status != "partial" && m.Status != "complete_for_implemented_scope") || m.Finished.IsZero() || (m.Mode != "filtered" && m.Mode != "preserve") {
 		return Manifest{}, errConfig("source manifest is unfinished or unsupported")
 	}
 	for _, c := range m.Coverage {
@@ -111,7 +111,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 		return Manifest{}, err
 	}
 	var original Manifest
-	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5 && original.FormatVersion != 6 && original.FormatVersion != 7) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
+	if err := decodeArchiveJSON(manifestBytes, &original); err != nil || (original.FormatVersion != 4 && original.FormatVersion != 5 && original.FormatVersion != 6 && original.FormatVersion != 7 && original.FormatVersion != 8) || (original.Status != "partial" && original.Status != "complete_for_implemented_scope") || original.Finished.IsZero() || original.Started.IsZero() || original.Finished.Before(original.Started) {
 		return Manifest{}, errConfig("source manifest is unfinished or uses an unsupported archive format")
 	}
 	if original.FormatVersion == 5 && (original.ArchiveState == nil || original.ArchiveState.Version != 1 && original.ArchiveState.Version != 2) {
@@ -123,7 +123,10 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 	if original.FormatVersion == 7 && (original.ArchiveState == nil || original.ArchiveState.Version != 4) {
 		return Manifest{}, errConfig("grouped canonical archive requires reconstruction version 4")
 	}
-	if s := original.ArchiveState; s != nil && ((s.Version < 1 || s.Version > 4) || s.Version == 3 && original.FormatVersion != 6 || s.Version == 4 && original.FormatVersion != 7 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
+	if original.FormatVersion == 8 && (original.ArchiveState == nil || original.ArchiveState.Version != 5) {
+		return Manifest{}, errConfig("grouped canonical archive requires reconstruction version 5")
+	}
+	if s := original.ArchiveState; s != nil && ((s.Version < 1 || s.Version > 5) || s.Version == 3 && original.FormatVersion != 6 || s.Version == 4 && original.FormatVersion != 7 || s.Version == 5 && original.FormatVersion != 8 || !validDigest(s.StateSHA256) || !validDigest(s.GraphSHA256) || !validDigest(s.LinkMapSHA256)) {
 		return Manifest{}, errConfig("archive reconstruction checksums are missing or invalid")
 	}
 	o := input.Options

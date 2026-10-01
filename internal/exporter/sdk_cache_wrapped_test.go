@@ -384,7 +384,7 @@ func TestWrappedSDKCacheUnknownLegacyEligibilityStaysUnknown(t *testing.T) {
 			materials, _ := SelectMaterials("SIGNALS,ANNOTATIONS")
 			policy := DefaultPolicy()
 			source := filepath.Join(t.TempDir(), "source")
-			m, err := Export(context.Background(), client, Options{Output: source, Mode: "filtered", Materials: materials, Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, policy)})
+			m, err := Export(context.Background(), client, Options{captureCheckpoint: useLegacyCanonicalFiles, Output: source, Mode: "filtered", Materials: materials, Timezone: "UTC", BatchSize: 50, WindowIDs: 5000, Scanner: scanner(t, policy)})
 			srv.Close()
 			if err != nil {
 				t.Fatal(err)

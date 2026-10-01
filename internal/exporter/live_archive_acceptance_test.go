@@ -42,7 +42,7 @@ type finalArchiveCounts struct {
 func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts, error) {
 	report := finalArchiveCounts{States: map[string]int{}}
 	manifest, err := InspectArchive(source)
-	if err != nil || manifest.FormatVersion != 5 && manifest.FormatVersion != 6 && manifest.FormatVersion != 7 || manifest.ArchiveState == nil || manifest.ArchiveState.Version < 1 || manifest.ArchiveState.Version > 4 {
+	if err != nil || manifest.FormatVersion != 5 && manifest.FormatVersion != 6 && manifest.FormatVersion != 7 && manifest.FormatVersion != 8 || manifest.ArchiveState == nil || manifest.ArchiveState.Version < 1 || manifest.ArchiveState.Version > 5 {
 		return report, errConfig("acceptance requires a finalized format-5/6/7 archive with reconstruction evidence")
 	}
 	report.ArchiveStatus = manifest.Status
@@ -109,8 +109,8 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		if row.DataLength > 0 {
 			dataPath = row.DataPath
 			_, association := associationFamilyByType(row.Material)
-			validVersion := manifest.FormatVersion == 6 && manifest.ArchiveState.Version == 3 || manifest.FormatVersion == 7 && manifest.ArchiveState.Version == 4
-			validType := association || manifest.FormatVersion == 7 && row.Material == "RANGES"
+			validVersion := manifest.FormatVersion == 6 && manifest.ArchiveState.Version == 3 || manifest.FormatVersion == 7 && manifest.ArchiveState.Version == 4 || manifest.FormatVersion == 8 && manifest.ArchiveState.Version == 5
+			validType := association || manifest.FormatVersion >= 7 && row.Material == "RANGES" || manifest.FormatVersion == 8
 			if !validVersion || !validType || !strings.HasPrefix(dataPath, prefix+material.Folder+"/") {
 				return errConfig("invalid grouped record storage")
 			}
@@ -246,6 +246,21 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		}
 	}
 	report.SummaryPipelineLinks, report.PipelinesWithSummaries = len(pipelineMembers), len(pipelines)
+	readAnnotation := func(a *Meta) ([]byte, error) {
+		if a.DataLength == 0 {
+			return archiveRead(root, a.DataPath, 128<<20)
+		}
+		f, err := openCanonicalSection(ctx, source, a)
+		if err != nil {
+			return nil, err
+		}
+		b, readErr := io.ReadAll(f)
+		closeErr := f.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		return b, closeErr
+	}
 	verifiedProfiles := map[string]bool{}
 	for _, m := range byKey {
 		if err := ctx.Err(); err != nil {
@@ -284,7 +299,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 					profile = true
 					report.PersonHistoryLinks++
 					if !verifiedProfiles[a.Key] {
-						canonical, err := archiveRead(root, a.DataPath, 128<<20)
+						canonical, err := readAnnotation(a)
 						var v map[string]any
 						if err != nil || decodeArchiveJSON(canonical, &v) != nil {
 							return report, errConfig("profile history canonical annotation cannot be read")
@@ -300,7 +315,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 				}
 				continue
 			}
-			b, err := archiveRead(root, a.DataPath, 128<<20)
+			b, err := readAnnotation(a)
 			var v map[string]any
 			if err != nil || decodeArchiveJSON(b, &v) != nil {
 				return report, errConfig("attached canonical annotation cannot be read")
@@ -426,6 +441,10 @@ func TestFinalArchiveAcceptanceDetectsDamage(t *testing.T) {
 	var links map[string]string
 	b, _ := os.ReadFile(filepath.Join(out, "link-map.json"))
 	json.Unmarshal(b, &links)
+	_, canonicalPath, err := readArchiveFixtureRecord(out, "ANNOTATIONS", "body")
+	if err != nil {
+		t.Fatal(err)
+	}
 	mdPath := filepath.Join(out, links[opaque("WORKSTREAM_SUMMARIES", "summary")])
 	for _, mutation := range []struct {
 		name, path string
@@ -434,7 +453,7 @@ func TestFinalArchiveAcceptanceDetectsDamage(t *testing.T) {
 		{"truncated-body", mdPath, []byte("# Body removed\n")},
 		{"truncated-profile", filepath.Join(out, links[opaque("ANNOTATIONS", "profile")]), []byte("# Profile body removed\n")},
 		{"broken-index-link", filepath.Join(out, "index.md"), []byte("[missing](missing.md)\n")},
-		{"changed-canonical", filepath.Join(out, "data/annotations/"+opaque("ANNOTATIONS", "body")+".json"), []byte("{}\n")},
+		{"changed-canonical", canonicalPath, []byte("{}\n")},
 	} {
 		t.Run(mutation.name, func(t *testing.T) {
 			before, err := os.ReadFile(mutation.path)

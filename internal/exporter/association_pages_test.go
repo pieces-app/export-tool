@@ -200,7 +200,7 @@ func assertPagedAssociationArchive(t *testing.T, root string, m Manifest, policy
 	if derived != 2*(count-1) {
 		t.Fatalf("missing explicit event/person navigation: %d", derived)
 	}
-	v, err := readRecord(filepath.Join(root, "data/events", opaque("WORKSTREAM_EVENTS", "event-001")+".json"))
+	v, _, err := readArchiveFixtureRecord(root, "WORKSTREAM_EVENTS", "event-001")
 	if err != nil || v["persons"] != nil {
 		t.Fatal("source snapshot projections were fabricated")
 	}

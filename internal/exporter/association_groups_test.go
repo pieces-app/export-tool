@@ -77,6 +77,9 @@ func requireNoTransientAssociationStorage(t *testing.T, parent string) {
 func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
 	parent := t.TempDir()
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial")}
+	if err := os.Mkdir(r.stage, 0700); err != nil {
+		t.Fatal(err)
+	}
 	s := r.canonicalRecords().(*associationCanonicalRecords)
 	if err := s.ensure(r.ctx); err != nil {
 		t.Fatal(err)
@@ -117,7 +120,7 @@ func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testi
 	o.captureCheckpoint = func(r *run) error { return r.saveCapture(checkpoint) }
 	m, err := Export(context.Background(), client, o)
 	srv.Close()
-	if err != nil || m.FormatVersion != 6 || m.ArchiveState.Version != 3 {
+	if err != nil || m.FormatVersion != 8 || m.ArchiveState.Version != 5 {
 		t.Fatal("grouped export failed", err)
 	}
 	requireNoTransientAssociationStorage(t, filepath.Dir(o.Output))
@@ -236,23 +239,8 @@ func TestGroupedAssociationLegacyArchiveUpgrade(t *testing.T) {
 	srv := junctionServer(t, f, nil)
 	client, _ := NewClient(srv.URL, time.Second, 8<<20)
 	o := junctionExportOptions(t)
-	o.captureCheckpoint = func(r *run) error {
-		files := &fileCanonicalRecords{run: r}
-		for _, m := range r.meta {
-			if _, ok := associationFamilyByType(m.Type); !ok || m.State != "included" {
-				continue
-			}
-			v, err := r.readCanonical(m)
-			if err != nil {
-				return err
-			}
-			if err := files.Write(r.ctx, m, v, false); err != nil {
-				return err
-			}
-		}
-		r.records = files // Produce the actual legacy per-record format for this fixture.
-		return nil
-	}
+	o.captureCheckpoint = useLegacyCanonicalFiles
+
 	m, err := Export(context.Background(), client, o)
 	if err != nil || m.FormatVersion != 5 || m.ArchiveState.Version != 2 {
 		t.Fatal("legacy fixture failed", err)
@@ -263,7 +251,7 @@ func TestGroupedAssociationLegacyArchiveUpgrade(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "upgraded")
 	next, err := Rebuild(context.Background(), RebuildOptions{Source: o.Output, Options: Options{Output: out, Scanner: scanner(t, DefaultPolicy())}})
-	if err != nil || next.FormatVersion != 6 || next.ArchiveState.Version != 3 {
+	if err != nil || next.FormatVersion != 8 || next.ArchiveState.Version != 5 {
 		t.Fatal("legacy archive did not upgrade", err)
 	}
 	after, err := inspectFinalArchive(context.Background(), out)

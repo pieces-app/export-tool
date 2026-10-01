@@ -2,6 +2,15 @@
 
 Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
 
+## Isolated all-material canonical storage
+
+- [x] Implement format-8 / reconstruction-version-5 canonical grouping for all supported materials while preserving individual ordinary Markdown documents and legacy format-4–7 readers.
+- [x] Verify source export, authenticated capture replay, repeated rebuilds, moved documents, canonical values/body/profile/graph preservation in a multi-chunk fixture (50.09s, race checked).
+- [x] Restore early canonical destination rejection and update existing privacy/legacy fixtures to inspect the correct physical record representation; focused compatibility checks pass (28.272s).
+- [x] Finish corrected full source regression (exporter 168.529s) and vet. Actual compiled Mac CLI checks, actual older-package Markdown/PDF upgrade and focused late-privacy/destination/storage cleanup checks passed with race instrumentation (72.544s).
+- [ ] Measure the same real capture, including final output, privacy audits, metadata and memory; reconcile every included canonical record and graph edge before promotion. Current range-only/sidecar rebuild runs separately with the frozen older candidate.
+- [ ] Verify other runtime behavior and merge into the production-validation branch only after these gates. This prototype is not distributed.
+
 ## Current outcome and immediate fixes — 2026-10-01
 
 Isolated `export-cli/grouped-canonical-storage` candidate: canonical range JSON now groups into bounded chunks while range/summary/profile Markdown paths remain distinct. Format 7 / reconstruction version 4 readers preserve formats 4–6. Source/replay/repeated-rebuild, exact numbers/fields/graph, moved Markdown/PDF, late-credential removal and adversarial row/path/version tests pass. Full source regression passed (exporter 164.225 s without race instrumentation), vet passed, and actual compiled Mac ARM64 CLI checks passed (71.750 s with race checks). Binary-only packaging, other runtimes and real-capture performance/acceptance remain required before promotion. Other ordinary canonical types and range Markdown grouping remain future work.

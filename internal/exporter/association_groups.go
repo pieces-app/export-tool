@@ -66,7 +66,7 @@ func (r *run) prepareAssociationGroups() error {
 			r.associationGroups = append(r.associationGroups, g)
 			r.manifest.FormatVersion = max(r.manifest.FormatVersion, 6)
 		} else {
-			r.manifest.FormatVersion = 7
+			r.manifest.FormatVersion = 8
 		}
 		number++
 		members, data = nil, bytes.Buffer{}

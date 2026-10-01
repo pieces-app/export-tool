@@ -186,6 +186,7 @@ func stagedSignalDigest(t testing.TB, count, textBytes int) *run {
 			t.Fatal(err)
 		}
 	}
+	r.records = &fileCanonicalRecords{run: r} // This unit fixture deliberately writes physical files.
 	return r
 }
 

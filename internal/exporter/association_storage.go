@@ -35,6 +35,31 @@ func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 	if s.transactions != nil {
 		return nil
 	}
+	// Detect an unusable public destination before accepting source records
+	// into private staging. Publishing still happens only after privacy checks.
+	root, err := os.OpenRoot(s.run.stage)
+	if err != nil {
+		return err
+	}
+	prefix := "data"
+	if s.run.opts.Mode == "preserve" {
+		prefix = "raw"
+	}
+	err = root.Mkdir(prefix, 0700)
+	if err == nil || os.IsExist(err) {
+		info, inspectErr := root.Lstat(prefix)
+		err = inspectErr
+		if err == nil && !info.IsDir() {
+			err = errConfig("canonical destination is not a directory")
+		}
+	}
+	closeErr := root.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
 	parent, err := os.MkdirTemp(filepath.Dir(s.run.stage), ".pieces-export-stage-")
 	if err != nil {
 		return err
@@ -200,11 +225,15 @@ func (r *run) cleanupCanonicalStage(resultErr ...*error) {
 	}
 }
 
-// Format 7 extends grouped canonical storage to ranges. Their Markdown
-// documents keep distinct paths; association pages alone share document paths.
+// Format 8 groups every known canonical material. User-facing documents remain
+// individual; association pages alone share document paths.
 func groupedCanonicalMaterial(typ string) bool {
-	if _, ok := associationFamilyByType(typ); ok {
-		return true
-	}
-	return typ == "RANGES"
+	_, ok := materialByType(typ)
+	return ok
+}
+
+// Keep physical contracts of older archives independent of current write policy.
+func groupedCanonicalInFormat(typ string, format int) bool {
+	_, association := associationFamilyByType(typ)
+	return format >= 6 && association || format >= 7 && typ == "RANGES" || format >= 8 && groupedCanonicalMaterial(typ)
 }

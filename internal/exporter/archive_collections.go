@@ -20,8 +20,7 @@ func archiveCollection(ctx context.Context, root *os.Root, material Material, mo
 		prefix = "raw/"
 	}
 	folder := prefix + material.Folder
-	_, association := associationFamilyByType(material.Type)
-	grouped := format >= 6 && association || format >= 7 && groupedCanonicalMaterial(material.Type)
+	grouped := groupedCanonicalInFormat(material.Type, format)
 	seen := map[int]bool{}
 	err := archiveDirectory(root, folder, func(entry fs.DirEntry) error {
 		if err := ctx.Err(); err != nil {

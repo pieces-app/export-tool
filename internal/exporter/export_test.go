@@ -479,8 +479,8 @@ func TestPreservationModeRetainsOriginalsAndRefusesOverwrite(t *testing.T) {
 	if _, err := Export(context.Background(), c, o); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(out, "raw/annotations", opaque("ANNOTATIONS", "a")+".json"))
-	if err != nil || !strings.Contains(string(data), secret) {
+	data, _, err := readArchiveFixtureRecord(out, "ANNOTATIONS", "a")
+	if err != nil || fieldString(data, "text") != secret {
 		t.Fatal("preservation mode lost original content")
 	}
 	if _, err := Export(context.Background(), c, o); err == nil {
