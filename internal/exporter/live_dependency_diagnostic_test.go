@@ -89,7 +89,7 @@ func TestDiagnosticRetainedDependencyGaps(t *testing.T) {
 	if err != nil {
 		t.Fatal("in-memory baseline filtering failed")
 	}
-	before, missing := map[string]int{}, map[string]int{}
+	before, missing, archivedWithheld, restored := map[string]int{}, map[string]int{}, map[string]int{}, map[string]int{}
 	compared := 0
 	for key, m := range baseline.meta {
 		if session.r.meta[key].State == "missing" {
@@ -98,8 +98,15 @@ func TestDiagnosticRetainedDependencyGaps(t *testing.T) {
 		if m.Type != "WORKSTREAM_SUMMARIES" && m.Type != "ANNOTATIONS" {
 			continue
 		}
-		if actualStates[opaque(m.Type, m.ID)] != m.State {
-			t.Fatal("dependency-only baseline does not reproduce final summary/annotation decisions")
+		archived := actualStates[opaque(m.Type, m.ID)]
+		if archived == "withheld" {
+			archivedWithheld[m.Type]++
+		}
+		if archived != m.State {
+			if archived != "withheld" || m.State != "included" {
+				t.Fatal("unexpected change in captured versus finalized narrative decisions")
+			}
+			restored[m.Type]++
 		}
 		compared++
 		if m.State == "withheld" {
@@ -122,10 +129,12 @@ func TestDiagnosticRetainedDependencyGaps(t *testing.T) {
 	result := struct {
 		Compared int            `json:"reconciled_summary_annotation_decisions"`
 		Missing  map[string]int `json:"missing_source_records"`
-		Before   map[string]int `json:"actual_withheld_narratives"`
+		Archived map[string]int `json:"archived_withheld_narratives"`
+		Restored map[string]int `json:"narratives_retained_by_current_filter_but_withheld_in_archive"`
+		Before   map[string]int `json:"current_filter_withheld_narratives"`
 		Removed  int            `json:"embedded_links_to_unavailable_persons"`
 		After    map[string]int `json:"counterfactual_withheld_after_removing_only_those_links"`
-	}{compared, missing, before, removed, after}
+	}{compared, missing, archivedWithheld, restored, before, removed, after}
 	b, _ := json.Marshal(result)
 	t.Log(string(b))
 	t.Log("Counterfactual only: no output changed and no missing record was invented. This does not approve a privacy-policy change or certify complete migration.")
@@ -136,9 +145,12 @@ func TestDependencyDiagnosticOnlyRemovesMissingPersonNavigation(t *testing.T) {
 		typ, state             string
 		before, after, removed int
 	}{
-		{"PERSONS", "missing", 2, 0, 1},
+		{"PERSONS", "missing", 0, 0, 1},
 		{"PERSONS", "excluded", 2, 2, 0},
+		{"PERSONS", "withheld", 2, 2, 0},
 		{"WEBSITES", "missing", 2, 2, 0},
+		{"WORKSTREAM_PATTERN_ENGINE_SOURCES", "missing", 2, 2, 0},
+		{"ANNOTATIONS", "missing", 2, 2, 0},
 		{"PERSONS", "included", 0, 0, 0},
 	} {
 		t.Run(fmt.Sprint(tc.typ, "_", tc.state), func(t *testing.T) {

@@ -1019,6 +1019,14 @@ func (r *run) filterGraph() error {
 				if target == nil || target.State == "included" {
 					continue
 				}
+				// An unavailable person is a dangling navigation destination,
+				// not a privacy exclusion. Keep the independently scanned text;
+				// rewriteMarkdown renders this unresolved link as its plain label.
+				// Explicitly excluded/withheld people still propagate below, as do
+				// missing source/body dependencies of every other relation/type.
+				if e.Relation == "embedded_markdown" && target.Type == "PERSONS" && target.State == "missing" {
+					continue
+				}
 				dependent := m.Type == "WORKSTREAM_SUMMARIES" && (e.Relation == "events" || e.Relation == "children" || e.Relation == "summaries" || e.Relation == "annotations")
 				dependent = dependent || m.Type == "SIGNALS" && e.Relation == "annotations"
 				dependent = dependent || generated(m) && (e.Relation == "workstream_events" || e.Relation == "summaries" || e.Relation == "summaryRoot")

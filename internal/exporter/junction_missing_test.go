@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 
 func missingJunctionFixture(profile bool) *fakeOS {
 	f := junctionFixture()
+	f.data["ANNOTATIONS"][0]["name"] = "Narrative with unavailable colleague"
+	f.data["ANNOTATIONS"][0]["text"] = "Current linked narrative. [Unavailable colleague](pieces://persons/unavailable-person)."
 	family, _ := junctionFamilyByName("workstream_summary_to_person_associations")
 	v := record("unavailable-person-binding", "2026-09-30T12:00:00Z")
 	v[family.leftField], v[family.rightField] = "summary", "unavailable-person"
@@ -25,10 +28,31 @@ func missingJunctionFixture(profile bool) *fakeOS {
 		v[family.leftField], v[family.rightField] = "unavailable-person", "available-profile"
 		f.data[family.material().Type] = append(f.data[family.material().Type], v)
 		body := record("available-profile", "2026-09-30T12:00:00Z")
-		body["text"], body["type"] = "Retained profile annotation; its owner snapshot is unavailable.", "HIERARCHICAL_PROFILE_SUMMARY"
+		body["name"] = "Profile with unavailable colleague"
+		body["text"], body["type"] = "Retained profile annotation; its owner snapshot is unavailable. [Unavailable colleague](pieces://persons/unavailable-person).", "HIERARCHICAL_PROFILE_SUMMARY"
 		f.data["ANNOTATIONS"] = append(f.data["ANNOTATIONS"], body)
 	}
 	return f
+}
+
+func assertMissingPersonNavigation(t *testing.T, directory string) {
+	t.Helper()
+	var links map[string]string
+	b, err := os.ReadFile(filepath.Join(directory, "link-map.json"))
+	if err != nil || json.Unmarshal(b, &links) != nil {
+		t.Fatal("cannot read finalized navigation")
+	}
+	if links[opaque("PERSONS", "unavailable-person")] != "" {
+		t.Fatal("missing person acquired a navigation destination")
+	}
+	path := links[opaque("WORKSTREAM_SUMMARIES", "summary")]
+	if path == "" {
+		t.Fatal("dangling person navigation withheld the summary")
+	}
+	body, err := os.ReadFile(filepath.Join(directory, path))
+	if err != nil || !strings.Contains(string(body), "Current linked narrative. Unavailable colleague.") || strings.Contains(string(body), "pieces://persons/unavailable-person") {
+		t.Fatalf("summary body or plain-text missing-person fallback differs: %v\n%s", err, body)
+	}
 }
 
 func TestMissingJunctionOwnerDoesNotForceGlobalAnnotationInventory(t *testing.T) {
@@ -76,6 +100,7 @@ func TestMissingJunctionOwnerDoesNotForceGlobalAnnotationInventory(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
+			assertMissingPersonNavigation(t, o.Output)
 			for i := range 2 {
 				out := filepath.Join(t.TempDir(), "archive")
 				if i == 0 {
@@ -90,6 +115,7 @@ func TestMissingJunctionOwnerDoesNotForceGlobalAnnotationInventory(t *testing.T)
 				if err != nil || after.Included != before.Included || after.States["missing"] != before.States["missing"] || after.Edges != before.Edges || after.SummariesWithBody != before.SummariesWithBody {
 					t.Fatal("reconstruction lost records, decisions or graph edges", err)
 				}
+				assertMissingPersonNavigation(t, out)
 			}
 		})
 	}
@@ -202,6 +228,7 @@ func TestPackagedMissingJunctionOwnerCLI(t *testing.T) {
 		if err != nil || counts.States["missing"] != 1 || counts.SummariesWithBody != 1 {
 			t.Fatal("compiled archive decisions or bodies did not reconcile", err)
 		}
+		assertMissingPersonNavigation(t, directory)
 	}
 	requireNoTransientAssociationStorage(t, parent)
 }
