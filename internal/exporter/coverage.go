@@ -171,7 +171,8 @@ func (r *run) renderCoverage() error {
 		}
 	}
 	if info := r.manifest.Rebuild; info != nil {
-		fmt.Fprintf(&b, "This archive was rebuilt offline. No OS connection or new source reconciliation occurred. The original read interval was %s through %s. Initial, inventoried, fetched, and final counts describe that source read; included/excluded/withheld/omitted counts include subsequent rebuild decisions. Original coverage and people statistics remain in the manifest's rebuild section.\n\n", info.OriginalReadStarted.UTC().Format(time.RFC3339), info.OriginalReadFinished.UTC().Format(time.RFC3339))
+		zone, _ := time.LoadLocation(r.opts.Timezone)
+		fmt.Fprintf(&b, "This archive was rebuilt offline. No OS connection or new source reconciliation occurred. The original read interval was %s through %s. Initial, inventoried, fetched, and final counts describe that source read; included/excluded/withheld/omitted counts include subsequent rebuild decisions. Original coverage and people statistics remain in the manifest's rebuild section.\n\n", displayTimestamp(info.OriginalReadStarted.Format(time.RFC3339Nano), zone), displayTimestamp(info.OriginalReadFinished.Format(time.RFC3339Nano), zone))
 		if info.LegacyEvidence {
 			b.WriteString("The source uses the legacy archive format without reconstruction evidence. Unknown original projections remain unknown, redacted counts can be unavailable (-1), and verified-user labels are replayed from existing user-profile navigation. This archive remains partial.\n\n")
 		}

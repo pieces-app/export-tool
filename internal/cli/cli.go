@@ -110,7 +110,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		materials := fs.String("materials", "", "custom comma-separated material types or all; cannot combine with --scope")
 		batch := fs.Int("batch-size", 50, "maximum IDs per batch (1–50); pacing starts smaller")
 		window := fs.Int("window-ids", 5000, "target ID count per adaptive time window")
-		zone := fs.String("timezone", "UTC", "IANA timezone for chronological daily indexes")
+		zone := fs.String("timezone", "Local", "Local uses this computer's timezone; or choose an IANA name such as America/New_York")
 		environment := fs.String("environment", "auto", "auto, production, or staging (verified using OS version)")
 		launch := fs.Bool("launch-os", true, "launch an installed OS when discovery finds none")
 		osPath := fs.String("os-path", "", "explicit OS executable or macOS app bundle; recommended for staging")
@@ -369,7 +369,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			}
 			return 0
 		}
-		fmt.Fprintf(stdout, "\nFormat: %s | Privacy: %s | Metadata: %s | Relationships: %s\nDestination: %s\n", *format, *mode, *metadata, *relationships, *out)
+		fmt.Fprintf(stdout, "\nFormat: %s | Privacy: %s | Metadata: %s | Relationships: %s\nTimezone: %s\nDestination: %s\n", *format, *mode, *metadata, *relationships, *zone, *out)
 		fmt.Fprintf(stdout, "Related lists: %s, up to %d per section", *relatedOrder, *relatedLimit)
 		if !since.IsZero() {
 			fmt.Fprintf(stdout, ", since %s", since.UTC().Format(time.RFC3339))

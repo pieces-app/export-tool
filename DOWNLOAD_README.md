@@ -51,6 +51,8 @@ Under `workstream_summaries/`:
 
 Summary names start with a zero-padded number: `000000.title.date.uuid.md`. Sorting filenames ascending shows the newest first. Related-summary lists live in sibling `.relationships_graph.md` files linked from each summary. Unavailable embedded Pieces destinations become plain labels; generated local links are validated before completion.
 
+Document dates use readable month names and your computer's local timezone by default, including daylight saving time—for example, `April 23, 2025 at 11:42:26 AM EDT (UTC-04:00)`. Use `--timezone America/New_York` (or another IANA name) to choose a fixed zone, or `--timezone UTC`. Dates in filenames and daily indexes use the same zone. JSON retains the exact original timestamps. A summary's “Persona context” section links to the attached profile version instead of repeating its full report; the summary's own narrative stays inline.
+
 Descriptions and tags appear in documents and portable metadata sidecars. Native attributes are attempted where supported; file-manager display varies by operating system and filesystem.
 
 Read `coverage.md` and `manifest.json` for omissions and unavailable records. Exit codes:

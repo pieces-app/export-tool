@@ -157,6 +157,7 @@ type PublicEdge struct {
 }
 
 func (r *run) render() (result error) {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	r.assignPaths()
 	if err := r.prepareAssociationGroups(); err != nil {
 		return err
@@ -279,10 +280,10 @@ func (r *run) render() (result error) {
 			fmt.Fprintf(&b, "Record reference: `%s`\n\n", opaque(m.Type, m.ID))
 		}
 		if m.Created != "" {
-			fmt.Fprintf(&b, "Created: %s\n\n", md(m.Created))
+			fmt.Fprintf(&b, "Created: %s\n\n", md(displayTimestamp(m.Created, zone)))
 		}
 		if m.Updated != "" {
-			fmt.Fprintf(&b, "Updated: %s\n\n", md(m.Updated))
+			fmt.Fprintf(&b, "Updated: %s\n\n", md(displayTimestamp(m.Updated, zone)))
 		}
 		fmt.Fprintf(&b, "[Record JSON](%s) · [Export index](%s)\n\n", relative(m.Path, m.DataPath), relative(m.Path, "index.md"))
 		for _, e := range m.Edges {
@@ -303,9 +304,23 @@ func (r *run) render() (result error) {
 		renderAssociationMetadata(&b, m, v, r.meta)
 		// Summaries expose their narrative through annotation records, not a body field.
 		if m.Type == "WORKSTREAM_SUMMARIES" {
+			var profiles strings.Builder
 			for _, e := range m.Edges {
 				a := r.meta[e.Target]
 				if e.Relation != "annotations" || a == nil || a.State != "included" {
+					continue
+				}
+				// Persona annotations are context, not the summary's narrative.
+				// Link the exact retained version instead of repeating its report.
+				if profileAnnotation(a.AnnotationType) {
+					if evidence, ok := r.cachedEdges[e]; ok {
+						fmt.Fprintf(&profiles, "%s\n\n", evidence.description(zone))
+					}
+					label := "Profile report"
+					if a.AnnotationType == "PROFILE_DESCRIPTION" {
+						label = "Profile description"
+					}
+					fmt.Fprintf(&profiles, "- [%s](%s) — %s\n", label, relative(m.Path, a.Path), md(displayTimestamp(a.Created, zone)))
 					continue
 				}
 				av, err := r.readCanonical(a)
@@ -314,10 +329,13 @@ func (r *run) render() (result error) {
 				}
 				if text := fieldString(av, "text"); text != "" {
 					if evidence, ok := r.cachedEdges[e]; ok {
-						fmt.Fprintf(&b, "%s\n\n", evidence.description())
+						fmt.Fprintf(&b, "%s\n\n", evidence.description(zone))
 					}
 					fmt.Fprintf(&b, "## Annotation: %s\n\n[Canonical annotation](%s)\n\n%s\n\n", md(fieldString(av, "type")), relative(m.Path, a.Path), rewriteMarkdown(text, m.Path, r.meta))
 				}
+			}
+			if profiles.Len() > 0 {
+				fmt.Fprintf(&b, "## Persona context\n\n%s\n", profiles.String())
 			}
 		}
 		if m.Type == "CONVERSATIONS" {
@@ -406,7 +424,6 @@ func (r *run) render() (result error) {
 	if err := writeJSONL(filepath.Join(r.stage, "timeline", "records.jsonl"), entries, r.local); err != nil {
 		return err
 	}
-	zone, _ := time.LoadLocation(r.opts.Timezone)
 	days := map[string][]TimelineEntry{}
 	for _, e := range entries {
 		t, _ := time.Parse(time.RFC3339Nano, e.Created)
@@ -622,6 +639,7 @@ func pruneReferences(v map[string]any, metas map[string]*Meta) bool {
 	return changed
 }
 func (r *run) transcript(b *strings.Builder, m *Meta) error {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	type message struct {
 		meta        *Meta
 		record      map[string]any
@@ -662,7 +680,7 @@ func (r *run) transcript(b *strings.Builder, m *Meta) error {
 	})
 	b.WriteString("## Transcript\n\n")
 	for _, message := range messages {
-		fmt.Fprintf(b, "### %s\n\n[Message record](%s)\n\n", md(message.meta.Created), relative(m.Path, message.meta.Path))
+		fmt.Fprintf(b, "### %s\n\n[Message record](%s)\n\n", md(displayTimestamp(message.meta.Created, zone)), relative(m.Path, message.meta.Path))
 		for _, block := range content(message.record) {
 			b.WriteString(rewriteMarkdown(block.Text, m.Path, r.meta) + "\n\n")
 		}

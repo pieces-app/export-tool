@@ -127,6 +127,7 @@ func (r *run) readSignalRecord(m *Meta) (map[string]any, error) {
 }
 
 func (r *run) signalDigestEntry(m *Meta, rank int, path string, limit int) ([]byte, signalEntryCoverage, error) {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	cov := signalEntryCoverage{}
 	v, err := r.readSignalRecord(m)
 	if err != nil {
@@ -140,7 +141,7 @@ func (r *run) signalDigestEntry(m *Meta, rank int, path string, limit int) ([]by
 	if len(name)+len(m.ID)+len(fieldString(v, "origin"))+len(fieldString(v, "category"))+len(m.Created)+len(m.Updated) > limit {
 		return nil, cov, signalDigestLimitError()
 	}
-	fmt.Fprintf(b, "## %06d. %s\n\n[Canonical signal](%s)\n\nID: %s\n\nOrigin: %s\n\nCategory: %s\n\nCreated: %s\n\nUpdated: %s\n\n", rank, md(name), relative(path, m.Path), md(m.ID), md(fieldString(v, "origin")), md(fieldString(v, "category")), md(m.Created), md(m.Updated))
+	fmt.Fprintf(b, "## %06d. %s\n\n[Canonical signal](%s)\n\nID: %s\n\nOrigin: %s\n\nCategory: %s\n\nCreated: %s\n\nUpdated: %s\n\n", rank, md(name), relative(path, m.Path), md(m.ID), md(fieldString(v, "origin")), md(fieldString(v, "category")), md(displayTimestamp(m.Created, zone)), md(displayTimestamp(m.Updated, zone)))
 	if b.err != nil {
 		return nil, cov, b.err
 	}
@@ -204,12 +205,12 @@ func (r *run) signalDigestEntry(m *Meta, rank int, path string, limit int) ([]by
 			provenance = "derived inverse of annotation.signals"
 		}
 		if evidence, ok := r.cachedEdges[Edge{m.Key, a.Key, "annotations"}]; ok {
-			provenance = evidence.description()
+			provenance = evidence.description(zone)
 			if r.derivedEdges[Edge{m.Key, a.Key, "annotations"}] {
 				provenance += " Derived inverse of annotation.signals."
 			}
 		}
-		fmt.Fprintf(b, "[Description annotation](%s); created %s; updated %s; %s.\n\n", relative(path, a.Path), md(a.Created), md(a.Updated), provenance)
+		fmt.Fprintf(b, "[Description annotation](%s); created %s; updated %s; %s.\n\n", relative(path, a.Path), md(displayTimestamp(a.Created, zone)), md(displayTimestamp(a.Updated, zone)), provenance)
 		// Do not parse a huge body after the document budget has already failed.
 		if b.err != nil {
 			return nil, cov, b.err

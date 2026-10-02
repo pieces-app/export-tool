@@ -11,6 +11,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 // This is an opt-in acceptance reader, not another exporter. It never opens
@@ -24,6 +28,7 @@ type finalArchiveCounts struct {
 	SummariesWithBody          int            `json:"summaries_with_nonempty_summary_body"`
 	SummariesWithAnyAnnotation int            `json:"summaries_with_nonempty_annotation"`
 	RenderedAnnotationBodies   int            `json:"verified_rendered_annotation_bodies"`
+	LinkedProfileAnnotations   int            `json:"verified_linked_profile_annotations"`
 	SummaryBodiesFromCache     int            `json:"summaries_with_historical_body_links"`
 	Persons                    int            `json:"included_persons"`
 	PersonsWithProfile         int            `json:"persons_with_profile_history"`
@@ -249,6 +254,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 			continue
 		}
 		var document []byte
+		var links map[string]bool
 		if m.Type == "WORKSTREAM_SUMMARIES" {
 			report.Summaries++
 			if m.JunctionFields["annotations"] {
@@ -300,6 +306,26 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 				return report, errConfig("attached canonical annotation cannot be read")
 			}
 			expected := rewriteMarkdown(fieldString(v, "text"), m.Path, byKey)
+			if a.AnnotationType == "HIERARCHICAL_PROFILE_SUMMARY" || a.AnnotationType == "PROFILE_DESCRIPTION" {
+				// Support earlier inline archives and current linked presentation,
+				// but always require the complete text in the destination document.
+				profileDoc, err := archiveRead(root, a.Path, 128<<20)
+				profileText := rewriteMarkdown(fieldString(v, "text"), a.Path, byKey)
+				if err != nil || !strings.Contains(string(profileDoc), profileText) {
+					return report, errConfig("linked profile document omits or truncates its canonical body")
+				}
+				if !strings.Contains(string(document), expected) {
+					if links == nil {
+						links = acceptanceMarkdownLinks(document)
+					}
+					if !links[relative(m.Path, a.Path)] {
+						return report, errConfig("summary omits its attached profile reference")
+					}
+					report.LinkedProfileAnnotations++
+					anyAnnotation = true
+					continue
+				}
+			}
 			if strings.TrimSpace(expected) != "" && !strings.Contains(string(document), expected) {
 				return report, errConfig("summary Markdown omits or truncates an attached annotation body")
 			}
@@ -325,6 +351,18 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		return report, errConfig("final Markdown link traversal failed")
 	}
 	return report, nil
+}
+
+func acceptanceMarkdownLinks(document []byte) map[string]bool {
+	links := map[string]bool{}
+	root := goldmark.DefaultParser().Parse(text.NewReader(document))
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if link, ok := n.(*ast.Link); ok && entering {
+			links[string(link.Destination)] = true
+		}
+		return ast.WalkContinue, nil
+	})
+	return links
 }
 
 func TestLiveFinalArchiveAcceptance(t *testing.T) {

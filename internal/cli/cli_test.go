@@ -71,17 +71,18 @@ func TestScopeValidationBeforeConnection(t *testing.T) {
 
 func TestScopeAndPeopleDefaultsBeforeConfirmation(t *testing.T) {
 	for _, test := range []struct {
-		name, scope, people string
-		flags               []string
+		name, scope, people, timezone string
+		flags                         []string
 	}{
-		{"default", "summaries", "profiles", nil},
-		{"explicit_summaries", "summaries", "profiles", []string{"--scope", "summaries"}},
-		{"all", "all", "all", []string{"--scope", "all"}},
-		{"custom", "custom", "all", []string{"--materials", "USERS"}},
-		{"custom_all", "custom", "all", []string{"--materials", "all"}},
-		{"people_override", "summaries", "all", []string{"--people", "all"}},
-		{"connected_override", "summaries", "connected", []string{"--people", "connected"}},
-		{"all_profiles_override", "all", "profiles", []string{"--scope", "all", "--people", "profiles"}},
+		{"default", "summaries", "profiles", "Local", nil},
+		{"explicit_summaries", "summaries", "profiles", "Local", []string{"--scope", "summaries"}},
+		{"all", "all", "all", "Local", []string{"--scope", "all"}},
+		{"custom", "custom", "all", "Local", []string{"--materials", "USERS"}},
+		{"custom_all", "custom", "all", "Local", []string{"--materials", "all"}},
+		{"people_override", "summaries", "all", "Local", []string{"--people", "all"}},
+		{"connected_override", "summaries", "connected", "Local", []string{"--people", "connected"}},
+		{"all_profiles_override", "all", "profiles", "Local", []string{"--scope", "all", "--people", "profiles"}},
+		{"timezone_override", "summaries", "profiles", "America/New_York", []string{"--timezone", "America/New_York"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +108,7 @@ func TestScopeAndPeopleDefaultsBeforeConfirmation(t *testing.T) {
 			if code := RunWithInput(context.Background(), args, strings.NewReader("n\n"), &out, &errs, "test"); code != 0 {
 				t.Fatalf("preflight failed: %d %s", code, errs.String())
 			}
-			for _, expected := range []string{"Export scope: " + test.scope, "People: " + test.people, "Canceled; no export created."} {
+			for _, expected := range []string{"Export scope: " + test.scope, "People: " + test.people, "Timezone: " + test.timezone, "Canceled; no export created."} {
 				if !strings.Contains(out.String(), expected) {
 					t.Fatalf("preflight omitted %q: %s", expected, out.String())
 				}

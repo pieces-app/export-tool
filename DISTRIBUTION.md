@@ -1,8 +1,12 @@
 # Binary distribution and installation
 
-Updated 2026-10-01. The application is closed source under [LICENSE.txt](LICENSE.txt). Binaries are intentionally unsigned and unnotarized. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that production acceptance has passed.
+Updated 2026-10-02. The application is closed source under [LICENSE.txt](LICENSE.txt). Binaries are intentionally unsigned and unnotarized. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that production acceptance has passed.
 
-## Frozen release candidate — 0.18.0-rc1
+## Presentation candidate — 0.18.0-rc2
+
+Six replacement ZIPs and `SHA256SUMS.txt` are built in `dist/0.18.0-rc2/`. The new package uses readable local dates and links exact attached profile versions from summaries. Full source tests, CLI race tests and actual Mac ARM64 summary/rebuild/recovery checks pass. The actual Mac package rebuilt the accepted archive in America/New_York in 28m36s. Independent body/profile/graph checks, all 11,751 summary timestamps and all 23,502 native metadata documents pass; canonical records and source fingerprints reconcile. [Open the refreshed archive](exports/readable-local-20261002/export/index.md). Other-platform runtime acceptance below applies to rc1; rebuilding their binaries does not repeat that acceptance. Nothing has been uploaded or published.
+
+## Previous accepted recovery candidate — 0.18.0-rc1
 
 Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.
 
@@ -14,7 +18,7 @@ The local Bash bootstrap additionally fixes cleanup after a failed download. Mis
 
 ## First public release scope — user decision, 2026-10-01
 
-The measured **28m32s** offline rebuild runtime is acceptable for this user's database. Freeze the first release at **0.18.0-rc1**: summaries, profiles, linked Markdown, privacy and recovery. Further storage rewrites, automatic recovery paths/cleanup and extra formats are deferred. The separate range/all-material storage prototypes are not being merged for this release. Verify the chosen package once against real data; do not reopen optimization work without a demonstrated failure.
+The measured **28m32s** offline rebuild runtime is acceptable for this user's database. Keep the first release focused on: summaries, profiles, linked Markdown, privacy and recovery. Further storage rewrites, automatic recovery paths/cleanup and extra formats are deferred. The separate range/all-material storage prototypes are not being merged for this release. Verify the chosen package once against real data; do not reopen optimization work without a demonstrated failure.
 
 The release focuses on **Markdown summaries, persona/profile histories, pipeline organization and their linked graph**, with privacy filtering and explicit coverage reports. Attachment extraction, audio and PDF acceptance are **deferred and do not block this release**. Existing optional code is not evidence of public support. Signals/all-data expansion also stays outside the default summaries release.
 

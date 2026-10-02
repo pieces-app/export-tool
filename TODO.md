@@ -1,8 +1,18 @@
 # Export tool execution checklist
 
-Updated 2026-10-01. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+Updated 2026-10-02. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
 
-## Frozen release candidate — 0.18.0-rc1
+## Readability update — 0.18.0-rc2
+
+- [x] Default new exports to the local timezone, preserve an explicit IANA/UTC override, and show the selection before confirmation.
+- [x] Format generated timestamps with readable month names, timezone and daylight saving time; preserve exact canonical timestamps and sortable filename dates.
+- [x] Replace attached persona report/description copies in summaries with links to the exact profile versions; keep the summary's own narrative inline.
+- [x] Verify shared/ownerless profiles, offline rebuilding, relocated links and damaged-link/body rejection. Full source suite and CLI race checks pass.
+- [x] Build all six replacement packages; actual Mac ARM64 default-summary, offline rebuild, completed-source replay and interrupted-fetch recovery checks pass with race instrumentation (17.328s).
+- [x] Rebuild the accepted archive offline in America/New_York: 28m36s, 1.56 GiB peak RSS, zero OS requests. Reconcile all 197,790 canonical records, 547,897 graph edges, privacy decisions and source fingerprints; independently verify bodies/profile links and all 23,502 native metadata documents. All 11,751 summary headers match the timezone. Existing source omissions remain.
+- [x] Record [the refreshed export](exports/readable-local-20261002/export/index.md) and `exports/readable-local-20261002/release-acceptance.json`. Summary Markdown is 37.8 MB smaller, with 4,162 Persona context sections. Public hosting and native Windows acceptance remain separate, previously open items.
+
+## Previous accepted recovery candidate — 0.18.0-rc1
 
 Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.
 
@@ -12,7 +22,7 @@ The actual Mac ARM64 package passed all 18 CLI checks and both installer suites,
 
 ## First public release scope — user decision, 2026-10-01
 
-The measured **28m32s** offline rebuild runtime is acceptable for this user's database. Freeze the first release at **0.18.0-rc1**: summaries, profiles, linked Markdown, privacy and recovery. Further storage rewrites, automatic recovery paths/cleanup and extra formats are deferred. The separate range/all-material storage prototypes are not being merged for this release. Verify the chosen package once against real data; do not reopen optimization work without a demonstrated failure.
+The measured **28m32s** offline rebuild runtime is acceptable for this user's database. Keep the first release focused on: summaries, profiles, linked Markdown, privacy and recovery. Further storage rewrites, automatic recovery paths/cleanup and extra formats are deferred. The separate range/all-material storage prototypes are not being merged for this release. Verify the chosen package once against real data; do not reopen optimization work without a demonstrated failure.
 
 The release focuses on **Markdown summaries, persona/profile histories, pipeline organization and their linked graph**, with privacy filtering and explicit coverage reports. Attachment extraction, audio and PDF acceptance are **deferred and do not block this release**. Existing optional code is not evidence of public support. Signals/all-data expansion also stays outside the default summaries release.
 

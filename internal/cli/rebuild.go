@@ -23,7 +23,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	yes := fs.Bool("yes", false, "approve the offline rebuild without a prompt")
 	fs.BoolVar(yes, "y", false, "approve the offline rebuild without a prompt")
 	format := fs.String("format", "", "markdown, pdf, or both; default inherits the archive setting")
-	zone := fs.String("timezone", "", "IANA timezone; default inherits the archive setting")
+	zone := fs.String("timezone", "", "Local or an IANA timezone; default inherits the archive setting")
 	naming := fs.String("naming", "", "readable or opaque; default inherits the archive setting")
 	relationships := fs.String("relationships", "", "inline, sidecar, or both; default inherits the archive setting")
 	metadata := fs.String("metadata", "", "auto or off; default inherits the archive setting; sidecars always retained")

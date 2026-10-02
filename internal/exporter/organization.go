@@ -142,12 +142,13 @@ func (r *run) assignPersonaHistoryPaths() {
 }
 
 func (r *run) writeSummaryIndex(path, heading, intro string, items []*Meta) error {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	sort.Slice(items, func(i, j int) bool { return newer(items[i], items[j]) })
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n%s\n\n[Export index](%s)\n\n", md(heading), intro, relative(path, "index.md"))
 	entries := make([]navigationEntry, 0, len(items))
 	for _, m := range items {
-		entries = append(entries, navigationEntry{label: m.Title, path: m.Path, detail: m.Created})
+		entries = append(entries, navigationEntry{label: m.Title, path: m.Path, detail: displayTimestamp(m.Created, zone)})
 	}
 	if len(items) == 0 {
 		b.WriteString("No included records in this folder. Missing association coverage is not evidence that no relationships existed.\n")

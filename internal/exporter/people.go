@@ -20,6 +20,11 @@ type PersonFacts struct {
 	ProfileSummaries                                []string
 	Connections                                     int
 }
+
+func profileAnnotation(kind string) bool {
+	return kind == "HIERARCHICAL_PROFILE_SUMMARY" || kind == "PROFILE_DESCRIPTION"
+}
+
 type PeopleStats struct {
 	NameReviewGroups        int    `json:"shared_name_review_groups"`
 	Total                   int    `json:"total_persons"`
@@ -419,6 +424,7 @@ func (r *run) preparePeople() error {
 }
 
 func (r *run) renderPersonas() error {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	groups := r.personaGroups()
 	review := map[string][]*PersonFacts{}
 	for id, p := range r.people {
@@ -490,7 +496,7 @@ func (r *run) renderPersonas() error {
 				}
 				sort.Slice(items, func(i, j int) bool { return newer(items[i], items[j]) })
 				for i, m := range items {
-					fmt.Fprintf(&body, "- [%s](%s) — %s", md(m.Title), relative(profilePath, m.Path), md(m.Created))
+					fmt.Fprintf(&body, "- [%s](%s) — %s", md(m.Title), relative(profilePath, m.Path), md(displayTimestamp(m.Created, zone)))
 					if i == 0 {
 						body.WriteString(" (newest retained)")
 					}

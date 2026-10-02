@@ -94,13 +94,13 @@ func (e CacheEvidence) timestamps() (string, string) {
 	return e.CachedUpdated, e.OSUpdated
 }
 
-func (e CacheEvidence) description() string {
+func (e CacheEvidence) description(zone *time.Location) string {
 	kind := "summary"
 	if e.Material != "" {
 		kind = e.Material + " record"
 	}
 	cached, current := e.timestamps()
-	return fmt.Sprintf("Historical attachment: cache %d, %s updated %s; current OS record updated %s. Attachment evidence may be stale; text comes from the retained OS annotation.", e.Cache, kind, cached, current)
+	return fmt.Sprintf("Historical attachment: cache %d, %s updated %s; current OS record updated %s. Attachment evidence may be stale; text comes from the retained OS annotation.", e.Cache, kind, md(displayTimestamp(cached, zone)), md(displayTimestamp(current, zone)))
 }
 
 type CacheCoverage struct {

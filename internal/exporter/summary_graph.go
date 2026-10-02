@@ -71,7 +71,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 				break
 			}
 			a := r.meta[e.Target]
-			if a != nil && a.State == "included" && a.Type == "ANNOTATIONS" && strings.Contains(a.AnnotationType, "DESCRIPTION") {
+			if a != nil && a.State == "included" && a.Type == "ANNOTATIONS" && !profileAnnotation(a.AnnotationType) && strings.Contains(a.AnnotationType, "DESCRIPTION") {
 				text, loaded := descriptions[a.Key]
 				if !loaded {
 					value, err := r.readCanonical(a)
@@ -188,6 +188,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 }
 
 func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
+	zone, _ := time.LoadLocation(r.opts.Timezone)
 	var b strings.Builder
 	order, limit := r.opts.RelatedOrder, r.opts.RelatedLimit
 	if order == "" {
@@ -204,7 +205,7 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 	}
 	fmt.Fprintf(&b, "Up to %d matches per section. ", limit)
 	if !r.opts.RelatedSince.IsZero() {
-		fmt.Fprintf(&b, "Related-list cutoff: %s (record creation). Undated matches are omitted from these lists. ", r.opts.RelatedSince.UTC().Format(time.RFC3339Nano))
+		fmt.Fprintf(&b, "Related-list cutoff: %s (record creation). Undated matches are omitted from these lists. ", displayTimestamp(r.opts.RelatedSince.Format(time.RFC3339Nano), zone))
 	}
 	b.WriteString("Complete shared-group indexes retain older and overflow matches.\n\n")
 	ctx := r.ctx
@@ -231,10 +232,7 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 					shared = append(shared, name)
 				}
 			}
-			date := other.Created
-			if date == "" {
-				date = "undated"
-			}
+			date := displayTimestamp(other.Created, zone)
 			fmt.Fprintf(&b, "- [%s](%s) — shared: %s; %d/4 dimensions (%s); %s\n", md(other.Title), relative(from, other.Path), md(strings.Join(unique(evidence), ", ")), bits.OnesCount8(mask), strings.Join(shared, ", "), md(date))
 		}
 		if len(selection.lists[dimension]) == 0 {
