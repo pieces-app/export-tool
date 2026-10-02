@@ -12,6 +12,16 @@ Updated 2026-10-02. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/name
 - [x] Rebuild the accepted archive offline in America/New_York: 28m36s, 1.56 GiB peak RSS, zero OS requests. Reconcile all 197,790 canonical records, 547,897 graph edges, privacy decisions and source fingerprints; independently verify bodies/profile links and all 23,502 native metadata documents. All 11,751 summary headers match the timezone. Existing source omissions remain.
 - [x] Record [the refreshed export](exports/readable-local-20261002/export/index.md) and `exports/readable-local-20261002/release-acceptance.json`. Summary Markdown is 37.8 MB smaller, with 4,162 Persona context sections. Public hosting and native Windows acceptance remain separate, previously open items.
 
+## Weekend macOS handoff — 2026-10-02
+
+- [x] Expand the consumer guide shipped as `README.md` in every ZIP: architecture selection, checksum verification, macOS approval, macOS/Linux/Windows commands, system timezone defaults, headless logging, exit codes, recovery, long-running processes, privacy limits and troubleshooting.
+- [x] Exercise the actual rc2 Apple-silicon executable with closed stdin and separate output streams: Markdown-only export, periodic stderr progress, default Local/explicit UTC, complete/partial exits, finalized archive validation and offline recovery inspection. Race-instrumented test harness passed (12.677s).
+- [x] Repeat headless and recovery checks with the rc2 Intel Mac executable under Rosetta (21.382s total). This is translated execution on macOS 15.7.3, not native Intel hardware acceptance.
+- [x] Refresh only the README in the six unpublished rc2 ZIPs; preserve executable bytes/permissions and record updated SHA-256 checksums. Original packages are retained privately. Local HTTPS Bash installer acceptance passed with the refreshed package (11.438s), including cleanup and partial-exit handling. Evidence: `exports/weekend-handoff-20261002/package-checks.json` and `exports/weekend-*.log`.
+- [ ] Complete the first external Mac trial, including downloaded-file/Gatekeeper behavior on that user's machine and the user's own OS version/data. This is the purpose of the controlled trial, not a claim already established by local fixtures.
+
+The Mac trial can use a directly shared platform ZIP plus `SHA256SUMS.txt`; it does not require Actions or public hosting. No files have been sent or published. Native Windows and public download acceptance remain open for a broad release. The README-only package refresh does not require another real-data export because the verified executable hashes are unchanged.
+
 ## Previous accepted recovery candidate — 0.18.0-rc1
 
 Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.

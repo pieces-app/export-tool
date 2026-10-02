@@ -6,6 +6,14 @@ Updated 2026-10-02. The application is closed source under [LICENSE.txt](LICENSE
 
 Six replacement ZIPs and `SHA256SUMS.txt` are built in `dist/0.18.0-rc2/`. The new package uses readable local dates and links exact attached profile versions from summaries. Full source tests, CLI race tests and actual Mac ARM64 summary/rebuild/recovery checks pass. The actual Mac package rebuilt the accepted archive in America/New_York in 28m36s. Independent body/profile/graph checks, all 11,751 summary timestamps and all 23,502 native metadata documents pass; canonical records and source fingerprints reconcile. [Open the refreshed archive](exports/readable-local-20261002/export/index.md). Other-platform runtime acceptance below applies to rc1; rebuilding their binaries does not repeat that acceptance. Nothing has been uploaded or published.
 
+### macOS trial handoff
+
+The local rc2 packages are ready for a controlled Mac trial. Share only the matching `darwin_arm64.zip` (Apple silicon) or `darwin_amd64.zip` (Intel) and the current `SHA256SUMS.txt`; [the consumer guide](DOWNLOAD_README.md) is included as `README.md` inside each ZIP. These are local handoff artifacts, not published download URLs. The unsigned-app approval experience still needs confirmation on the recipient's Mac; the guide links Apple's per-app approval instructions.
+
+On 2026-10-02, the six unpublished ZIPs received the expanded consumer guide. The executable, license, notices and executable permissions were preserved; all executable hashes still match the prior candidate. ZIP checksums changed with the README. The previous packages/checksums are retained privately under `exports/weekend-handoff-20261002/original-packages/`. Use the current files in `dist/0.18.0-rc2/` together, not a checksum file from before this refresh. Published version artifacts must remain immutable.
+
+Actual rc2 headless checks passed with closed stdin and separately captured stdout/stderr on Apple silicon and with the Intel executable under Rosetta. They verify periodic progress, Local/UTC settings, finalized Markdown bodies/links, complete/partial exit codes and offline recovery inspection. The Intel run also repeats recovery checks. The refreshed Mac ZIP passed the local HTTPS Bash installer test. No runtime code changed and no second large export was required. Native Windows, native Intel hardware, public-host downloads and recipient-specific security dialogs are not established by these checks.
+
 ## Previous accepted recovery candidate — 0.18.0-rc1
 
 Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.
