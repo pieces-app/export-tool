@@ -210,7 +210,7 @@ func TestObsidianCompactReadableNamesAvoidCollisions(t *testing.T) {
 		records[opaque("TAGS", id)] = &compactRecord{entry: TimelineEntry{Type: "TAGS", ID: id, Title: title, Created: "2026-10-01T01:00:00Z"}, kind: "connection", destination: "connections/topics/" + id + ".md"}
 	}
 	zone, _ := time.LoadLocation("America/New_York")
-	if err := compactNotePaths(records, "readable", zone); err != nil {
+	if err := compactNotePaths(records, "readable", zone, nil); err != nil {
 		t.Fatal(err)
 	}
 	seen := map[string]bool{}

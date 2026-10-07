@@ -47,7 +47,32 @@ type ObsidianInfo struct {
 	SourceFormat         string    `json:"source_format,omitempty"`
 }
 
+// displayFunc returns the text that generated documents show for a value
+// after display formatting changed it; see run.rescanDisplay. The vault builder
+// applies it to titles, previews and readable note names.
+type displayFunc func(original, shown string) (string, error)
+
+func showAsIs(_, shown string) (string, error) { return shown, nil }
+
+// name sanitizes value for a note name and scans the result again, as
+// run.safeName does for archive paths. A nil display shows names as is.
+func (display displayFunc) name(value string, maxBytes int) (string, error) {
+	if display == nil {
+		display = showAsIs
+	}
+	name := safeTitle(value, maxBytes)
+	shown, err := display(value, name)
+	if err != nil {
+		return "", err
+	}
+	if shown == name {
+		return name, nil
+	}
+	return safeTitle(shown, maxBytes), nil
+}
+
 type obsidianPlan struct {
+	display      displayFunc
 	compactKinds map[string]string
 	ctx          context.Context
 	relatedOrder string
@@ -58,12 +83,15 @@ type obsidianPlan struct {
 	info         ObsidianInfo
 }
 
-func newObsidianPlan(ctx context.Context, root *os.Root, timezone, naming, relatedOrder string) (*obsidianPlan, error) {
+func newObsidianPlan(ctx context.Context, root *os.Root, timezone, naming, relatedOrder string, display displayFunc) (*obsidianPlan, error) {
+	if display == nil {
+		display = showAsIs
+	}
 	zone, err := time.LoadLocation(timezone)
 	if err != nil {
 		return nil, errConfig("Obsidian requires a valid archive timezone")
 	}
-	p := &obsidianPlan{ctx: ctx, relatedOrder: relatedOrder, entries: map[string]TimelineEntry{}, shared: map[string]bool{}, zone: zone,
+	p := &obsidianPlan{display: display, ctx: ctx, relatedOrder: relatedOrder, entries: map[string]TimelineEntry{}, shared: map[string]bool{}, zone: zone,
 		info: ObsidianInfo{Version: 2, StartPage: obsidianHome, ConvertedAt: time.Now().UTC()}}
 	f, err := archiveOpen(root, "timeline/records.jsonl")
 	if err != nil {
@@ -318,7 +346,7 @@ func obsidianBody(data []byte) []byte {
 }
 
 func (r *run) prepareObsidian() error {
-	info, err := buildCompactObsidian(r.ctx, r.stage, r.opts.Timezone, r.opts.Naming, r.opts.RelatedOrder, r.opts.Progress)
+	info, err := buildCompactObsidian(r.ctx, r.stage, r.opts.Timezone, r.opts.Naming, r.opts.RelatedOrder, r.opts.Progress, r.rescanDisplay)
 	if err != nil {
 		return err
 	}
@@ -430,7 +458,7 @@ func ConvertObsidian(ctx context.Context, source, output string, progress io.Wri
 	}
 	pr.Close()
 	pr = nil
-	info, err := buildCompactObsidian(ctx, stage, m.Timezone, m.Naming, m.RelatedOrder, progress)
+	info, err := buildCompactObsidian(ctx, stage, m.Timezone, m.Naming, m.RelatedOrder, progress, nil)
 	if err != nil {
 		return Manifest{}, err
 	}

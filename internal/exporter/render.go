@@ -296,7 +296,11 @@ func (r *run) render() (result error) {
 			b.WriteString("Some fields were redacted by the export policy.\n\n")
 		}
 		if meta := graph.Metadata[m.Key]; meta != nil {
-			b.WriteString(metadataMarkdown(meta))
+			section, err := r.metadataMarkdown(meta)
+			if err != nil {
+				return err
+			}
+			b.WriteString(section)
 		}
 		for _, block := range content(v) {
 			fmt.Fprintf(&b, "## %s\n\n%s\n\n", md(block.Path), rewriteMarkdown(block.Text, m.Path, r.meta))

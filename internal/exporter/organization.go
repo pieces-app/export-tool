@@ -21,7 +21,7 @@ func stableFileID(typ, id string) string {
 func (r *run) pipelineAssociationPath(m *Meta) string {
 	name := "pipeline"
 	if r.opts.Naming != "opaque" {
-		name = safeTitle(m.Title, 48)
+		name = r.safeName(m.Title, 48)
 	}
 	return workstreamRoot + "/pipeline_associations/" + name + "." + stableFileID(m.Type, m.ID) + ".md"
 }
@@ -98,7 +98,7 @@ func (r *run) personaFolder(key string, people []*PersonFacts) string {
 	}
 	name := "person"
 	if r.opts.Naming != "opaque" {
-		name = safeTitle(personaDisplayName(people[0]), 48)
+		name = r.safeName(personaDisplayName(people[0]), 48)
 	}
 	return workstreamRoot + "/personas/" + category + "/" + name + "." + opaque("PERSONA_GROUP", key)
 }

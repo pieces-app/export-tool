@@ -59,13 +59,21 @@ func compactCanonical(root *os.Root, e TimelineEntry) (map[string]any, string, e
 // Keep the full export at the bundle root. Only this child folder is a vault:
 // no copied raw indexes, exhaustive technical inverse lists or relationship
 // sidecars to index. Connection notes have bounded lists of readable memories.
-func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order string, progress io.Writer) (*ObsidianInfo, error) {
+//
+// display receives each title or preview before and after the vault's display
+// formatting (Markdown stripped, lines joined, text shortened) and returns the
+// text to show. A filtered export scans changed text again; conversions of a
+// finalized archive pass nil and show the formatted text as is.
+func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order string, progress io.Writer, display displayFunc) (*ObsidianInfo, error) {
+	if display == nil {
+		display = showAsIs
+	}
 	root, err := os.OpenRoot(archive)
 	if err != nil {
 		return nil, err
 	}
 	defer root.Close()
-	p, err := newObsidianPlan(ctx, root, timezone, naming, order)
+	p, err := newObsidianPlan(ctx, root, timezone, naming, order, display)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +98,11 @@ func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order 
 			return nil, err
 		}
 		e := p.entries[name]
-		e.Title = compactDisplayTitle(e.Title)
+		shown, err := display(e.Title, compactDisplayTitle(e.Title))
+		if err != nil {
+			return nil, err
+		}
+		e.Title = shown
 		p.entries[name] = e
 		kind := ""
 		dest := name
@@ -103,7 +115,11 @@ func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order 
 			kind, dest = "range", ""
 		case "SIGNALS":
 			kind = "signal"
-			dest = "signals/" + safeTitle(e.Title, 72) + "." + opaque(e.Type, e.ID)[:12] + ".md"
+			label, err := display.name(e.Title, 72)
+			if err != nil {
+				return nil, err
+			}
+			dest = "signals/" + label + "." + opaque(e.Type, e.ID)[:12] + ".md"
 		default:
 			if c := p.connections[name]; c != nil {
 				kind = "connection"
@@ -119,7 +135,7 @@ func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order 
 		}
 		r := &compactRecord{entry: e, kind: kind, destination: dest}
 		if kind == "summary" {
-			if err := compactSummaryDescription(root, r, v); err != nil {
+			if err := compactSummaryDescription(root, r, v, display); err != nil {
 				return nil, err
 			}
 		}
@@ -133,7 +149,11 @@ func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order 
 				r.kind = "profile"
 			} else if r.annotation == "SIGNAL_DESCRIPTION" {
 				r.kind = "signal-description"
-				r.destination = "signals/descriptions/" + safeTitle(e.Title, 72) + "." + opaque(e.Type, e.ID)[:12] + ".md"
+				label, err := display.name(e.Title, 72)
+				if err != nil {
+					return nil, err
+				}
+				r.destination = "signals/descriptions/" + label + "." + opaque(e.Type, e.ID)[:12] + ".md"
 			} else {
 				r.destination = ""
 			}
@@ -179,7 +199,7 @@ func buildCompactObsidian(ctx context.Context, archive, timezone, naming, order 
 	if scanErr != nil {
 		return nil, scanErr
 	}
-	if err := compactNotePaths(records, naming, p.zone); err != nil {
+	if err := compactNotePaths(records, naming, p.zone, display); err != nil {
 		return nil, err
 	}
 	metas := map[string]*Meta{}
@@ -606,9 +626,12 @@ func compactIndexes(ctx context.Context, vault string, records map[string]*compa
 
 // Obsidian labels graph nodes and backlinks with filenames, not aliases.
 // Keep archival chronological names in the parent, and readable titles here.
-func compactNotePaths(records map[string]*compactRecord, naming string, zone *time.Location) error {
+func compactNotePaths(records map[string]*compactRecord, naming string, zone *time.Location, display displayFunc) error {
 	if naming == "opaque" {
 		return nil
+	}
+	if display == nil {
+		display = showAsIs
 	}
 	candidates := map[string]string{}
 	counts := map[string]int{}
@@ -617,7 +640,16 @@ func compactNotePaths(records map[string]*compactRecord, naming string, zone *ti
 		if r.destination == "" {
 			continue
 		}
+		// Readable names show underscores as spaces, which the payment card
+		// pattern accepts between digit groups. Scan the shown form again.
 		base := strings.ReplaceAll(safeTitle(r.entry.Title, 80), "_", " ")
+		shown, err := display(r.entry.Title, base)
+		if err != nil {
+			return err
+		}
+		if shown != base {
+			base = strings.ReplaceAll(safeTitle(shown, 80), "_", " ")
+		}
 		// Preserve the Windows device-name escape made by safeTitle.
 		if strings.HasPrefix(base, " ") {
 			base = "Note" + base

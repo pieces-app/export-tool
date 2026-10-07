@@ -160,7 +160,7 @@ func (r *run) buildSummaryGraph() (*summaryGraph, error) {
 			case "Source":
 				meta.Sources = labels
 				for _, label := range labels {
-					meta.NativeTags = append(meta.NativeTags, "source:"+strings.ToLower(safeTitle(label, 80)))
+					meta.NativeTags = append(meta.NativeTags, "source:"+strings.ToLower(r.safeName(label, 80)))
 				}
 			case "Person":
 				meta.Persons = labels
@@ -271,11 +271,16 @@ func (g *summaryGraph) render(r *run, m *Meta, from string) (string, error) {
 	}
 	return b.String(), nil
 }
-func metadataMarkdown(meta *DocumentMetadata) string {
+func (r *run) metadataMarkdown(meta *DocumentMetadata) (string, error) {
 	var b strings.Builder
 	b.WriteString("## Summary metadata\n\n")
 	if meta.Description != "" {
-		fmt.Fprintf(&b, "Description: %s\n\n", md(meta.Description))
+		// Descriptions span lines; the sidecar keeps the original text.
+		description, err := r.displayLine(meta.Description)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&b, "Description: %s\n\n", md(description))
 	}
 	for _, item := range []struct {
 		label  string
@@ -283,5 +288,5 @@ func metadataMarkdown(meta *DocumentMetadata) string {
 	}{{"Tags", meta.Tags}, {"Sources", meta.Sources}, {"Persons", meta.Persons}, {"Websites", meta.Websites}, {"Normalized file tags", meta.NativeTags}} {
 		fmt.Fprintf(&b, "%s: %s\n\n", item.label, md(strings.Join(item.values, ", ")))
 	}
-	return b.String()
+	return b.String(), nil
 }

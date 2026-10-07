@@ -123,7 +123,10 @@ func (p *obsidianPlan) planConnections(naming string) error {
 		if group == "" || e.ID == "" {
 			continue
 		}
-		label := safeTitle(e.Title, 72)
+		label, err := p.display.name(e.Title, 72)
+		if err != nil {
+			return err
+		}
 		if naming == "opaque" {
 			label = kind
 		}

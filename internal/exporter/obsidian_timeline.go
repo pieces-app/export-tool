@@ -10,7 +10,10 @@ import (
 
 // Descriptions have already passed the archive's selection/privacy decisions.
 // Show plain text rather than introduce additional links into navigation pages.
-func compactSummaryDescription(root *os.Root, r *compactRecord, canonical map[string]any) error {
+func compactSummaryDescription(root *os.Root, r *compactRecord, canonical map[string]any, display displayFunc) error {
+	if display == nil {
+		display = showAsIs
+	}
 	description := fieldString(canonical, "description")
 	name := sidecarPath(r.entry.Path)
 	if _, err := root.Lstat(name); err == nil {
@@ -23,19 +26,23 @@ func compactSummaryDescription(root *os.Root, r *compactRecord, canonical map[st
 	} else if !os.IsNotExist(err) {
 		return err
 	}
+	original := description
 	description = compactDisplayTitle(description)
-	chars := []rune(description)
-	if len(chars) > 360 {
-		description = string(chars[:360])
+	if prefix, truncated := displayPrefix(description, 360); truncated {
+		description = prefix
 		if at := strings.LastIndex(description, " "); at > len(description)*2/3 {
 			description = description[:at]
 		}
 		description = strings.TrimSpace(description) + "…"
 	}
-	if description == "" {
-		description = "Description unavailable."
+	shown, err := display(original, description)
+	if err != nil {
+		return err
 	}
-	r.description = description
+	if shown == "" {
+		shown = "Description unavailable."
+	}
+	r.description = shown
 	return nil
 }
 
