@@ -22,7 +22,7 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 	policy := fs.String("policy", "", "original privacy policy; category files must match the source hashes")
 	yes := fs.Bool("yes", false, "approve the offline rebuild without a prompt")
 	fs.BoolVar(yes, "y", false, "approve the offline rebuild without a prompt")
-	format := fs.String("format", "", "markdown, pdf, or both; default inherits the archive setting")
+	format := fs.String("format", "", "markdown, obsidian, pdf, or both; default inherits the archive setting")
 	zone := fs.String("timezone", "", "Local or an IANA timezone; default inherits the archive setting")
 	naming := fs.String("naming", "", "readable or opaque; default inherits the archive setting")
 	relationships := fs.String("relationships", "", "inline, sidecar, or both; default inherits the archive setting")
@@ -108,6 +108,9 @@ func rebuild(ctx context.Context, args []string, stdin io.Reader, stdout, stderr
 		return fail(err)
 	}
 	fmt.Fprintf(stdout, "Rebuilt archive written: %s\nStatus: %s\nRead index.md, coverage.md, and manifest.json.\n", *out, m.Status)
+	if m.Format == "obsidian" {
+		fmt.Fprintln(stdout, "In Obsidian choose Open folder as vault, select the vault subfolder, then open Start Here.md.")
+	}
 	if m.Status == "partial" {
 		return 2
 	}

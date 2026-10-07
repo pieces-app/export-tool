@@ -1,6 +1,10 @@
 # Binary distribution and installation
 
-Updated 2026-10-02. The application is closed source under [LICENSE.txt](LICENSE.txt). Binaries are intentionally unsigned and unnotarized. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that production acceptance has passed.
+Updated 2026-10-03. The application is closed source under [LICENSE.txt](LICENSE.txt). The original six-platform packages are unsigned; the current Mac email packages are Developer ID signed and notarized by Apple. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Signed and notarized Mac email package — 2026-10-03
+
+Use [MACOS_HANDOFF.md](MACOS_HANDOFF.md) for the current ARM64/Intel ZIPs, checksums, measured email sizes and [email draft](MACOS_EMAIL_DRAFT.md). These are separate `_notarized.zip` artifacts in `dist/macos-notarized-0.18.0-rc2/`; earlier packages remain intact. Apple accepted both submissions with no issues after the user resolved the agreement. The final ZIPs refresh documentation and retain the exact tested/notarized executable bytes. Each code hash matches its Apple ticket; online notarization requirements and execution from locally quarantined copies pass on ARM64 and Intel/Rosetta. No runtime code changed. Keep the Mac online for first launch; raw CLI/ZIP files do not support stapling. Only intended packages were uploaded to Apple; no public upload or email occurred.
 
 ## Presentation candidate — 0.18.0-rc2
 
@@ -8,7 +12,7 @@ Six replacement ZIPs and `SHA256SUMS.txt` are built in `dist/0.18.0-rc2/`. The n
 
 ### macOS trial handoff
 
-The local rc2 packages are ready for a controlled Mac trial. Share only the matching `darwin_arm64.zip` (Apple silicon) or `darwin_amd64.zip` (Intel) and the current `SHA256SUMS.txt`; [the consumer guide](DOWNLOAD_README.md) is included as `README.md` inside each ZIP. These are local handoff artifacts, not published download URLs. The unsigned-app approval experience still needs confirmation on the recipient's Mac; the guide links Apple's per-app approval instructions.
+For the current controlled Mac trial, use the notarized packages and matching checksums in [MACOS_HANDOFF.md](MACOS_HANDOFF.md). The older `darwin_arm64.zip` and `darwin_amd64.zip` described in this section remain unsigned. These are local artifacts, not published download URLs. The recipient-machine download experience remains part of the first external trial; local quarantined-copy checks pass.
 
 On 2026-10-02, the six unpublished ZIPs received the expanded consumer guide. The executable, license, notices and executable permissions were preserved; all executable hashes still match the prior candidate. ZIP checksums changed with the README. The previous packages/checksums are retained privately under `exports/weekend-handoff-20261002/original-packages/`. Use the current files in `dist/0.18.0-rc2/` together, not a checksum file from before this refresh. Published version artifacts must remain immutable.
 
@@ -32,7 +36,7 @@ The release focuses on **Markdown summaries, persona/profile histories, pipeline
 
 The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
 
-Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. Source repository publication is not required. The later Mac handoff request adds Developer ID signing and notarization; both are complete as recorded above.
 
 **Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration, Actions dispatch or publication is required for the current work.
 

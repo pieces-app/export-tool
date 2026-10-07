@@ -1,6 +1,28 @@
 # Export tool execution checklist
 
-Updated 2026-10-02. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+Updated 2026-10-03. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+
+## Obsidian vault — 0.20.0-dev
+
+- [x] Audit the full export and original vault: 86,051 notes, 1,805,438 links, 436 MB of relationship sidecars and very large inverse lists. Preserve aggregate evidence in `exports/obsidian-20261003/`.
+- [x] Diagnose the original first-index crash and retry with existing cache at the user's request. Both renderers crashed; exact cause is unproven. Version 2's added links do not solve indexing cost and are superseded by the compact view.
+- [x] Keep the complete archive at the output root; generate an independently linked compact `vault/` child. Preserve source records, graph, numbered archive paths, body text, profile histories, privacy decisions and partial status.
+- [x] Preserve named people/topics/sources/websites/pipelines and selected signals. Use automatic backlinks, four nearby-summary links, direct associations and bounded report-history indexes. No invented graph bridges or identity merges.
+- [x] Use readable browsing filenames because Obsidian graph/backlink labels use filenames rather than aliases. Guard case/punctuation/reserved-name collisions. Retain newest-first timeline/profile indexes, localized dates, safe properties and existing Pieces topic tags.
+- [x] Verify the first compact real-data candidate: 260.80s conversion, 228 MiB peak RSS, 30,455 notes, 115.3 MB Markdown, 187,294 links, no notes over 256 KiB, no broken Markdown targets. Retain 11,751 summaries, 5,170 reports, 1,380 people and 8,755 topics.
+- [x] Independently verify parent archive: 197,790 records, 547,897 edges, 44 pipeline memberships. Verify the compact view's 5,170 profile bodies, 23,198 summary attachment bodies and 4,162 report links. Existing 43 unavailable people/375 summaries without attached text remain.
+- [x] Observe first compact indexing complete in Obsidian 1.13.7; open Start Here, chronological pages, a summary, a topic, automatic backlinks and local graph. Use the actual graph review to improve filename labels.
+- [x] Fix profile-title formatting: strip Markdown syntax from generated titles, avoid repeating a report’s own heading, default the browsing vault to Reading view and readable line length. Add fixture/body acceptance for the regression.
+- [x] Add summary index previews: real activity ranges, timezone/DST-aware prose, approved descriptions bounded to 360 characters, explicit missing-data labels, and dated page selection. Keep creation-date ordering distinct from activity coverage; paginate at 50 previews/64 KiB. Test undated range records, offset changes, multiple/invalid ranges, safe Markdown and unchanged bodies.
+- [x] Make connection notes usable without the Backlinks sidebar: direct recent-memory links, complete bounded browsing lists, localized dates/types and explicit empty states. Derive membership from rendered summary/profile/signal links; deduplicate embedded/repeated references, exclude navigation/code/frontmatter/external links, and test bounds, relocation and export integration.
+- [x] Refresh all 10,525 connection notes in both local candidates; reconcile 96,454 memory references and QuickTime Player's 77 summaries. Preserve memory notes/settings, back up connection documents and hash-check unrelated files. Corrected vault: 31,691 notes, 140.8 MB, 288,470 links, zero missing Markdown targets. Include generated page properties in the 64-KiB budget. Full suite, vet and compiled offline/recovery checks pass; evidence is in `exports/obsidian-connections-20261003/`.
+- [ ] Reopen the current compact vault from Obsidian/the Dock and verify the refreshed QuickTime note, its five recent links and complete list. The existing app kept an old cached note; Force Reload left a blank window, and automated reopening after closing that window was unavailable. Both vaults pass file/link audits; current GUI refresh/restart acceptance remains outstanding.
+- [x] Refresh both local compact candidates' generated summary indexes using their existing note maps. Retain all 11,751 summary entries, with 11,068 activity ranges; check 12,450 links per refresh and preserve all other non-settings files by hash. Each now has 30,641 notes. Back up overwritten navigation files and record current sizes in OBSIDIAN_EXPORT.md. Full source suite and vet pass.
+- [x] Build the corrected readable-name/heading vault at `/Users/tsavoknott/Documents/Pieces Obsidian/vault`: 192.53s, 243 MiB peak RSS, 30,455 notes, 113.5 MB Markdown. Verify bodies and every local Markdown target; preserve all 86,050 archival Markdown files unchanged. Full measurements and paths are in OBSIDIAN_EXPORT.md.
+- [ ] Open the corrected vault when the user is finished browsing the earlier candidate; verify fresh index completion, tag search, person/history navigation, nearby-summary click-through, readable graph labels and close/reopen. The earlier compact candidate completed indexing; final GUI/restart acceptance remains separate.
+- [x] Final compiled offline/recovery checks, full suite, vet, focused race tests and six-target compilation pass after naming/formatting changes. Intel version runs through Rosetta. Native Windows/Linux GUI acceptance remains separate.
+- [x] Document the root-versus-vault boundary, short filenames, graph scope, signals, privacy/coverage, commands and indexing tradeoffs in spec/layout/guide.
+- [ ] Package/sign/notarize the new feature when selected for release. Existing notarized rc2 packages remain unchanged and lack Obsidian support. No public upload/email is part of this work.
 
 ## Readability update — 0.18.0-rc2
 
@@ -14,13 +36,19 @@ Updated 2026-10-02. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/name
 
 ## Weekend macOS handoff — 2026-10-02
 
+- [x] Locate Nathan's renewed Developer ID certificate in the private Match repository; confirm validity through June 2031, matching private key and local keychain access. Record the actual keychain password location and future renewal instructions in [APPLE_SIGNING.md](APPLE_SIGNING.md), without copying secrets.
+- [x] Sign separate ARM64/Intel Mac executables with secure timestamps and hardened runtime. Verify strict signatures and explicitly execute each architecture, including Intel under Rosetta.
+- [x] Run headless Markdown, interrupted-fetch recovery and completed-source recovery suites against the exact signed binaries: ARM64 20.179s; Intel/Rosetta 23.028s. Verify the final ZIPs preserve these bytes, signatures, executable permissions and four-file contents.
+- [x] Prepare individual signed ZIPs/checksums, the combined email bundle, consumer quickstart and [email draft](MACOS_EMAIL_DRAFT.md). Record measured sizes and MIME estimates in [MACOS_HANDOFF.md](MACOS_HANDOFF.md). No email or publication performed.
+- [x] Resolve the Apple agreement blocker after the user accepts the terms. Both submissions are **Accepted** on October 3, with no issues in Apple's logs. Save receipts and match final executable code hashes to Apple tickets.
+- [x] Verify both final executables with `codesign --verify --strict --verbose=4 --check-notarization -R=notarized`; run manually quarantined copies on native ARM64 and Intel/Rosetta. Preserve identical tested executable bytes while refreshing README, quickstart, email draft, ZIP names and checksums in `dist/macos-notarized-0.18.0-rc2/`. Record first-launch internet requirement; stapling is unsupported for a standalone CLI/ZIP. Evidence: `exports/macos-notarization-20261003/acceptance.json`.
 - [x] Expand the consumer guide shipped as `README.md` in every ZIP: architecture selection, checksum verification, macOS approval, macOS/Linux/Windows commands, system timezone defaults, headless logging, exit codes, recovery, long-running processes, privacy limits and troubleshooting.
 - [x] Exercise the actual rc2 Apple-silicon executable with closed stdin and separate output streams: Markdown-only export, periodic stderr progress, default Local/explicit UTC, complete/partial exits, finalized archive validation and offline recovery inspection. Race-instrumented test harness passed (12.677s).
 - [x] Repeat headless and recovery checks with the rc2 Intel Mac executable under Rosetta (21.382s total). This is translated execution on macOS 15.7.3, not native Intel hardware acceptance.
 - [x] Refresh only the README in the six unpublished rc2 ZIPs; preserve executable bytes/permissions and record updated SHA-256 checksums. Original packages are retained privately. Local HTTPS Bash installer acceptance passed with the refreshed package (11.438s), including cleanup and partial-exit handling. Evidence: `exports/weekend-handoff-20261002/package-checks.json` and `exports/weekend-*.log`.
 - [ ] Complete the first external Mac trial, including downloaded-file/Gatekeeper behavior on that user's machine and the user's own OS version/data. This is the purpose of the controlled trial, not a claim already established by local fixtures.
 
-The Mac trial can use a directly shared platform ZIP plus `SHA256SUMS.txt`; it does not require Actions or public hosting. No files have been sent or published. Native Windows and public download acceptance remain open for a broad release. The README-only package refresh does not require another real-data export because the verified executable hashes are unchanged.
+The Mac trial can use the matching notarized platform ZIP, its `.sha256` file and quickstart from [MACOS_HANDOFF.md](MACOS_HANDOFF.md); it does not require Actions or public hosting. Packages were submitted only to Apple for notarization; nothing has been emailed or publicly published. Native Windows and public download acceptance remain open for a broad release. Notarization preserves the tested signed executable bytes; no repeat large export is needed.
 
 ## Previous accepted recovery candidate — 0.18.0-rc1
 
@@ -38,7 +66,7 @@ The release focuses on **Markdown summaries, persona/profile histories, pipeline
 
 The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
 
-Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. Source publication is not required. The later Mac handoff request adds Developer ID signing and notarization; both are complete for the current Mac packages.
 
 **Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration, Actions dispatch or publication is required for the current work.
 
@@ -307,8 +335,8 @@ Implementation: render from canonical approved Markdown; retain it in PDF export
 - [x] Run `go test -race ./...`, `go vet ./...`, and the pinned `govulncheck` command in README after changes. Fix reachable findings; record non-reachable dependency advisories accurately.
 - [x] Build six targets with `CGO_ENABLED=0`; verify ZIP contents, binary formats, SHA-256 checksums, licenses/font notices, and absence of repository source or private test exports.
 - [ ] Native runtime matrix: macOS ARM64/AMD64; Windows ARM64/AMD64; Linux ARM64/AMD64. At minimum execute doctor, scan, synthetic export, PDF validation, metadata behavior, cancellation, and missing-OS launch tests.
-- [x] Adopt unsigned, unnotarized, closed-source distribution as explicitly requested. No signing/notarization release gate.
-- [ ] Test the actual unsigned download/run experience on each platform, including Linux executable permissions and desktop/headless launch behavior; do not disable system security controls automatically.
+- [x] Preserve closed-source distribution. The initial unsigned policy is superseded for the new October 2 Mac email packages by the user's signing request; signing is complete and notarization is tracked above.
+- [ ] Test the actual download/run experience on each platform, including signature/notarization status, Linux executable permissions and desktop/headless launch behavior; do not disable system security controls automatically.
 - [ ] Verify download UX from a clean machine with no development tools installed; supported OS versions and optional desktop facilities documented.
 - [x] Add proprietary binary-use notice in LICENSE.txt and retain third-party notices in every package. Application source remains private; installer scripts are intended for a Gist.
 - [x] Publish the unlisted installer Gist and verify both uploaded files match the tested local scripts; pin raw revisions in DISTRIBUTION.md. No application source or exported records were published.

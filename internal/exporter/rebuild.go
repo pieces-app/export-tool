@@ -144,8 +144,8 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 	if o.Format == "" {
 		o.Format = original.Format
 	}
-	if o.Format != "markdown" && o.Format != "pdf" && o.Format != "both" {
-		return Manifest{}, errConfig("format must be markdown, pdf, or both")
+	if o.Format != "markdown" && o.Format != "obsidian" && o.Format != "pdf" && o.Format != "both" {
+		return Manifest{}, errConfig("format must be markdown, obsidian, pdf, or both")
 	}
 	if o.Timezone == "" {
 		o.Timezone = original.Timezone
@@ -223,6 +223,7 @@ func Rebuild(ctx context.Context, input RebuildOptions) (result Manifest, result
 	r.manifest.LocalPerformance = nil
 	r.legacySignalPrivacy = original.SignalPrivacyVersion < currentSignalPrivacyVersion && o.Mode == "filtered" && o.Scanner.SourceFiltering()
 	r.manifest.PDFLimits = nil // New rendering uses this invocation's budgets.
+	r.manifest.Obsidian = nil  // Regenerate presentation for the requested format.
 	digest := sha256.Sum256(manifestBytes)
 	r.manifest.Rebuild = &RebuildInfo{SourceManifestSHA256: hex.EncodeToString(digest[:]), SourceToolVersion: original.ToolVersion, SourceStarted: original.Started, SourceFinished: original.Finished, SourceStatus: original.Status, SourceCoverage: original.Coverage, SourcePeople: original.People, SourcePerformance: original.Performance, LegacyEvidence: original.ArchiveState == nil}
 	r.manifest.Rebuild.OriginalReadStarted, r.manifest.Rebuild.OriginalReadFinished = original.Started, original.Finished

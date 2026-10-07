@@ -68,6 +68,7 @@ type SourceRecoveryInfo struct {
 }
 
 type Manifest struct {
+	Obsidian                *ObsidianInfo            `json:"obsidian,omitempty"`
 	SourceRecovery          *SourceRecoveryInfo      `json:"source_recovery,omitempty"`
 	Junctions               []JunctionCoverage       `json:"junction_reads,omitempty"`
 	CaptureReplay           *CaptureReplayInfo       `json:"capture_replay,omitempty"`
@@ -307,7 +308,7 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	if o.Metadata == "" {
 		o.Metadata = "off"
 	}
-	if (o.Format != "markdown" && o.Format != "pdf" && o.Format != "both") || (o.Naming != "readable" && o.Naming != "opaque") || (o.Metadata != "off" && o.Metadata != "auto") || (o.Relationships != "both" && o.Relationships != "inline" && o.Relationships != "sidecar") {
+	if (o.Format != "markdown" && o.Format != "obsidian" && o.Format != "pdf" && o.Format != "both") || (o.Naming != "readable" && o.Naming != "opaque") || (o.Metadata != "off" && o.Metadata != "auto") || (o.Relationships != "both" && o.Relationships != "inline" && o.Relationships != "sidecar") {
 		return Manifest{}, errConfig("invalid format, naming, metadata, or relationships option")
 	}
 	if o.PDFFont != "" {
@@ -336,8 +337,8 @@ func Export(ctx context.Context, client *Client, o Options) (result Manifest, re
 	}
 	var sourceStore *recovery.Store
 	if o.Recovery != nil {
-		if o.Format != "markdown" || len(o.SDKCaches) > 0 {
-			return Manifest{}, errConfig("source recovery currently supports Markdown exports without SDK-cache input")
+		if (o.Format != "markdown" && o.Format != "obsidian") || len(o.SDKCaches) > 0 {
+			return Manifest{}, errConfig("source recovery currently supports Markdown or Obsidian exports without SDK-cache input")
 		}
 		if _, err := os.Lstat(abs + ".partial"); !os.IsNotExist(err) {
 			return Manifest{}, errConfig("partial directory already exists or cannot be inspected; choose a new output path")
@@ -613,7 +614,7 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 			return r.manifest, err
 		}
 	}
-	if o.Format != "markdown" {
+	if o.Format == "pdf" || o.Format == "both" {
 		if err = r.renderPDFs(); err != nil {
 			return r.manifest, err
 		}
@@ -621,6 +622,11 @@ func (r *run) finish(destination string) (result Manifest, resultErr error) {
 	r.progress.Stage("Native and portable metadata", len(r.documentMetadata))
 	if err = r.applyMetadata(); err != nil {
 		return r.manifest, err
+	}
+	if o.Format == "obsidian" {
+		if err = r.prepareObsidian(); err != nil {
+			return r.manifest, err
+		}
 	}
 	r.progress.Stage("Validate links and output", 0)
 	if err = r.validateMarkdownLinks(); err != nil {

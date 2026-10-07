@@ -10,8 +10,8 @@ Choose the ZIP for the computer where Pieces OS and your data live:
 
 | Computer | ZIP filename ends with |
 | --- | --- |
-| Mac with Apple silicon (M-series) | `darwin_arm64.zip` |
-| Mac with an Intel processor | `darwin_amd64.zip` |
+| Mac with Apple silicon (M-series) | `darwin_arm64_notarized.zip` |
+| Mac with an Intel processor | `darwin_amd64_notarized.zip` |
 | Linux with Intel/AMD 64-bit CPU (`uname -m`: `x86_64`) | `linux_amd64.zip` |
 | Linux with ARM64 CPU (`uname -m`: `aarch64` or `arm64`) | `linux_arm64.zip` |
 | Windows with Intel/AMD x64 processor | `windows_amd64.zip` |
@@ -25,7 +25,11 @@ Extract the ZIP fully; do not run inside the archive. The four files are the exe
 
 On Mac/Linux, if extraction lost the executable permission, use `chmod u+x ./pieces-export`. This does not fix a wrong-architecture download or a macOS security block.
 
-The executable is unsigned and not notarized. macOS may block the first launch. After verifying its source/checksum and attempting to run it, follow [Apple's per-application approval instructions](https://support.apple.com/en-us/102445): **System Settings → Privacy & Security → Open Anyway**, if offered, then retry. An agent cannot bypass an approval that requires the computer's owner. Managed computers may prohibit exceptions; contact the administrator. Do not disable Gatekeeper or endpoint protection globally. A damaged/malware warning requires investigation, not an automatic bypass.
+The current Mac ZIPs ending in `_notarized.zip` contain executables signed by **Developer ID Application: Mesh Intelligent Technologies, Inc. (287L9TU9JL)** and **accepted by Apple's notarization service**. Use these packages for Mac. The original Mac ZIPs without a signing/notarization suffix are unsigned; do not mix their checksums with the current packages.
+
+Keep the Mac online for its first launch so Gatekeeper can retrieve Apple's notarization ticket. This ZIP contains a standalone command-line executable; Apple does not support attaching a notarization ticket directly to that file format. If macOS still blocks execution, first check your internet connection, checksum and selected download. Contact the sender with the exact message if it persists. Managed computers may require administrator approval. Do not disable Gatekeeper or endpoint protection globally; a damaged/malware warning requires investigation. [Apple's notarization guidance](https://developer.apple.com/videos/play/wwdc2019/703/), [macOS security guidance](https://support.apple.com/en-us/102445).
+
+For a Mac package, `codesign --verify --strict --verbose=2 ./pieces-export` checks the embedded signature, and `codesign --display --verbose=4 ./pieces-export` shows its authority and team. To require a notarization ticket for this standalone executable, run `codesign --verify --strict --verbose=4 --check-notarization -R=notarized ./pieces-export`; success reports that its explicit requirement is satisfied. `spctl --assess --type execute` is an app assessment and can reject a valid standalone CLI because it is not an app bundle; use the notarization check above. These checks do not override a managed computer's security policy. The matching `.zip.sha256` file can also be checked with `shasum -a 256 -c <zip-file>.sha256`.
 
 This candidate's export/recovery behavior has been exercised on Apple silicon with macOS 15.7.3. The Intel Mac executable is also checked under Rosetta on that machine, which is not native Intel hardware acceptance. Linux has prior runtime checks; native Windows and all OS-version combinations have not been certified. For a first trial, use the Markdown commands below.
 
@@ -145,7 +149,7 @@ Website allow/deny rules can be configured in that policy. Adult/banking categor
 
 | Symptom | What to do |
 | --- | --- |
-| Wrong architecture / cannot execute | Check the platform table, extract fully, and run `version`. Approve a trusted unsigned Mac binary through the per-app security UI if needed. |
+| Wrong architecture / cannot execute | Check the platform table, extract fully, and run `version`. Approve a trusted Mac binary through the per-app security UI if needed. |
 | Pieces OS is not found | Open Pieces OS manually, wait for its database to be ready, then run `doctor --launch-os=false`. Choose `--environment production` or `staging` when both exist. |
 | Desktop closure fails | Close Pieces Desktop manually and retry with `--close-desktop=false`. Leave Pieces OS running. |
 | Output/workspace already exists | Use new paths for a new export; use `resume` with the existing workspace and keys to recover. Do not repeatedly restart into the same paths. |
@@ -166,4 +170,4 @@ To report a problem, start with the tool's `version`, OS version/CPU, process ex
 
 Use `--environment production` or `--environment staging` when both are installed. `--base-url http://127.0.0.1:39300` selects a particular running instance. `--os-path` can specify an installed OS executable or macOS application bundle.
 
-The application source is private. This utility is unsigned and not notarized. Its use is covered by `LICENSE.txt`; keep `THIRD_PARTY_NOTICES.txt` with it. Only the finalized export folder should be shared—never the private recovery workspace or keys.
+The application source is private. The current Mac packages are Developer ID signed and notarized as described above. Its use is covered by `LICENSE.txt`; keep `THIRD_PARTY_NOTICES.txt` with it. Only the finalized export folder should be shared—never the private recovery workspace or keys.

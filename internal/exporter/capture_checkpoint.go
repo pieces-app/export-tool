@@ -536,7 +536,7 @@ func validateCaptureOptions(o Options) error {
 	if (o.PeopleMode != "all" && o.PeopleMode != "profiles" && o.PeopleMode != "connected") || o.MinPersonConnections < 1 || (o.RelatedOrder != "relevance" && o.RelatedOrder != "recent") || o.RelatedLimit < 1 || o.RelatedLimit > 500 || o.BatchSize < 1 || o.BatchSize > 50 || o.WindowIDs < 1 {
 		return errConfig("recovery selection settings are invalid")
 	}
-	if (o.Format != "markdown" && o.Format != "pdf" && o.Format != "both") || (o.Naming != "readable" && o.Naming != "opaque") || (o.Metadata != "off" && o.Metadata != "auto") || (o.Relationships != "both" && o.Relationships != "inline" && o.Relationships != "sidecar") {
+	if (o.Format != "markdown" && o.Format != "obsidian" && o.Format != "pdf" && o.Format != "both") || (o.Naming != "readable" && o.Naming != "opaque") || (o.Metadata != "off" && o.Metadata != "auto") || (o.Relationships != "both" && o.Relationships != "inline" && o.Relationships != "sidecar") {
 		return errConfig("recovery presentation settings are invalid")
 	}
 	if _, err := time.LoadLocation(o.Timezone); err != nil {
