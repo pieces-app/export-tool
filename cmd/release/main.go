@@ -152,7 +152,7 @@ func licenseNotices(targets []string) ([]byte, error) {
 		modules = append(modules, m)
 	}
 	var result bytes.Buffer
-	result.WriteString("Third-party notices for Pieces Export\n\nProject source is private. The following notices apply to third-party dependencies, not to the export-tool source.\nIncludes the union of dependency modules compiled into the requested platform binaries.\n\n")
+	result.WriteString("Third-party notices for Pieces Export\n\nPieces Export is open source under the MIT License (see LICENSE.txt). The following notices apply to third-party dependencies compiled into it.\nIncludes the union of dependency modules compiled into the requested platform binaries.\n\n")
 	root, err := exec.Command("go", "env", "GOROOT").Output()
 	if err != nil {
 		return nil, err

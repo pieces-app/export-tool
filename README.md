@@ -1,18 +1,171 @@
 # Pieces Export
 
-A compiled Go CLI for exporting local Pieces summaries, persona/profile histories and their linked graph to Markdown. Source stays private; users receive an executable with the secret detector and timezone database included. No Go, Python, Flutter or separate scanner is required to run it.
+Save your Pieces memories as Markdown files you keep: your summaries, your persona and profile histories, and the links between them. The tool only reads your local Pieces data. Nothing in Pieces is changed or deleted.
 
-The **0.18.0-rc2** presentation candidate adds readable local timestamps and replaces repeated persona reports inside summaries with links to the exact profile versions. Source and actual Mac CLI recovery/rebuild checks pass. The verified offline refresh finished in 28m36s, retaining all 11,751 summaries and their graph. [Open the refreshed export](exports/readable-local-20261002/export/index.md). See [the current checklist](TODO.md#readability-update--0180-rc2).
+Pieces Export is open source under the [MIT License](LICENSE.txt). The current release is **0.18.0-rc2** (early access).
 
-The previously accepted **0.18.0-rc1** candidate adds interrupted-fetch recovery to the existing Markdown export. Six binary-only ZIPs are built under `dist/0.18.0-rc1/`; see [download instructions](DOWNLOAD_README.md). Mac ARM64, Rosetta and Linux ARM64/translated AMD64 CLI/recovery checks pass. The full real-summary interruption/resume check passed in 43m45s, including source reads; the finalized archive retains all 11,751 summaries and passed independent body/graph/link and native metadata checks. Native Windows and public download checks remain outstanding; hosting is deferred and Actions remains on hold.
+## Quick start
 
-The user accepted the measured 28m32s offline rebuild duration and the clearly reported source limitations: 43 unavailable people and 375 summaries without attached body text in the earlier accepted archive. Those remain partial exports, not invented completeness. Further storage rewrites, PDF/audio/attachments and signals expansion are outside this release. Follow the [current checklist](TODO.md#current-remaining-work-in-execution-order), [specification](EXPORT_SPEC.md) and [folder layout](EXPORT_LAYOUT.md).
+Keep Pieces installed. The tool starts PiecesOS if it isn't running.
 
-## Obsidian vaults — working build 0.20.0-dev
+**Mac or Linux.** Open Terminal and run:
+
+```sh
+curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash
+```
+
+**Windows.** Open PowerShell (Start menu, type "PowerShell") and run:
+
+```powershell
+irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1 | iex
+```
+
+## What happens
+
+1. It downloads the tool for your computer (about 8 MB) from our Google Drive folder. It checks the file's SHA-256 fingerprint before running anything.
+2. It finds Pieces, scans your memories, and shows how long the export should take.
+3. It asks `Export now? [Y/n]`. Press Return to start. Pieces Desktop closes during the export, and PiecesOS keeps running.
+4. It shows progress as it works. Large libraries can take 30 minutes or more, so keep the window open and the computer awake and plugged in.
+5. When it's done, it opens your export folder. Start with `index.md`. [Obsidian](https://obsidian.md) or [VS Code](https://code.visualstudio.com) are good ways to browse it. Keep the folder together so the links keep working.
+
+On a Mac, you may see "Terminal would like to access files in your Documents folder." Click **Allow**, because that's where the export is saved.
+
+## If the export is interrupted
+
+Your progress is saved automatically. Run this to continue where it stopped:
+
+```sh
+curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash -s -- --resume
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1))) -Resume
+```
+
+The finished export goes into a new folder in Documents/Pieces-Exports.
+
+## Options
+
+Add options to the end of the command:
+
+- **Mac or Linux:** `curl -fsSL <url>/install.sh | bash -s -- OPTIONS`
+- **Windows:** `& ([scriptblock]::Create((irm <url>/install.ps1))) OPTIONS`
+
+| To do this | Mac or Linux | Windows |
+| --- | --- | --- |
+| Estimate the time without exporting | `--dry-run` | `-DryRun` |
+| Continue an interrupted export | `--resume` | `-Resume` |
+| Save the export somewhere else | `--output ~/Desktop/my-export` | `-Output "$HOME\Desktop\my-export"` |
+| Also make PDFs (experimental) | `-- --format both` | `-ExportArgs '--format','both'` |
+| Don't open the folder at the end | `--no-open` | `-NoOpen` |
+| Delete the tool afterward | `--remove` | `-Cleanup Remove` |
+| Only download and check the tool | `--install-only` | `-InstallOnly` |
+| Skip the Export now? question | `-- --yes` | `-ExportArgs '--yes'` |
+
+PDF exports can't be resumed after an interruption. Markdown exports can.
+
+## Where things are saved
+
+| | Mac | Windows | Linux |
+| --- | --- | --- | --- |
+| Your export | `~/Documents/Pieces-Exports/<date_time>` | `Documents\Pieces-Exports\<date_time>` | `~/Documents/Pieces-Exports/<date_time>` |
+| The tool | `~/Library/Application Support/Pieces Export/tool/` | `%LOCALAPPDATA%\Pieces Export\tool\` | `~/.local/share/pieces-export/tool/` |
+| Resume data | `~/Library/Application Support/Pieces Export/recovery/` | `%LOCALAPPDATA%\Pieces Export\recovery\` | `~/.local/share/pieces-export/recovery/` |
+
+The resume data is private and encrypted. It stays on your computer and isn't saved in Documents, so it isn't synced. It's deleted when an export finishes. The tool is kept so you can resume or run it again. To remove everything except your exports, delete the `Pieces Export` folder (Linux: `pieces-export`) shown above.
+
+## Manual download
+
+To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1NjJ8jsOnFkSxp8Msn7PkAg0tJwgsVfZA):
+
+| Computer | Download |
+| --- | --- |
+| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/1oMRUgO184Pt0kavuccCQVQgmqKWViSE8/view) |
+| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1opKlUbvSCjS3RO4i9qHoapoxf81pj7nf/view) |
+| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1mGaXSaDUAflRaa6cCI4zfj_nILWNTH67/view) |
+| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1dJmEB55mnG3sYITFcfVL0DAXcyQ8ySWn/view) |
+| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1zk2WVA12LxtCQsBnlPm7aDdWs2no1X3A/view) |
+| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1h44eHYqIAW6Yg7J90L1o9qqC4IAffpdV/view) |
+
+Not sure which one you need? On a Mac, open the Apple menu and choose About This Mac. "Chip: Apple M..." means Apple silicon. On Windows, open Settings, then System, then About, and check System type. On Linux, run `uname -m`. `x86_64` means x86-64, and `aarch64` means ARM64.
+
+Open Pieces and wait until it has loaded, then run these commands in your Downloads folder. Swap in your ZIP's name where it differs.
+
+Mac, in Terminal:
+
+```sh
+cd ~/Downloads
+unzip pieces-export_0.18.0-rc2_darwin_arm64_notarized.zip -d pieces-export-tool
+cd pieces-export-tool
+./pieces-export version
+./pieces-export export --dry-run --format markdown --launch-os=false
+caffeinate -i ./pieces-export export --format markdown --launch-os=false --close-desktop=false --output ./my-pieces-export --work ./private-work --recovery-keys ./private-keys
+```
+
+Windows, in PowerShell:
+
+```powershell
+cd $HOME\Downloads
+Expand-Archive .\pieces-export_0.18.0-rc2_windows_amd64.zip -DestinationPath .\pieces-export-tool
+cd .\pieces-export-tool
+.\pieces-export.exe version
+.\pieces-export.exe export --dry-run --format markdown --launch-os=false
+.\pieces-export.exe export --format markdown --launch-os=false --close-desktop=false --output .\my-pieces-export --work .\private-work --recovery-keys .\private-keys
+```
+
+Linux, in a terminal:
+
+```sh
+cd ~/Downloads
+unzip pieces-export_0.18.0-rc2_linux_amd64.zip -d pieces-export-tool
+cd pieces-export-tool
+chmod u+x ./pieces-export
+./pieces-export version
+./pieces-export export --dry-run --format markdown --launch-os=false
+./pieces-export export --format markdown --launch-os=false --close-desktop=false --output ./my-pieces-export --work ./private-work --recovery-keys ./private-keys
+```
+
+To continue an interrupted manual export, keep `private-work` and `private-keys` and run:
+
+```sh
+./pieces-export resume --work ./private-work --recovery-keys ./private-keys --output ./recovered-export
+```
+
+On Windows, use `.\pieces-export.exe` and `.\` paths. To check a manual download, save the matching `.sha256` file from the folder next to the ZIP and run `shasum -a 256 -c <file>.sha256` on a Mac or `sha256sum -c <file>.sha256` on Linux. Both should print OK. On Windows, compare the output of `Get-FileHash <zip>` with the `.sha256` file.
+
+## Troubleshooting
+
+- **Windows says `irm` isn't recognized.** You're in Command Prompt. Open PowerShell instead.
+- **Windows or antivirus warns about the tool.** The Windows build isn't code-signed yet. The script checks the download's SHA-256 before running it. If Windows still blocks it, send us the exact message.
+- **It says Pieces OS was not found.** Open Pieces, wait until it has fully loaded, then run the command again.
+- **The download does not match its expected SHA-256.** Google Drive may be limiting downloads. Wait a few minutes and try again. If it keeps happening, use the manual download above.
+- **Linux says it needs curl or unzip.** Install them, for example with `sudo apt install curl unzip`.
+- **Some records were unavailable.** The export still finished. `coverage.md` in the export folder lists what was missing.
+
+To report a problem, send the tool version, your operating system and chip, and the last thing the tool printed. Please don't send your export or the resume data.
+
+## Privacy and security
+
+- Everything runs on your computer. The tool reads from the local PiecesOS and writes files to your disk; it does not upload your memories anywhere.
+- Filtered mode is the default. It removes detected secrets, credential fields, and basic financial identifiers, then audits the finished files. Detection is best effort, so review an export before sharing it.
+- The install scripts download only the Google Drive files pinned in them. Each file must match the SHA-256 written in the script, and the ZIP must contain exactly the tool, its README, and its license files. Anything else is rejected before it runs.
+- The Mac tool is signed with our Apple Developer ID (Mesh Intelligent Technologies, Inc.) and notarized by Apple. The Windows and Linux tools aren't code-signed yet.
+- No administrator rights, PATH changes, or background services are involved. The scripts are [`install/install.sh`](install/install.sh) and [`install/install.ps1`](install/install.ps1); the [Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) serves the same files.
+
+## Release status
+
+- **macOS:** export and recovery are tested on Apple silicon. The Intel build is tested under Rosetta.
+- **Linux:** the ARM64 build is tested natively and the x86-64 build under emulation.
+- **Windows:** builds are available, and native Windows testing is in progress.
+- The 0.18.0-rc2 ZIPs were packaged before the project moved to the MIT License, so the `LICENSE.txt` inside them still has the earlier text.
+
+## For developers
+
+### Obsidian vaults — working build 0.20.0-dev
 
 `export --format obsidian`, `rebuild --format obsidian`, and `pieces-export obsidian --source ./finished-export --output ./Pieces-Obsidian --yes` create a compact **`vault/` subfolder** alongside the complete archive. Open that child folder in Obsidian. It keeps summaries/profile histories, existing Pieces tags and named connections, with automatic backlinks, readable graph labels and four nearby-summary shortcuts. Bulk evidence stays in the parent. The first compact trial reduced indexing from 86,051 notes/1.8 million links to 30,455 notes/187,294 links and completed Obsidian's index. See [the guide and current acceptance](OBSIDIAN_EXPORT.md). Signals appear only when selected in the source. The signed/notarized rc2 email packages remain unchanged and do not contain this development feature.
 
-## Run from this repository
+### Run from this repository
 
 Use Go 1.27.1 or newer (Go's toolchain support can download the required compiler):
 
@@ -51,7 +204,7 @@ Parents must exist; the workspace must be new. Workspace, keys and output must b
 
 New exports write related-summary suggestions once in `.relationships_graph.md` siblings, linked from summary footers. Use `--relationships both` only when you want the lists duplicated inside summaries too. The ranked suggestions and full graph remain available in either layout.
 
-## Summaries and personas by default
+### Summaries and personas by default
 
 New builds default to `--scope summaries --people profiles` for summaries and persona/profile documents:
 
@@ -70,7 +223,7 @@ Secret detection and domain rules still scan the exported content. If a website 
 
 Advanced `--materials TYPE,TYPE` still selects full inventories of those types; it cannot be combined with `--scope`. `--materials WORKSTREAM_SUMMARIES` alone does **not** select annotation bodies or profile context.
 
-## Rebuild without fetching from OS again
+### Rebuild without fetching from OS again
 
 ```sh
 ./pieces-export rebuild --source ./exports/finished --output ./exports/rebuilt --format both
@@ -79,11 +232,11 @@ Advanced `--materials TYPE,TYPE` still selects full inventories of those types; 
 
 This reads only a finalized archive and writes a new folder. It preserves the source policy, exclusions, graph provenance, and coverage gaps, and can optionally use historical `--sdk-cache` links to records already exported. It never connects to or launches OS. Legacy archives remain partial where reconstruction evidence is unavailable. Use the original `--policy` when one was configured. See [offline rebuilding](OFFLINE_REBUILD.md) for integrity checks, conservative cache handling, and limitations.
 
-## Consolidated signals
+### Consolidated signals
 
 Starting with `0.9.0-dev`, the CLI adds `--signals-digest split|single|off`. Split is the default, with `--signals-per-part 1000` and `--signals-max-part-mib 8`; canonical signal files remain available in every mode. The digest preserves approved attached descriptions, reports missing projections, and links to included records. It makes no extra OS requests. Oversized documents fail without truncation. Rebuild can change digest presentation offline; independent PDF limits still apply. See [layout and limits](EXPORT_LAYOUT.md#signals-digest).
 
-## Measure performance and choose people
+### Measure performance and choose people
 
 ```sh
 ./pieces-export export --dry-run --launch-os=false --people profiles --people-report
@@ -101,7 +254,7 @@ Final privacy auditing uses bounded read buffers and rejects truncated JSON. A l
 
 `--people profiles` is the default for summaries scope. Explicit `--scope all` and custom `--materials` default to `--people all`; an explicit `--people` always overrides the scope default. `profiles` selects persona/profile-bearing people and stored account identities; `connected` additionally keeps summary-linked/high-connectivity people. Missing evidence is retained conservatively. Selection does not remove summaries/events or merge names/emails. The finalized 2026-09-30 focused baseline retained **1,381 of 4,413 persons**, omitting **3,032 (68.7%)**; every retained person had profile history. That older export remains partial because its core relationship recovery relies on historical evidence. The current-junction archive retained **1,381 of 4,343 persons**, omitting **2,962 (68.2%)**, with current profile evidence for all retained people. Twelve earlier same-name candidate groups were identified for review; no automatic identity merges occurred.
 
-## What this version implements
+### What this version implements
 
 - Inventories 32 generic material types plus connector/observer snapshots. Unreadable types are reported. Reads records in batches of up to 50, with individual-read fallback where an endpoint exists.
 - Splits large inventories into adaptive creation-time windows, deduplicates boundary IDs, then audits against an unfiltered inventory to capture undated records. A final ID comparison reports additions/deletions during the run. There is no cursor or offset to advance.
@@ -127,7 +280,7 @@ Add these entries to the policy JSON, with paths relative to the policy file:
 
 Every configured list is a deny list; `category` is its report label. The importer uses domain entries, not URL/path-specific entries. It normalizes public-feed hostnames and records invalid-entry omissions and original/imported checksums in `source.json`; manually supplied lists are validated strictly. Domain lists are imperfect and do not identify adult prose, images, or banking information without a matching domain. See [the actual JSON policy example](policy.example.json) and [download-user instructions](DOWNLOAD_README.md) for strict mode and supported flags.
 
-## Documents, ranking, and metadata
+### Documents, ranking, and metadata
 
 ```sh
 ./pieces-export scan --environment staging --launch-os=false
@@ -150,23 +303,23 @@ PDF rendering has configurable per-document input/page/output limits (16 MiB / 1
 
 Descriptions, tags, normalized source tags, persons, and website hosts appear in documents and portable `.metadata.json` sidecars. `--metadata auto` also attempts macOS Finder xattrs, Linux XDG xattrs, or Windows writable Shell properties and records readback outcomes. Actual file-manager visibility depends on the platform, filesystem, indexing, and property handlers. `--metadata off` keeps portable metadata only. Sidecars survive ZIP/cross-platform copying where native attributes may be lost.
 
-## Historical SDK-cache recovery
+### Historical SDK-cache recovery
 
 `--sdk-cache /path/to/pieces_client_sqlite.db` optionally recovers historical summary, annotation, person, and signal relationships to records fetched from the current OS. Repeat the flag for multiple caches. Current fields take precedence, cached text is never imported, conflicting/tombstoned links are handled conservatively, and the archive remains partial. [SDK_CACHE_RECOVERY.md](SDK_CACHE_RECOVERY.md) documents selection, bounds, privacy, provenance, and the 87.9% candidate body-link coverage measured on this machine. Candidate coverage is not a completed live recovery.
 
-## Build binary-only downloads
+### Build binary-only downloads
 
 ```sh
 go run ./cmd/release --version 0.17.0-dev --output dist/0.17.0-dev
 ```
 
-This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.17.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, proprietary license, and third-party notices. No application source is packaged or published. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
+This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.17.0-dev/`: macOS, Linux, and Windows, each for AMD64 and ARM64. Each ZIP contains only the executable, download instructions, the license, and third-party notices. Builds use `CGO_ENABLED=0`, trimmed build paths, disabled VCS stamping, and stripped debug symbols. Notices are gathered from dependency modules compiled into the requested platforms and from the Go runtime; packaging stops if a module has no root license/notice file.
 
-Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
+Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 
-The packager produces unsigned archives; it does not sign, notarize, upload, or publish anything. The separate Mac handoff in `dist/macos-notarized-0.18.0-rc2/` has completed Developer ID signing and Apple notarization. Distributed as open-source software under the Apache 2.0 license (see [LICENSE.txt](LICENSE.txt)). See [DISTRIBUTION.md](DISTRIBUTION.md) for installer and release workflows. Native Windows acceptance, the first external Mac trial and public hosting remain separate open items.
+The packager produces unsigned archives; it does not sign, notarize, upload, or publish anything. The separate Mac handoff in `dist/macos-notarized-0.18.0-rc2/` has completed Developer ID signing and Apple notarization. See [DISTRIBUTION.md](DISTRIBUTION.md) for installer and release workflows. Native Windows acceptance, the first external Mac trial and public hosting remain separate open items.
 
-## Known limits
+### Known limits
 
 Live hierarchy verification recovered **1,708 direct edges**, using two global identifier reads plus 20 parent reads, with 1,004 distinct children and matching returned inventories. OS remained healthy. This avoids an extra snapshot request for every summary. It does not prove internal database completeness because server helpers may suppress errors.
 
@@ -180,7 +333,7 @@ An evenly spaced sample of 250 summary snapshots omitted annotation/person/pipel
 - Privacy filtering is conservative but cannot guarantee anonymity or recognize every secret. It does not include Presidio/NLP, arbitrary bank-account-number detection, semantic adult-content classification, or image/audio inspection. Strict derived-content filtering intentionally removes all generated content when source filtering is active because complete provenance cannot be proved.
 - Records are staged on disk, but IDs, graph metadata, and category lists remain in memory. Large unfiltered inventories must fit the configured response limit (`--max-response-mib`, default 64). Disk-backed graph storage, resumable exports, and large-history benchmarks remain future work.
 
-## Research and design
+### Research and design
 
 Latest read-only validation on 2026-09-29: the inventory grew to 1,902,907 records, including 11,730 summaries and 4,291 persons. Final calibration read 750 record samples in 40 batches in 454 ms (repeated, possibly cached samples). The complete people preview took about 35 seconds, backed off for two ~0.9-second requests, and finished with OS responsive, recent p95 ~2 ms, and zero retries. It did not create an archive or close Desktop.
 
@@ -191,3 +344,7 @@ Earlier validation on 2026-09-29: fixture tests cover inventory reconciliation, 
 [Endpoint and traversal guide](EXPORT_GUIDE.md): source-backed endpoint inventory, pagination semantics, graph model, SDK loading patterns, personas/profiles, and remaining coverage work.
 
 [Privacy filtering research](PRIVACY_FILTERING.md): alternatives, category sources, provenance issues, and a broader future policy design. Its proposed YAML is not the CLI's JSON configuration schema.
+
+## License
+
+MIT. See [LICENSE.txt](LICENSE.txt). Third-party components keep their own licenses, listed in `THIRD_PARTY_NOTICES.txt` inside each release ZIP.

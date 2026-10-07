@@ -5,8 +5,8 @@
 #
 # Downloads the pieces-export tool, checks its SHA-256 before running it, and
 # exports your Pieces memories to Markdown in Documents/Pieces-Exports. The tool
-# is kept so an interrupted export can be resumed. The downloaded tool is
-# proprietary; see LICENSE.txt in the download.
+# is kept so an interrupted export can be resumed. Pieces Export is open source
+# under the MIT License: https://github.com/pieces-app/export-tool
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 

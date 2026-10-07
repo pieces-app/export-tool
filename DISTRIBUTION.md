@@ -1,6 +1,6 @@
 # Binary distribution and installation
 
-Updated 2026-10-07. The application is open source under the Apache 2.0 license ([LICENSE.txt](LICENSE.txt)). macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)); the 0.18.0-rc2 ZIPs predate the change and still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
 
 ## Current Windows validation — 2026-10-07
 
@@ -48,7 +48,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 ## Installation UX
 
-Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/` as revision `12613a13cbb370e94020fc6eb13b28e201050e3d`. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
+Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
 1. With no options, both scripts install the built-in `0.18.0-rc2` release from the public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
