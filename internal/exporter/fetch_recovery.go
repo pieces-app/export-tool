@@ -139,7 +139,7 @@ func openFetchRecovery(ctx context.Context, root *recovery.Store, o RecoveryOpti
 		return nil, errConfig("invalid source recovery checkpoint")
 	}
 	f := &fetchCheckpoint{root: root, options: o, state: *frame.Fetch, generation: generation, resumed: true}
-	if f.state.Core.Options.Scanner != nil || f.state.Core.Options.Progress != nil || (f.state.Core.Options.Mode != "filtered" && f.state.Core.Options.Mode != "preserve") || f.state.Core.Manifest.Mode != f.state.Core.Options.Mode || f.state.Core.Options.Recovery != nil || len(f.state.Core.Options.SDKCaches) > 0 || f.state.Core.Options.Format != "markdown" || len(f.state.Outputs) == 0 || f.state.Core.Options.Output != f.state.Outputs[0] || f.state.Core.Manifest.Started.IsZero() {
+	if f.state.Core.Options.Scanner != nil || f.state.Core.Options.Progress != nil || (f.state.Core.Options.Mode != "filtered" && f.state.Core.Options.Mode != "preserve") || f.state.Core.Manifest.Mode != f.state.Core.Options.Mode || f.state.Core.Options.Recovery != nil || len(f.state.Core.Options.SDKCaches) > 0 || (f.state.Core.Options.Format != "markdown" && f.state.Core.Options.Format != "obsidian") || len(f.state.Outputs) == 0 || f.state.Core.Options.Output != f.state.Outputs[0] || f.state.Core.Manifest.Started.IsZero() {
 		return nil, errConfig("invalid source recovery configuration")
 	}
 	if err := validateCaptureOptions(f.state.Core.Options); err != nil {

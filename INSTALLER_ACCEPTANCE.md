@@ -1,5 +1,13 @@
 # Installer acceptance
 
+## One-line installer with Drive downloads and resume — 2026-10-07
+
+Both scripts now default to the pinned `0.18.0-rc2` Drive files, keep the tool, pass `--format markdown`, add private recovery folders for Markdown runs, support `--resume`/`-Resume` and `--dry-run`/`-DryRun`, and open the finished folder. Behavior and paths are in [DISTRIBUTION.md](DISTRIBUTION.md#installation-ux).
+
+Two Windows defects were reproduced before the fix. Under `irm | iex`, the script's final `exit` ended the user's PowerShell session. Piping the CLI through `Out-Host` hid `Export now? [Y/n]` until Enter was pressed, shown by an `expect`-driven terminal test that timed out waiting for the prompt. Reintroducing either defect makes its test fail again.
+
+`go test ./install` passed with Homebrew Bash 5.3, macOS `/bin/bash` 3.2 and PowerShell 7.5. Installer runs start in a new session, so `/dev/tty` prompts cannot block on a developer's terminal. Packaged acceptance with the actual `0.18.0-rc2` CLI passed on macOS ARM64 for both scripts, including a default-Markdown case using the installer's own recovery folders. All six pinned Drive files matched their hashes through curl and PowerShell's HTTP client. The published Gist one-liners ran a live read-only dry run, `irm | iex`, and the scriptblock options form. Native Windows and Windows PowerShell 5.1 remain unverified.
+
 ## Frozen release candidate — 0.18.0-rc1
 
 Six executable-only release ZIPs and `SHA256SUMS.txt` are prepared in `dist/0.18.0-rc1/`. Each ZIP contains the executable, Markdown-only release instructions, license and third-party notices. No source, recovery keys or exported data is packaged. Nothing has been published.

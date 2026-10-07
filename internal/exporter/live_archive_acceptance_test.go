@@ -56,6 +56,14 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 		return report, errConfig("archive cannot be opened")
 	}
 	defer root.Close()
+	presentation := func(markdown string) string {
+		if manifest.Format == "obsidian" && (manifest.Obsidian == nil || manifest.Obsidian.Layout != "compact" || manifest.Obsidian.ArchivePresentation == "obsidian") {
+			// Obsidian has additional link syntax; literal source wiki openers
+			// are escaped in presentation while canonical text stays unchanged.
+			return string(escapeObsidianWikis([]byte(markdown)))
+		}
+		return markdown
+	}
 	coverage := map[string]*Coverage{}
 	wantIncluded := 0
 	for _, c := range manifest.Coverage {
@@ -289,7 +297,7 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 						if err != nil || decodeArchiveJSON(canonical, &v) != nil {
 							return report, errConfig("profile history canonical annotation cannot be read")
 						}
-						expected := rewriteMarkdown(fieldString(v, "text"), a.Path, byKey)
+						expected := presentation(rewriteMarkdown(fieldString(v, "text"), a.Path, byKey))
 						doc, err := archiveRead(root, a.Path, 128<<20)
 						if err != nil || strings.TrimSpace(expected) != "" && !strings.Contains(string(doc), expected) {
 							return report, errConfig("profile history Markdown omits or truncates its canonical body")
@@ -305,12 +313,12 @@ func inspectFinalArchive(ctx context.Context, source string) (finalArchiveCounts
 			if err != nil || decodeArchiveJSON(b, &v) != nil {
 				return report, errConfig("attached canonical annotation cannot be read")
 			}
-			expected := rewriteMarkdown(fieldString(v, "text"), m.Path, byKey)
+			expected := presentation(rewriteMarkdown(fieldString(v, "text"), m.Path, byKey))
 			if a.AnnotationType == "HIERARCHICAL_PROFILE_SUMMARY" || a.AnnotationType == "PROFILE_DESCRIPTION" {
 				// Support earlier inline archives and current linked presentation,
 				// but always require the complete text in the destination document.
 				profileDoc, err := archiveRead(root, a.Path, 128<<20)
-				profileText := rewriteMarkdown(fieldString(v, "text"), a.Path, byKey)
+				profileText := presentation(rewriteMarkdown(fieldString(v, "text"), a.Path, byKey))
 				if err != nil || !strings.Contains(string(profileDoc), profileText) {
 					return report, errConfig("linked profile document omits or truncates its canonical body")
 				}

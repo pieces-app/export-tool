@@ -8,6 +8,10 @@ The previously accepted **0.18.0-rc1** candidate adds interrupted-fetch recovery
 
 The user accepted the measured 28m32s offline rebuild duration and the clearly reported source limitations: 43 unavailable people and 375 summaries without attached body text in the earlier accepted archive. Those remain partial exports, not invented completeness. Further storage rewrites, PDF/audio/attachments and signals expansion are outside this release. Follow the [current checklist](TODO.md#current-remaining-work-in-execution-order), [specification](EXPORT_SPEC.md) and [folder layout](EXPORT_LAYOUT.md).
 
+## Obsidian vaults — working build 0.20.0-dev
+
+`export --format obsidian`, `rebuild --format obsidian`, and `pieces-export obsidian --source ./finished-export --output ./Pieces-Obsidian --yes` create a compact **`vault/` subfolder** alongside the complete archive. Open that child folder in Obsidian. It keeps summaries/profile histories, existing Pieces tags and named connections, with automatic backlinks, readable graph labels and four nearby-summary shortcuts. Bulk evidence stays in the parent. The first compact trial reduced indexing from 86,051 notes/1.8 million links to 30,455 notes/187,294 links and completed Obsidian's index. See [the guide and current acceptance](OBSIDIAN_EXPORT.md). Signals appear only when selected in the source. The signed/notarized rc2 email packages remain unchanged and do not contain this development feature.
+
 ## Run from this repository
 
 Use Go 1.27.1 or newer (Go's toolchain support can download the required compiler):
@@ -160,7 +164,7 @@ This produces six ZIPs and `SHA256SUMS.txt` under ignored `dist/0.17.0-dev/`: ma
 
 Go is a better fit here than Python because it supports native cross-compilation through `GOOS`/`GOARCH`, and this implementation needs no C runtime integration. Python packaging is possible, but PyInstaller bundles a Python interpreter and builds distributions specific to the build OS. Neither approach prevents reverse engineering. See [Go build documentation](https://pkg.go.dev/cmd/go#hdr-Compile_packages_and_dependencies), [Go platform configuration](https://go.dev/doc/install/source), and [PyInstaller's operating model](https://pyinstaller.org/en/stable/operating-mode.html).
 
-The packager does not sign, notarize, upload, or publish anything. Distribution is intentionally unsigned and closed source under [LICENSE.txt](LICENSE.txt). See [DISTRIBUTION.md](DISTRIBUTION.md) for the Bash/PowerShell installers, GCP object layout, Gist publication, cleanup UX, and native CI matrix. Production distribution still needs complete migration acceptance, native platform evidence, and an actual download destination.
+The packager produces unsigned archives; it does not sign, notarize, upload, or publish anything. The separate Mac handoff in `dist/macos-notarized-0.18.0-rc2/` has completed Developer ID signing and Apple notarization. Distributed as open-source software under the Apache 2.0 license (see [LICENSE.txt](LICENSE.txt)). See [DISTRIBUTION.md](DISTRIBUTION.md) for installer and release workflows. Native Windows acceptance, the first external Mac trial and public hosting remain separate open items.
 
 ## Known limits
 

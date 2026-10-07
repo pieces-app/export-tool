@@ -146,7 +146,7 @@ func (p Preflight) Print(w io.Writer, format string) {
 		fmt.Fprintln(w, "Estimated duration: unavailable (no usable read samples).")
 	} else {
 		high := p.High
-		if format != "markdown" {
+		if format == "pdf" || format == "both" {
 			high *= 3
 		}
 		fmt.Fprintf(w, "Estimated duration: %s–%s, based on %d sampled records.\n", p.Low.Round(time.Second), high.Round(time.Second), p.Sampled)

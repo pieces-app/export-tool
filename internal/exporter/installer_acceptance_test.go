@@ -59,7 +59,9 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 		t.Fatal(err)
 	}
 	interactive := os.Getenv("PIECES_EXPORT_TEST_INSTALLER_PROMPT")
-	scenarios := []string{"complete-remove", "complete-keep", "partial-remove", "recovery-remove"}
+	// default-keep omits --format and recovery flags, so the actual CLI must
+	// accept the installer's own Markdown default and private recovery folders.
+	scenarios := []string{"complete-remove", "complete-keep", "partial-remove", "recovery-remove", "default-keep"}
 	if interactive != "" {
 		if interactive != "remove" && interactive != "keep" {
 			t.Fatal("PIECES_EXPORT_TEST_INSTALLER_PROMPT must be remove or keep")
@@ -104,21 +106,26 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 			osServer := f.server(t)
 			defer osServer.Close()
 			temp := t.TempDir()
+			data := filepath.Join(t.TempDir(), "installer data")
 			out := filepath.Join(t.TempDir(), "export with spaces")
 			args := []string{script, "--base-url", downloads.URL, "--version", version, "--output", out}
 			keep := strings.HasSuffix(scenario, "keep")
-			if interactive == "" {
-				cleanup := "--remove"
-				if keep {
-					cleanup = "--keep"
-				}
-				args = append(args, cleanup)
+			cleanup := "--remove"
+			if keep {
+				cleanup = "--keep"
 			}
+			if interactive != "" {
+				cleanup = "--ask"
+			}
+			args = append(args, cleanup)
 			format := "both"
-			if scenario == "recovery-remove" {
+			if scenario == "recovery-remove" || scenario == "default-keep" {
 				format = "markdown"
 			}
-			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--format", format, "--metadata", "off")
+			args = append(args, "--", "--base-url", osServer.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--metadata", "off")
+			if scenario != "default-keep" {
+				args = append(args, "--format", format)
+			}
 			var work, keys string
 			if scenario == "recovery-remove" {
 				cfg := recoveryOptionsFixture(t)
@@ -128,7 +135,7 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", args...)
-			cmd.Env = append(os.Environ(), "TMPDIR="+temp, "CURL_CA_BUNDLE="+cert)
+			cmd.Env = append(os.Environ(), "TMPDIR="+temp, "CURL_CA_BUNDLE="+cert, "PIECES_EXPORT_HOME="+data)
 			if powershell {
 				cleanup := "Remove"
 				if keep {
@@ -138,7 +145,10 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 					cleanup = "Ask"
 				}
 				cmd = packagedPowerShellInstallerCommand(t, ctx, script, release, version, out, temp, osServer.URL, cleanup)
-				cmd.Env = append(cmd.Env, "PIECES_TEST_RECOVERY_WORK="+work, "PIECES_TEST_RECOVERY_KEYS="+keys)
+				cmd.Env = append(cmd.Env, "PIECES_EXPORT_HOME="+data, "PIECES_TEST_RECOVERY_WORK="+work, "PIECES_TEST_RECOVERY_KEYS="+keys)
+				if scenario == "default-keep" {
+					cmd.Env = append(cmd.Env, "PIECES_TEST_DEFAULT_FORMAT=1")
+				}
 			}
 			var log bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &log, &log
@@ -165,23 +175,31 @@ func testPackagedInstaller(t *testing.T, powershell bool) {
 			if code != wantCode {
 				t.Fatalf("bootstrap exit %d, want %d: %s", code, wantCode, log.String())
 			}
-			if interactive != "" && !strings.Contains(log.String(), "Remove the downloaded CLI and installer files? Export files will stay. [Y/n]") {
+			if interactive != "" && !strings.Contains(log.String(), "Remove the export tool? Your exports will stay. [y/N]") {
 				t.Fatal("interactive cleanup prompt was not displayed; run the compiled test executable in a terminal")
 			}
-			dirs, err := filepath.Glob(filepath.Join(temp, "pieces-export.*"))
-			if err != nil || len(dirs) > 1 || (len(dirs) == 1) != keep {
-				t.Fatalf("installation retention: count=%d wantKeep=%t: %s", len(dirs), keep, log.String())
+			executable := "pieces-export"
+			if runtime.GOOS == "windows" {
+				executable += ".exe"
 			}
-			if keep {
-				executable := "pieces-export"
-				if runtime.GOOS == "windows" {
-					executable += ".exe"
-				}
-				binary := filepath.Join(dirs[0], executable)
+			binary := filepath.Join(data, "tool", version, executable)
+			_, statErr := os.Stat(binary)
+			if (statErr == nil) != keep {
+				t.Fatalf("tool retention=%t wantKeep=%t: %s", statErr == nil, keep, log.String())
+			}
+			if statErr == nil {
 				b, err := exec.CommandContext(ctx, binary, "--version").CombinedOutput()
 				if err != nil || !strings.Contains(string(b), version) {
 					t.Fatal("retained CLI is not the selected runnable release")
 				}
+			}
+			staging, _ := filepath.Glob(filepath.Join(data, "tool", ".download*"))
+			if len(staging) != 0 {
+				t.Fatalf("download staging left behind: %v", staging)
+			}
+			sessions, _ := filepath.Glob(filepath.Join(data, "recovery", "*"))
+			if len(sessions) != 0 {
+				t.Fatalf("finalized export left installer recovery data: %v", sessions)
 			}
 			var manifest Manifest
 			b, err := os.ReadFile(filepath.Join(out, "manifest.json"))
@@ -273,7 +291,9 @@ function Get-PiecesReleaseFile {
 }
 $exportFormat='both'
 if ($env:PIECES_TEST_RECOVERY_WORK) { $exportFormat='markdown' }
-$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--format',$exportFormat,'--metadata','off')}
+$exportArgs=@('--base-url',$env:PIECES_TEST_OS,'--launch-os=false','--close-desktop=false','--yes','--metadata','off')
+if (!$env:PIECES_TEST_DEFAULT_FORMAT) { $exportArgs += @('--format',$exportFormat) }
+$options=@{BaseUrl='https://fixture.invalid';Version=$env:PIECES_TEST_VERSION;Output=$env:PIECES_TEST_OUTPUT;Cleanup=$env:PIECES_TEST_CLEANUP;ExportArgs=$exportArgs}
 if ($env:PIECES_TEST_RECOVERY_WORK) { $options.ExportArgs += @('--work',$env:PIECES_TEST_RECOVERY_WORK,'--recovery-keys',$env:PIECES_TEST_RECOVERY_KEYS) }
 exit (Invoke-PiecesBootstrap @options)
 `

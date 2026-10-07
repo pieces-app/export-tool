@@ -1,0 +1,89 @@
+name: Windows export acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['export-cli/windows-validation-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            target: windows/amd64
+            label: windows_amd64
+          - runner: windows-11-arm
+            target: windows/arm64
+            label: windows_arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 50
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_VERSION: windows-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Confirm native architecture and build release ZIP
+        run: |
+          New-Item -ItemType Directory -Path acceptance | Out-Null
+          if ("$(go env GOOS)/$(go env GOARCH)" -ne '${{ matrix.target }}') { throw 'Runner is not executing the requested native architecture.' }
+          go run ./cmd/release --version $env:RELEASE_VERSION --targets '${{ matrix.target }}' --output dist/windows-ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Source tests including Windows ACLs and long paths
+        run: |
+          go test ./... -timeout 20m -json | Tee-Object -FilePath acceptance/source-tests.jsonl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go vet ./...
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual packaged CLI export and recovery
+        env:
+          PIECES_EXPORT_TEST_BINARY: ${{ github.workspace }}/dist/windows-ci/pieces-export_${{ env.RELEASE_VERSION }}_${{ matrix.label }}/pieces-export.exe
+        run: |
+          go test ./internal/exporter -run '^TestPackaged.*CLI$' -count=1 -timeout 20m -json | Tee-Object -FilePath acceptance/packaged-cli.jsonl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: PowerShell 5.1 and 7 installer and package checks
+        env:
+          PIECES_EXPORT_TEST_RELEASE: ${{ github.workspace }}/dist/windows-ci
+          PIECES_EXPORT_TEST_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          foreach ($shell in @('powershell.exe', 'pwsh')) {
+            $env:PIECES_EXPORT_TEST_POWERSHELL = $shell
+            go test ./install -run '^TestPowerShellInstaller$' -count=1 -timeout 10m -json | Tee-Object -FilePath "acceptance/installer-$shell.jsonl"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            go test ./internal/exporter -run '^TestPackagedPowerShellInstaller$' -count=1 -timeout 10m -json | Tee-Object -FilePath "acceptance/packaged-installer-$shell.jsonl"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Race regression on Windows x64
+        if: matrix.label == 'windows_amd64'
+        run: |
+          go test -race ./... -timeout 25m -json | Tee-Object -FilePath acceptance/race-tests.jsonl
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Retain private binaries and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-acceptance-${{ matrix.label }}
+          path: |
+            acceptance/
+            dist/windows-ci/*.zip
+            dist/windows-ci/SHA256SUMS.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+# Uses synthetic loopback data only. Tests do not establish installed Pieces OS
+# lifecycle, Explorer/viewer behavior, public HTTPS delivery or signing trust.
+# The PowerShell package tests currently substitute local-file transport.

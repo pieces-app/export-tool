@@ -95,11 +95,15 @@ func Write(path, title, description string, tags []string) string {
 		}
 		equal := false
 		if !item.vector && value.Type == 31 {
-			equal = windows.UTF16PtrToString((*uint16)(unsafe.Pointer(value.Data[0]))) == item.values[0]
+			// PROPVARIANT's union contains native pointers. Read the pointer
+			// directly from the union storage instead of reconstructing it
+			// from a uintptr, which Go's pointer checker cannot validate.
+			ptr := *(**uint16)(unsafe.Pointer(&value.Data[0]))
+			equal = windows.UTF16PtrToString(ptr) == item.values[0]
 		}
 		if item.vector && value.Type == 0x101f && value.Data[0] == uintptr(len(item.values)) {
 			equal = true
-			ptrs := unsafe.Slice((**uint16)(unsafe.Pointer(value.Data[1])), len(item.values))
+			ptrs := unsafe.Slice(*(***uint16)(unsafe.Pointer(&value.Data[1])), len(item.values))
 			for i, ptr := range ptrs {
 				if windows.UTF16PtrToString(ptr) != item.values[i] {
 					equal = false

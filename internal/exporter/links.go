@@ -28,7 +28,7 @@ func (r *run) validateMarkdownLinks() error {
 		if err != nil {
 			return err
 		}
-		root := goldmark.DefaultParser().Parse(text.NewReader(data))
+		root := goldmark.DefaultParser().Parse(text.NewReader(obsidianBody(data)))
 		return ast.Walk(root, func(n ast.Node, enter bool) (ast.WalkStatus, error) {
 			if r.ctx != nil {
 				if canceled := r.ctx.Err(); canceled != nil {

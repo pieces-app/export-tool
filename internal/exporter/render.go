@@ -461,7 +461,7 @@ func (r *run) render() (result error) {
 	if err := r.writeNavigationIndex("timeline/index.md", chronology.String(), dayLinks); err != nil {
 		return err
 	}
-	if r.opts.Format != "markdown" {
+	if r.opts.Format == "pdf" || r.opts.Format == "both" {
 		index.WriteString("\n[Open PDF index](index.pdf) - PDFs are in the pdf folder; Markdown companions are retained.\n")
 	}
 	if err := r.renderPersonas(); err != nil {

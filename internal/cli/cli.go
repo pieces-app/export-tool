@@ -27,6 +27,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 	}
 	fail := func(err error) int { fmt.Fprintln(stderr, "Error:", err); return 1 }
 	switch args[0] {
+	case "obsidian":
+		return obsidian(ctx, args[1:], stdin, stdout, stderr)
 	case "rebuild":
 		return rebuild(ctx, args[1:], stdin, stdout, stderr, version)
 	case "resume":
@@ -118,7 +120,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		closeDesktop := fs.Bool("close-desktop", true, "gracefully close Pieces Desktop after approval")
 		yes := fs.Bool("yes", false, "approve export without interactive prompts")
 		fs.BoolVar(yes, "y", false, "approve export without interactive prompts")
-		format := fs.String("format", "", "markdown, pdf (with Markdown companions), or both")
+		format := fs.String("format", "", "markdown, obsidian, pdf (with Markdown companions), or both")
 		pdfFont := fs.String("pdf-font", "", "optional local TrueType font for additional Unicode coverage")
 		fileWorkers := fs.Int("file-workers", 2, "local Markdown writers and text auditors (1–4); 1 keeps both serial; OS reads remain serialized")
 		pdfLimits := pdfLimitFlags(fs)
@@ -168,7 +170,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if *timeout <= 0 || *maxMiB < 1 || *maxMiB > 1024 {
 			return fail(fmt.Errorf("timeout must be positive and max-response-mib must be 1–1024"))
 		}
-		if *startup <= 0 || (*format != "" && *format != "markdown" && *format != "pdf" && *format != "both") {
+		if *startup <= 0 || (*format != "" && *format != "markdown" && *format != "obsidian" && *format != "pdf" && *format != "both") {
 			return fail(fmt.Errorf("invalid startup timeout or format"))
 		}
 		if *mode != "filtered" && *mode != "preserve" {
@@ -330,7 +332,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if *format == "" {
 			*format = "markdown"
 			if args[0] == "export" && !*yes {
-				fmt.Fprint(stdout, "Format: 1 Markdown [default], 2 PDF + Markdown companions, 3 Both: ")
+				fmt.Fprint(stdout, "Format: 1 Markdown [default], 2 PDF + Markdown companions, 3 Both, 4 Obsidian vault: ")
 				answer, err := readAnswer(ctx, input)
 				if err != nil {
 					fmt.Fprintln(stdout, "Canceled; no export created.")
@@ -342,6 +344,8 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 					*format = "pdf"
 				case "3", "both":
 					*format = "both"
+				case "4", "obsidian":
+					*format = "obsidian"
 				default:
 					return fail(fmt.Errorf("unknown format choice; use --format"))
 				}
@@ -408,6 +412,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			return fail(err)
 		}
 		fmt.Fprintf(stdout, "Export written: %s\nStatus: %s\nRead index.md and manifest.json for content and coverage.\n", *out, manifest.Status)
+		if manifest.Format == "obsidian" {
+			fmt.Fprintln(stdout, "In Obsidian choose Open folder as vault, select the vault subfolder, then open Start Here.md.")
+		}
 		included, excluded, withheld, fetched, omitted := 0, 0, 0, 0, 0
 		for _, coverage := range manifest.Coverage {
 			included += coverage.Included
@@ -435,7 +442,9 @@ Usage:
   pieces-export benchmark [--benchmark-duration 30s] [--people-report]
   pieces-export export --dry-run [--people connected --people-report]
   pieces-export export --output ./my-summaries [--yes]
-  pieces-export export --scope all --output ./my-export [--format markdown|pdf|both] [--yes]
+  pieces-export export --scope all --output ./my-export [--format markdown|obsidian|pdf|both] [--yes]
+  pieces-export export --format obsidian --output ./my-vault [--yes]
+  pieces-export obsidian --source ./finished-export --output ./my-vault [--yes]
   pieces-export export --output ./private-originals --mode preserve
   pieces-export rebuild --source ./finished-export --output ./rebuilt --format both
   pieces-export export --output ./my-export --work ./private-work --recovery-keys ./private-keys

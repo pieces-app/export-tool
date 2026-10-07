@@ -312,6 +312,12 @@ func TestFetchRecoverySurvivesSecondInterruptionAndCaptureFailure(t *testing.T) 
 }
 
 func TestPackagedInterruptedFetchRecoveryCLI(t *testing.T) {
+	for _, format := range []string{"markdown", "obsidian"} {
+		t.Run(format, func(t *testing.T) { packagedInterruptedFetchRecoveryCLI(t, format) })
+	}
+}
+
+func packagedInterruptedFetchRecoveryCLI(t *testing.T, format string) {
 	binary := os.Getenv("PIECES_EXPORT_TEST_BINARY")
 	if binary == "" {
 		t.Skip("set PIECES_EXPORT_TEST_BINARY to the actual CLI")
@@ -341,7 +347,7 @@ func TestPackagedInterruptedFetchRecoveryCLI(t *testing.T) {
 	defer srv.Close()
 	cfg := recoveryOptionsFixture(t)
 	output := filepath.Join(t.TempDir(), "interrupted")
-	cmd := exec.CommandContext(ctx, binary, "export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--metadata", "off", "--output", output, "--work", cfg.Directory, "--recovery-keys", cfg.KeyDirectory)
+	cmd := exec.CommandContext(ctx, binary, "export", "--format", format, "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--yes", "--metadata", "off", "--output", output, "--work", cfg.Directory, "--recovery-keys", cfg.KeyDirectory)
 	progress := &phaseHookWriter{phase: "Stage: Fetch WORKSTREAM_SUMMARIES", hook: func() { armed.Store(true) }}
 	cmd.Stdout, cmd.Stderr = progress, progress
 	if err = cmd.Start(); err != nil {
@@ -386,6 +392,9 @@ func TestPackagedInterruptedFetchRecoveryCLI(t *testing.T) {
 	}
 	if manifest.SourceRecovery == nil || manifest.SourceRecovery.ReusedRecords == 0 {
 		t.Fatal("compiled resume did not reuse saved records")
+	}
+	if manifest.Format != format || format == "obsidian" && manifest.Obsidian == nil {
+		t.Fatal("resume lost presentation format")
 	}
 	if _, err = inspectFinalArchive(ctx, dest); err != nil {
 		t.Fatal(err)

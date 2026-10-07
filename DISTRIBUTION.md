@@ -1,6 +1,16 @@
 # Binary distribution and installation
 
-Updated 2026-10-02. The application is closed source under [LICENSE.txt](LICENSE.txt). Binaries are intentionally unsigned and unnotarized. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that production acceptance has passed.
+Updated 2026-10-07. The application is open source under the Apache 2.0 license ([LICENSE.txt](LICENSE.txt)). macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Current Windows validation — 2026-10-07
+
+The user confirmed credits should now be available and made Windows readiness the current priority. The older Actions hold below is historical and superseded. [Windows quickstart](WINDOWS_START_HERE.md) contains the consumer PowerShell commands.
+
+GitHub currently rejects both acceptance and a minimal Windows-only diagnostic with `startup_failure` before any job exists, despite enabled repository/organization Actions permissions and clean local workflow syntax checks. The precise cause needs run-page annotations; no Windows runtime pass is claimed. The Windows downloads remain unsigned. 
+
+## Signed and notarized Mac email package — 2026-10-03
+
+The current ARM64 and Intel macOS packages in `dist/macos-notarized-0.18.0-rc2/` are Developer ID signed and notarized by Apple. Apple accepted both submissions with no issues after the user resolved the agreement. The final ZIPs refresh documentation and retain the exact tested/notarized executable bytes. Each code hash matches its Apple ticket; online notarization requirements and execution from locally quarantined copies pass on ARM64 and Intel/Rosetta. No runtime code changed. Keep the Mac online for first launch; raw CLI/ZIP files do not support stapling. Only intended packages were uploaded to Apple; no public upload or email occurred.
 
 ## Presentation candidate — 0.18.0-rc2
 
@@ -8,7 +18,7 @@ Six replacement ZIPs and `SHA256SUMS.txt` are built in `dist/0.18.0-rc2/`. The n
 
 ### macOS trial handoff
 
-The local rc2 packages are ready for a controlled Mac trial. Share only the matching `darwin_arm64.zip` (Apple silicon) or `darwin_amd64.zip` (Intel) and the current `SHA256SUMS.txt`; [the consumer guide](DOWNLOAD_README.md) is included as `README.md` inside each ZIP. These are local handoff artifacts, not published download URLs. The unsigned-app approval experience still needs confirmation on the recipient's Mac; the guide links Apple's per-app approval instructions.
+For macOS builds, use the notarized packages and matching checksums. The older `darwin_arm64.zip` and `darwin_amd64.zip` described in this section remain unsigned. These are local artifacts, not published download URLs. The recipient-machine download experience remains part of the first external trial; local quarantined-copy checks pass.
 
 On 2026-10-02, the six unpublished ZIPs received the expanded consumer guide. The executable, license, notices and executable permissions were preserved; all executable hashes still match the prior candidate. ZIP checksums changed with the README. The previous packages/checksums are retained privately under `exports/weekend-handoff-20261002/original-packages/`. Use the current files in `dist/0.18.0-rc2/` together, not a checksum file from before this refresh. Published version artifacts must remain immutable.
 
@@ -22,7 +32,7 @@ The actual Mac ARM64 package passed all 18 CLI checks and both installer suites,
 
 **Full real-data recovery passed.** The packaged CLI was killed after 500 saved snapshots, then resumed into a new output in **43m45s**, including fresh OS reads. All 500 snapshots were reused; the original partial folder is unchanged. Independent checks verified **11,751 summaries, 1,380 people, 5,170 profile-history documents, 547,897 graph edges and 23,502 native metadata documents**. The archive remains partial: **43 unavailable people, 375 summaries without attached text**, plus reported source-inventory changes. See [the evidence and source-drift explanation](RECOVERY_DESIGN.md#candidate-verification). Storage prototypes, optional formats and automatic recovery cleanup remain deferred.
 
-The local Bash bootstrap additionally fixes cleanup after a failed download. Missing checksum/archive HTTP 404 cases reproduced the failure, then passed with the fix. The full installer suite and current Mac/Linux ARM64 packaged Bash checks pass. The ZIP executables are unchanged by this installer-only fix. The existing Gist has **not** been updated; its earlier byte-match record no longer applies to the local Bash script. Publish the tested script with the chosen release later.
+The local Bash bootstrap additionally fixes cleanup after a failed download. Missing checksum/archive HTTP 404 cases reproduced the failure, then passed with the fix. The full installer suite and current Mac/Linux ARM64 packaged Bash checks pass. The ZIP executables are unchanged by this installer-only fix. The Gist was updated with this fix and the new installer behavior on 2026-10-07; see [Installation UX](#installation-ux).
 
 ## First public release scope — user decision, 2026-10-01
 
@@ -32,58 +42,40 @@ The release focuses on **Markdown summaries, persona/profile histories, pipeline
 
 The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
 
-Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. No source repository publication, signing or notarization is required.
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. The prior Actions billing hold is superseded by the October 7 Windows validation request; current startup failures are tracked above. Source repository publication is not required. The later Mac handoff request adds Developer ID signing and notarization; both are complete as recorded above.
 
-**Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration, Actions dispatch or publication is required for the current work.
+**Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration or publication is required. The October 7 Windows request authorizes private Actions validation.
 
 ## Installation UX
 
-1. The user runs the Bash bootstrap on macOS/Linux or the PowerShell bootstrap on Windows. No administrator permissions or package manager are needed. The CLI itself needs no Go/Python/.NET installation; the Windows bootstrap uses built-in PowerShell/.NET facilities.
-2. Require an explicit HTTPS release base URL and pinned version. Detect OS/CPU, create a unique temporary installation, and download that release's SHA256SUMS.txt and matching ZIP. Do not alter PATH or shell startup files.
-3. Check SHA-256 before executing anything. Reject absent/duplicate checksum entries and any archive members beyond the exact executable, README.md, LICENSE.txt, and THIRD_PARTY_NOTICES.txt. Copy those named entries into new regular files instead of extracting archive paths or symlinks.
-4. Put exports outside the temporary installation. The default is `Documents/Pieces-Exports/<timestamp>` under the user account. An explicit output path must be new. Ordinary CLI discovery, inventory, format choice, privacy settings, and export confirmation still apply.
-5. Run the CLI and preserve its exit status: zero completed for implemented scope, two partial archive, one fatal error, or an interruption status. Installation success is not export success.
-6. Ask `Remove the downloaded CLI and installer files? Export files will stay. [Y/n]`. Yes removes only the unique installation, package, and checksum file. No keeps the CLI and prints its path. Download/setup failures clean the failed installation automatically. EOF/no terminal retains a verified installation; unattended callers choose cleanup explicitly. Exports, partial exports, user policies, and Pieces applications are never deleted by installer cleanup.
+Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/` as revision `12613a13cbb370e94020fc6eb13b28e201050e3d`. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-The Gist bootstrap can run from memory, so there is no separate saved bootstrap file to uninstall. If someone saves it manually, that user-chosen file remains theirs to remove. The installer does not delete an arbitrary path it was launched from.
+1. With no options, both scripts install the built-in `0.18.0-rc2` release from the public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
+3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
+4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`.
+5. Pass `--format markdown` unless the user supplies a format, so the format prompt no longer appears. For Markdown exports without SDK caches or user-supplied recovery flags, add `--work`/`--recovery-keys` in a private session under `<root>/recovery/`, outside Documents so it is not synced. A finalized export deletes the session. An unfinished export keeps it and prints the `--resume` / `-Resume` command, which resumes the newest saved session into a new export folder. Dry runs (`--dry-run` / `-DryRun`, or the CLI flag) get no recovery or output flags, because the CLI rejects recovery folders there.
+6. Run the CLI on the user's terminal. Bash reads prompts from `/dev/tty` when the script itself arrives on stdin. PowerShell starts the CLI with `Process.Start` on the inherited console; the earlier `| Out-Host` hid `Export now? [Y/n]` until Enter was pressed, which an `expect` terminal test reproduced.
+7. After a finalized export, open the folder in Finder, Explorer or `xdg-open` when stdout is a terminal. `--no-open` / `-NoOpen` disables this. Preserve the CLI exit status: 0 complete, 2 partial, 1 failure, 130 interrupted.
+8. Under `irm | iex`, the PowerShell script sets `$LASTEXITCODE` instead of calling `exit`, which previously closed the user's window. Run as a script file, it still exits with the status.
 
 ## Bootstrap commands
 
-Repository commands, before publication:
-
 ```sh
-bash install/install.sh --base-url https://github.com/OWNER/RELEASES-REPO/releases/download \
-  --version VERSION --output "$HOME/Documents/Pieces-Export"
-
-# Optional CLI flags follow --. An unattended export needs explicit approval.
-bash install/install.sh --base-url https://github.com/OWNER/RELEASES-REPO/releases/download \
-  --version VERSION --remove -- --yes --format markdown --people profiles
+curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash
+curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash -s -- --resume
 ```
 
 ```powershell
-& ./install/install.ps1 -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' `
-  -Version 'VERSION' -Output "$HOME\Documents\Pieces-Export"
-
-& ./install/install.ps1 -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' `
-  -Version 'VERSION' -Cleanup Remove -ExportArgs @('--yes', '--format', 'markdown')
+irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1 | iex
+& ([scriptblock]::Create((irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1))) -Resume
 ```
 
-`--keep` / `-Cleanup Keep` skips cleanup. `--install-only` / `-InstallOnly` verifies and retains a CLI without exporting. Export flags cannot override `--output`; choose the destination through the installer option. Only Bash needs `curl`, `unzip`, and `sha256sum` or `shasum`. Neither script changes execution policy, removes quarantine attributes, or disables platform security checks.
+The revision-less raw URL serves the newest Gist revision, so customer commands stay the same across releases; pin a revision URL for audits. The Gist README lists every option, the manual ZIP links and the per-OS manual commands. Repository runs use the same flags, for example `bash install/install.sh --base-url https://HOST/releases --version VERSION -- --yes`. Export flags cannot override `--output`; use the installer option.
 
-The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) is published as unlisted (anyone with its link can read it). Both files were retrieved through the GitHub API and matched to the tested local files by SHA-256. The commands below pin immutable raw revisions. Review the script before running it. The base URL and version remain explicit; replace BUCKET and VERSION with the published release values:
+Verification on 2026-10-07: `go test ./install` passed with Homebrew Bash 5.3, macOS `/bin/bash` 3.2 and PowerShell 7.5. It covers resume, dry runs, cleanup choices, integrity failures, default locations, PowerShell argument quoting, `irm | iex` session survival and a real-terminal prompt check. Packaged acceptance with the actual `0.18.0-rc2` CLI passed for both installers, including a new default-Markdown case where the CLI accepted the installer's recovery folders. All six pinned Drive files were downloaded through curl and PowerShell's HTTP client and matched their hashes. The published one-liners ran from the Gist: a live read-only dry run, `irm | iex`, and the options form. Windows PowerShell 5.1 and native Windows were not available for these checks.
 
-```sh
-curl --proto '=https' --proto-redir '=https' --tlsv1.2 --fail --location \
-  'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/6d928715f5faf7bf4e9776be2a8b34c981abacab/install.sh' | bash -s -- \
-  --base-url https://github.com/OWNER/RELEASES-REPO/releases/download --version VERSION
-```
-
-```powershell
-$bootstrap = (Invoke-WebRequest -UseBasicParsing -Uri 'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/866cfdf5ec3192a7a43d82f4b3c4b34343f523de/install.ps1').Content
-& ([scriptblock]::Create($bootstrap)) -BaseUrl 'https://github.com/OWNER/RELEASES-REPO/releases/download' -Version 'VERSION'
-```
-
-Checksums fetched from the same HTTPS release origin detect corruption or mismatched files; they are not independent proof against a compromised publisher/bucket. Version objects should be immutable. The Gist does not contain application source, credentials, private fixtures, or exported records.
+Checksums pinned in the scripts are independent of Drive, but they are only as trustworthy as the Gist account that publishes them. Release objects should stay immutable.
 
 ## GCP object layout
 
