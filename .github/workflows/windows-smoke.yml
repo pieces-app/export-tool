@@ -1,0 +1,15 @@
+name: Windows runner startup diagnostic
+on:
+  push:
+    branches: ['export-cli/windows-validation-*']
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: windows-2025
+    steps:
+      - name: Verify PowerShell and Windows
+        shell: pwsh
+        run: |
+          $PSVersionTable.PSVersion
+          [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
