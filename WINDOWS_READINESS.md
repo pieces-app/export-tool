@@ -10,13 +10,25 @@ Consumer instructions: [Windows quickstart](WINDOWS_START_HERE.md). The general 
 - Fixed release-notice collection for Homebrew's Go layout, where `LICENSE` is next to `libexec`, rather than inside GOROOT. Missing notices still stop packaging.
 - Added a Windows-only private CI workflow for native x64 (`windows-2025`) and ARM64 (`windows-11-arm`), using synthetic loopback data. It builds ZIPs, checks architecture, runs all source tests/vet, executes all compiled-CLI cases, runs installer tests in PowerShell 5.1 and 7, and runs race tests on x64.
 - Syntax-checked consumer PowerShell examples with PowerShell 7 on macOS. This checks syntax only; it does not establish Windows runtime acceptance.
-- Cross-compilation and package verification are recorded below once complete. They do not execute Windows binaries on this Mac.
+- Windows x64 and ARM64 vet and all test-package compilation pass. Cross-compilation does not execute Windows binaries on this Mac.
+- Both current candidate ZIPs pass checksum, four-file member, CPU-type, executable-byte, README/license and build-setting verification; neither contains an Authenticode signature. Evidence: `exports/windows-readiness-20261007/packages.json`.
+
+## Current local Windows packages
+
+Version: `0.20.0-windows-dev.1`. These are unsigned development candidates, not native-accepted release artifacts. They include the current Obsidian implementation; older rc2 ZIPs do not.
+
+| Platform | Local ZIP | Size |
+| --- | --- | --- |
+| Windows x64 (Intel/AMD) | [windows_amd64.zip](dist/windows-0.20.0-dev.1/pieces-export_0.20.0-windows-dev.1_windows_amd64.zip) | 8,395,317 bytes |
+| Windows ARM64 | [windows_arm64.zip](dist/windows-0.20.0-dev.1/pieces-export_0.20.0-windows-dev.1_windows_arm64.zip) | 7,683,222 bytes |
+
+[Matching SHA256SUMS.txt](dist/windows-0.20.0-dev.1/SHA256SUMS.txt). Each ZIP has exactly `pieces-export.exe`, `README.md`, `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt`. Keep these artifacts together; no data, recovery secrets or source files are included.
 
 ## GitHub startup blocker
 
 The user confirmed credits should now be available and authorized Windows validation. The previous “do not retry Actions” hold is superseded.
 
-The private validation branch is `export-cli/windows-validation-20261007`. GitHub reports `startup_failure` with **zero jobs** for the [acceptance attempt](https://github.com/pieces-app/export-tool/actions/runs/37627607834), an [additional diagnostic attempt](https://github.com/pieces-app/export-tool/actions/runs/37627781050), and a [minimal Windows-only job](https://github.com/pieces-app/export-tool/actions/runs/37627958451). The minimal job has no checkout, Go setup, matrix or exporter code. Repository and organization Actions permissions report enabled/all actions allowed. Local actionlint passes. GitHub's APIs provide no specific reason and reject retrying these startup failures.
+The private validation branch is `export-cli/windows-validation-20261007`. The [restored workflow with the fixes](https://github.com/pieces-app/export-tool/actions/runs/37629332650) also failed before startup. GitHub reports `startup_failure` with **zero jobs** for the [acceptance attempt](https://github.com/pieces-app/export-tool/actions/runs/37627607834), an [additional diagnostic attempt](https://github.com/pieces-app/export-tool/actions/runs/37627781050), and a [minimal Windows-only job](https://github.com/pieces-app/export-tool/actions/runs/37627958451). The minimal job has no checkout, Go setup, matrix or exporter code. Repository and organization Actions permissions report enabled/all actions allowed. Local actionlint passes. GitHub's APIs provide no specific reason and reject retrying these startup failures.
 
 This establishes that no exporter test ran on a Windows runner. It does **not** establish the precise account/workflow startup cause. Read the run-page annotations to resolve it; do not describe the current failure as confirmed billing debt or an exporter runtime failure. Detailed API evidence stays under `exports/windows-readiness-20261007/`.
 

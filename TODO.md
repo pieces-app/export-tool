@@ -12,7 +12,8 @@ Current focus: Windows x64 and ARM64. The user confirmed credits should now be a
 - [x] Fix Windows COM property readback conversions flagged by cross-platform vet; preserve the metadata fallback.
 - [x] Fix Homebrew Go license discovery in release packaging; keep missing-license failures fatal.
 - [x] Prepare syntax-checked PowerShell quickstart: architecture, local output, recovery, headless logs, partial exits and Obsidian conversion.
-- [ ] Complete Windows x64/ARM64 cross-vet, test-package compilation and candidate ZIP verification; compilation is not native execution.
+- [x] Complete Windows x64/ARM64 cross-vet and verify both candidate ZIPs (hashes, CPU type, exact four-file layout, notices and input bytes).
+- [x] Complete both architectures’ test-package compilation; this does not execute tests or binaries on Windows.
 - [ ] Run all native automated Windows acceptance after resolving GitHub startup; fix any actual failures and record the tested package hashes.
 - [ ] Complete installed-Pieces-OS and downloaded-file Windows trial; verify discovery/lifecycle, recovery, localized dates and viewer navigation. Unsigned-executable/managed-machine behavior remains explicit.
 
