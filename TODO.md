@@ -1,6 +1,20 @@
 # Export tool execution checklist
 
-Updated 2026-10-03. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+Updated 2026-10-07. Follow [EXPORT_LAYOUT.md](EXPORT_LAYOUT.md) for folders/names and [EXPORT_SPEC.md](EXPORT_SPEC.md) for behavior and [EXPORT_GUIDE.md](EXPORT_GUIDE.md) for endpoints. Check a box only when its behavior and listed verification are complete. Keep platform runtime checks separate from cross-compilation. This file is the working release plan, not a promise that unchecked features already ship.
+
+## Windows readiness — 2026-10-07
+
+Current focus: Windows x64 and ARM64. The user confirmed credits should now be available; the earlier Actions billing hold is superseded. Track evidence and the exact remaining runtime gates in [WINDOWS_READINESS.md](WINDOWS_READINESS.md); consumer commands are in [WINDOWS_START_HERE.md](WINDOWS_START_HERE.md).
+
+- [x] Snapshot current source on a separate private validation branch without changing the existing working branch or exporting personal data.
+- [x] Add Windows-only native acceptance for source tests/vet, packaged export/recovery/Obsidian, long paths, Windows ACLs, PowerShell 5.1/7 installers and x64 race tests. Actionlint passes.
+- [x] Diagnose current GitHub startup failure with a minimal Windows job: all attempts have zero jobs; Actions permissions are enabled. Ask for run-page annotations rather than assuming the previous billing cause.
+- [x] Fix Windows COM property readback conversions flagged by cross-platform vet; preserve the metadata fallback.
+- [x] Fix Homebrew Go license discovery in release packaging; keep missing-license failures fatal.
+- [x] Prepare syntax-checked PowerShell quickstart: architecture, local output, recovery, headless logs, partial exits and Obsidian conversion.
+- [ ] Complete Windows x64/ARM64 cross-vet, test-package compilation and candidate ZIP verification; compilation is not native execution.
+- [ ] Run all native automated Windows acceptance after resolving GitHub startup; fix any actual failures and record the tested package hashes.
+- [ ] Complete installed-Pieces-OS and downloaded-file Windows trial; verify discovery/lifecycle, recovery, localized dates and viewer navigation. Unsigned-executable/managed-machine behavior remains explicit.
 
 ## Obsidian vault — 0.20.0-dev
 

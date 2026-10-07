@@ -49,6 +49,8 @@ On Windows, in PowerShell:
 .\pieces-export.exe export --format markdown --output .\my-pieces-export --work .\private-work --recovery-keys .\private-keys
 ```
 
+On Windows, run from a writable local folder outside OneDrive/network shares. A suitable parent is `$env:LOCALAPPDATA\Pieces-Exports` (create it first). Keep the root path short for Explorer/viewer compatibility. The Windows downloads are currently unsigned; if Windows or company policy blocks them, verify the origin/checksum and contact support with the exact warning. Do not disable antivirus or SmartScreen globally. Recovery should be exported and resumed under the same Windows user.
+
 The CLI finds Pieces OS on localhost ports 39300–39333, launches it if needed, scans your inventory, shows the destination and an approximate duration, and asks `Export now? [Y/n]`. After approval it closes Pieces Desktop gracefully; OS remains running. Add `--close-desktop=false` to keep Desktop open or `--launch-os=false` to disable OS launch. `--yes` approves an unattended run; EOF cancels an interactive prompt.
 
 New exports default to summaries and people with profiles. Event history is not required for summary bodies and is skipped. The terminal reports progress through fetching, privacy checks, writing, metadata and validation. A phase reaching 100% does not mean the whole export is finished.

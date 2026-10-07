@@ -1,6 +1,12 @@
 # Binary distribution and installation
 
-Updated 2026-10-03. The application is closed source under [LICENSE.txt](LICENSE.txt). The original six-platform packages are unsigned; the current Mac email packages are Developer ID signed and notarized by Apple. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+Updated 2026-10-07. The application is closed source under [LICENSE.txt](LICENSE.txt). The original six-platform packages are unsigned; the current Mac email packages are Developer ID signed and notarized by Apple. The repository stays private; only platform ZIPs, checksums, notices, download instructions, and the two bootstrap scripts are distributed. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Current Windows validation — 2026-10-07
+
+The user confirmed credits should now be available and made Windows readiness the current priority. The older Actions hold below is historical and superseded. [Windows readiness](WINDOWS_READINESS.md) records the private validation branch, the source fix, candidate artifacts and unverified runtime boundaries. [Windows quickstart](WINDOWS_START_HERE.md) contains the consumer PowerShell commands.
+
+GitHub currently rejects both acceptance and a minimal Windows-only diagnostic with `startup_failure` before any job exists, despite enabled repository/organization Actions permissions and clean local workflow syntax checks. The precise cause needs run-page annotations; no Windows runtime pass is claimed. The Windows downloads remain unsigned. Source stays private, and no public publication is authorized by this verification pass.
 
 ## Signed and notarized Mac email package — 2026-10-03
 
@@ -36,9 +42,9 @@ The release focuses on **Markdown summaries, persona/profile histories, pipeline
 
 The verified **43 unavailable people and 375 summary records without attached body text** are accepted source limitations when plainly reported. Preserve those summary records and available metadata, omit invalid links, retain partial status and exit code 2, and do not promise complete historical recovery. New unexplained omissions still require investigation.
 
-Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. GitHub Actions remains on the billing hold. Source repository publication is not required. The later Mac handoff request adds Developer ID signing and notarization; both are complete as recorded above.
+Release gates: interrupted-fetch recovery; one real-data acceptance of the chosen final candidate; actual supported-platform CLI/installer checks; and configured public binary hosting/download/cleanup verification. The prior Actions billing hold is superseded by the October 7 Windows validation request; current startup failures are tracked above. Source repository publication is not required. The later Mac handoff request adds Developer ID signing and notarization; both are complete as recorded above.
 
-**Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration, Actions dispatch or publication is required for the current work.
+**Latest direction:** finish recovery and release verification without expanding scope. Hosting is deferred; public GitHub Releases is the likely distribution route. No GCP configuration or publication is required. The October 7 Windows request authorizes private Actions validation.
 
 ## Installation UX
 

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -156,7 +157,13 @@ func licenseNotices(targets []string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	goLicense, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(root)), "LICENSE"))
+	goRoot := strings.TrimSpace(string(root))
+	goLicense, err := os.ReadFile(filepath.Join(goRoot, "LICENSE"))
+	// Homebrew keeps the toolchain under libexec and installs Go's license
+	// beside it in the versioned keg. Keep requiring the actual license.
+	if errors.Is(err, os.ErrNotExist) && filepath.Base(goRoot) == "libexec" {
+		goLicense, err = os.ReadFile(filepath.Join(filepath.Dir(goRoot), "LICENSE"))
+	}
 	if err != nil {
 		return nil, err
 	}
