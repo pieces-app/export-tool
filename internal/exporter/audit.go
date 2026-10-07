@@ -229,7 +229,7 @@ func (a *outputAuditor) hashFile(f *os.File) (digest [32]byte, bytes int64, resu
 
 func (r *run) auditText(text string) error {
 	stats := ScanResult{}
-	_, err := r.opts.Scanner.cleanString(r.ctx, "", text, &stats)
+	err := r.opts.Scanner.auditRendered(r.ctx, text, &stats)
 	for i := 0; i < stats.TimeoutRetries; i++ {
 		r.local.record("secret_scan_timeout_retry", 0, 0, err)
 	}

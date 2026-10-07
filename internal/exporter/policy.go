@@ -397,6 +397,17 @@ func (s *Scanner) walk(ctx context.Context, key string, v any, stats *ScanResult
 }
 
 func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *ScanResult) (string, error) {
+	return s.scan(ctx, key, value, false, stats)
+}
+
+// auditRendered counts what record sanitizing would still change in generated
+// output. URLs are read as renderers write them; see renderedURLRedactions.
+func (s *Scanner) auditRendered(ctx context.Context, text string, stats *ScanResult) error {
+	_, err := s.scan(ctx, "", text, true, stats)
+	return err
+}
+
+func (s *Scanner) scan(ctx context.Context, key, value string, rendered bool, stats *ScanResult) (string, error) {
 	if len(value) > 2<<20 {
 		return "", errConfig("text field exceeds 2 MiB scanning limit")
 	}
@@ -463,33 +474,17 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 			value = strings.ReplaceAll(value, secret, "[REDACTED:SECRET]")
 		}
 	}
-	value = urlPattern.ReplaceAllStringFunc(value, func(raw string) string {
-		u, err := url.Parse(raw)
-		if err != nil {
-			return raw
-		}
-		changed := false
-		if u.User != nil {
-			u.User = nil
-			changed = true
-		}
-		q := u.Query()
-		for k := range q {
-			if credentialField(k) || strings.EqualFold(k, "key") || strings.Contains(strings.ToLower(k), "signature") {
-				if len(q[k]) == 1 && q[k][0] == "REDACTED" {
-					continue
-				}
-				q.Set(k, "REDACTED")
-				changed = true
+	if rendered {
+		stats.Redactions += renderedURLRedactions(value)
+	} else {
+		value = urlPattern.ReplaceAllStringFunc(value, func(raw string) string {
+			clean, changed := redactURL(raw, false)
+			if changed {
+				stats.Redactions++
 			}
-		}
-		if changed {
-			u.RawQuery = q.Encode()
-			stats.Redactions++
-			return u.String()
-		}
-		return raw
-	})
+			return clean
+		})
+	}
 	if s.Policy.Financial {
 		value = redactPaymentCards(value, stats)
 		value = ibanPattern.ReplaceAllStringFunc(value, func(v string) string {
@@ -511,6 +506,82 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 		value = emailPattern.ReplaceAllStringFunc(value, func(string) string { stats.Redactions++; return "[REDACTED:EMAIL]" })
 	}
 	return value, nil
+}
+
+func credentialQueryKey(k string) bool {
+	return credentialField(k) || strings.EqualFold(k, "key") || strings.Contains(strings.ToLower(k), "signature")
+}
+
+// redactURL removes user information and credential query values. When cut is
+// set, the text ended right after this URL, so its final value may be a
+// truncated redaction marker.
+func redactURL(raw string, cut bool) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw, false
+	}
+	changed := false
+	if u.User != nil {
+		u.User = nil
+		changed = true
+	}
+	final := ""
+	if cut && !strings.Contains(raw, "#") {
+		pair := u.RawQuery[strings.LastIndexByte(u.RawQuery, '&')+1:]
+		key, _, _ := strings.Cut(pair, "=")
+		final, _ = url.QueryUnescape(key)
+	}
+	q := u.Query()
+	for k := range q {
+		if !credentialQueryKey(k) {
+			continue
+		}
+		if len(q[k]) == 1 && (q[k][0] == "REDACTED" || k == final && strings.HasPrefix("REDACTED", q[k][0])) {
+			continue
+		}
+		q.Set(k, "REDACTED")
+		changed = true
+	}
+	if !changed {
+		return raw, false
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), true
+}
+
+// Generated documents put sanitized URLs inside Markdown syntax: link labels
+// end in "](", link destinations in ")", escapes add "\" and long titles end
+// in "…". A rendered URL stops at an unescaped "]" or the ellipsis, keeps a
+// bracketed IPv6 host, and includes escaped punctuation.
+var renderedURLPattern = regexp.MustCompile(`(?i)https?://(?:\[[^\]\s]*\])?(?:\\[!-/:-@\[-` + "`" + `{-~]|[^\s<>"` + "`" + `\]…])*`)
+
+// renderedURLRedactions counts URLs in generated output that still carry user
+// information or a credential value. Reading the renderer's syntax as part of
+// a value would reject an already-redacted URL and could hide the next URL.
+// Keys and values stay literal, as record sanitizing read them; only the
+// fragment delimiter that title escaping writes as "\#" is restored.
+func renderedURLRedactions(text string) int {
+	count := 0
+	for _, at := range renderedURLPattern.FindAllStringIndex(text, -1) {
+		raw := strings.ReplaceAll(trimURLSyntax(text[at[0]:at[1]]), `\#`, "#")
+		if _, changed := redactURL(raw, strings.HasPrefix(text[at[1]:], "…")); changed {
+			count++
+		}
+	}
+	return count
+}
+
+// trimURLSyntax drops trailing prose punctuation, a hard-break backslash and an
+// unmatched ")" such as the end of a Markdown link destination.
+func trimURLSyntax(raw string) string {
+	for raw != "" {
+		last := raw[len(raw)-1]
+		if strings.IndexByte(`.,:;!?*_~'\`, last) < 0 && (last != ')' || strings.Count(raw, ")") <= strings.Count(raw, "(")) {
+			break
+		}
+		raw = raw[:len(raw)-1]
+	}
+	return raw
 }
 
 func (s *Scanner) remember(value string) {
