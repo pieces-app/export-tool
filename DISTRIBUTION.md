@@ -1,6 +1,21 @@
 # Binary distribution and installation
 
-Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)); the 0.18.0-rc2 ZIPs predate the change and still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Release candidate 0.18.0-rc3 — 2026-10-07
+
+Built with `go run ./cmd/release --version 0.18.0-rc3` from `main` at `2807417`, which includes the Obsidian vault format, the Windows fixes, the MIT license and the final-audit fix for redacted credential URLs in rendered Markdown. Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` (hardened runtime, secure timestamp, identifier `app.pieces.export-tool`) from the dedicated `pieces-codesign` keychain and notarized with the `global-cloud-runtime/apple-codesigning-config-pieces-app-json` credentials. Apple accepted arm64 submission `0c752b8f-0913-4fd5-9479-79d9f0187152` and amd64 submission `1dfb6042-b88c-4bf9-bcd3-fe8f19f247c7` as Ready for distribution with no issues. Each ticket's cdhash matches its executable, and extracted copies of both final ZIPs pass `codesign --verify --strict --check-notarization -R=notarized`. The amd64 build was run under Rosetta. Packaged installer acceptance passed with the notarized arm64 ZIP for both scripts. Windows and Linux ZIPs are unsigned, as before.
+
+All six ZIPs, per-file `.sha256` files and `SHA256SUMS.txt` are in the public [0.18.0-rc3 Drive folder](https://drive.google.com/drive/folders/1lABvGdTeCue2AMRHSAS_cl4dQ9OYEiE4) (anyone with the link can view). Anonymous downloads of every ZIP matched its SHA-256. Local artifacts are in ignored `dist/0.18.0-rc3/` and `dist/macos-notarized-0.18.0-rc3/` (with Apple receipts under `receipts/`). A first rc3 build from `eeb77f5` was signed and notarized but superseded before publication by `2807417`; its Drive uploads were moved to the trash.
+
+| File | Drive ID | SHA-256 |
+| --- | --- | --- |
+| `pieces-export_0.18.0-rc3_darwin_arm64_notarized.zip` | `1RGIoNvro0AuyADwL3zKTKFZi1oDal9l-` | `88dc2067fb9e27321bdb37ec3f463ecf5b6a67d7282131b94fd64f78dafa9a1b` |
+| `pieces-export_0.18.0-rc3_darwin_amd64_notarized.zip` | `1vgoUYENQRqob845TYnXJzSi7jdUQJl3f` | `24f27445f0a769970ffc9b3a2e0a674cb83e1e86946fd63de1a004fcd71fa167` |
+| `pieces-export_0.18.0-rc3_linux_amd64.zip` | `1alrEphCpjI2l8A_vkQ3y3aKOkwt1a_LI` | `1579cf23a9c1be22967ece3ba5c1f1b6c88da5c0ddcc30c8f5916c0919905286` |
+| `pieces-export_0.18.0-rc3_linux_arm64.zip` | `1ReiyL2qQRbDYjQMht1fEX5EQ8baCFTHY` | `a6bc477aac963cd277890ba8b10de5edf6cb56ff5c5890da85cbbf2e489ef1cd` |
+| `pieces-export_0.18.0-rc3_windows_amd64.zip` | `1FUpqjfpXRfumjfECHJB3IMi2mD2zZ04Z` | `fd8331e0730a8248df2c6a34abb6b06ff7342500bcfacc3dfd26b99c116ef7e6` |
+| `pieces-export_0.18.0-rc3_windows_arm64.zip` | `1b7I4WOu1yl6JFROX6KNMwn5Aie0cMS33` | `538a4c1c475bfe46c6b2eb53de979c7d920982d1848267a1db6cdf690bd0cebf` |
 
 ## Current Windows validation — 2026-10-07
 
@@ -50,7 +65,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-1. With no options, both scripts install the built-in `0.18.0-rc2` release from the public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+1. With no options, both scripts install the built-in `0.18.0-rc3` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
 3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
 4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`.

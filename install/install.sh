@@ -10,8 +10,8 @@
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 
-PIECES_RELEASE_VERSION='0.18.0-rc2'
-PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1NjJ8jsOnFkSxp8Msn7PkAg0tJwgsVfZA'
+PIECES_RELEASE_VERSION='0.18.0-rc3'
+PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1lABvGdTeCue2AMRHSAS_cl4dQ9OYEiE4'
 PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh'
 
 # The built-in release lives in a public Google Drive folder. Each file is
@@ -19,10 +19,10 @@ PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3
 # Prints "<drive id> <sha256> <file name>".
 pieces_release_file() {
   case "$1" in
-    darwin_arm64) echo '1oMRUgO184Pt0kavuccCQVQgmqKWViSE8 39c150fca5e9ed362b4c1094da422c22586c720a3c73c4cf3a7c8537a4e07578 pieces-export_0.18.0-rc2_darwin_arm64_notarized.zip' ;;
-    darwin_amd64) echo '1opKlUbvSCjS3RO4i9qHoapoxf81pj7nf baa78f32f93a8c4249dc7d20d0f0618bf9e53f9bc7f59492aa3d64f8fbeb743a pieces-export_0.18.0-rc2_darwin_amd64_notarized.zip' ;;
-    linux_amd64) echo '1zk2WVA12LxtCQsBnlPm7aDdWs2no1X3A 9a3442916135f0865e3eacc232c45e2058ca0e8166f3be6ef7654f6d074d4bdf pieces-export_0.18.0-rc2_linux_amd64.zip' ;;
-    linux_arm64) echo '1h44eHYqIAW6Yg7J90L1o9qqC4IAffpdV eec215a709f07a6c7021ceb12f46f524f52bd4b308f06121d5e44ead67c9c8bd pieces-export_0.18.0-rc2_linux_arm64.zip' ;;
+    darwin_arm64) echo '1RGIoNvro0AuyADwL3zKTKFZi1oDal9l- 88dc2067fb9e27321bdb37ec3f463ecf5b6a67d7282131b94fd64f78dafa9a1b pieces-export_0.18.0-rc3_darwin_arm64_notarized.zip' ;;
+    darwin_amd64) echo '1vgoUYENQRqob845TYnXJzSi7jdUQJl3f 24f27445f0a769970ffc9b3a2e0a674cb83e1e86946fd63de1a004fcd71fa167 pieces-export_0.18.0-rc3_darwin_amd64_notarized.zip' ;;
+    linux_amd64) echo '1alrEphCpjI2l8A_vkQ3y3aKOkwt1a_LI 1579cf23a9c1be22967ece3ba5c1f1b6c88da5c0ddcc30c8f5916c0919905286 pieces-export_0.18.0-rc3_linux_amd64.zip' ;;
+    linux_arm64) echo '1ReiyL2qQRbDYjQMht1fEX5EQ8baCFTHY a6bc477aac963cd277890ba8b10de5edf6cb56ff5c5890da85cbbf2e489ef1cd pieces-export_0.18.0-rc3_linux_arm64.zip' ;;
     *) return 1 ;;
   esac
 }
