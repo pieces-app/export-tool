@@ -57,12 +57,13 @@ Add options to the end of the command:
 | Continue an interrupted export | `--resume` | `-Resume` |
 | Save the export somewhere else | `--output ~/Desktop/my-export` | `-Output "$HOME\Desktop\my-export"` |
 | Also make PDFs (experimental) | `-- --format both` | `-ExportArgs '--format','both'` |
+| Make an Obsidian vault (experimental) | `-- --format obsidian` | `-ExportArgs '--format','obsidian'` |
 | Don't open the folder at the end | `--no-open` | `-NoOpen` |
 | Delete the tool afterward | `--remove` | `-Cleanup Remove` |
 | Only download and check the tool | `--install-only` | `-InstallOnly` |
 | Skip the Export now? question | `-- --yes` | `-ExportArgs '--yes'` |
 
-PDF exports can't be resumed after an interruption. Markdown exports can.
+PDF and Obsidian exports can't be resumed after an interruption. Markdown exports can.
 
 ## Where things are saved
 
@@ -73,6 +74,76 @@ PDF exports can't be resumed after an interruption. Markdown exports can.
 | Resume data | `~/Library/Application Support/Pieces Export/recovery/` | `%LOCALAPPDATA%\Pieces Export\recovery\` | `~/.local/share/pieces-export/recovery/` |
 
 The resume data is private and encrypted. It stays on your computer and isn't saved in Documents, so it isn't synced. It's deleted when an export finishes. The tool is kept so you can resume or run it again. To remove everything except your exports, delete the `Pieces Export` folder (Linux: `pieces-export`) shown above.
+
+## Explore your memories in Obsidian (experimental)
+
+![Obsidian's graph view of one Pieces export](docs/images/obsidian-graph.png)
+
+*The graph of one real export. Summaries are blue, topics gold, people green, sources and websites brown, and profile reports purple.*
+
+The Obsidian format turns your export into a vault. Each summary links to the people, topics, sources and websites it's connected to, so you can browse your memories by following links. This is experimental. On a large library, Obsidian takes several minutes to index the vault the first time you open it, and the full graph view takes much longer to draw. If your computer can handle it, the graph is worth a look.
+
+### Make a vault
+
+To export straight into a vault, add the Obsidian format to the install command:
+
+```sh
+curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash -s -- -- --format obsidian
+```
+
+```powershell
+& ([scriptblock]::Create((irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1))) -ExportArgs '--format','obsidian'
+```
+
+An Obsidian export can't be resumed if it's interrupted. For a large library, it's safer to make the normal Markdown export first and convert it afterward. Converting works offline and leaves the original export unchanged. Run it from the folder that holds the tool. The installer keeps the tool in a folder named after its version, inside the tool location listed under [Where things are saved](#where-things-are-saved).
+
+```sh
+./pieces-export obsidian --source ~/Documents/Pieces-Exports/<date_time> --output ~/Documents/Pieces-Obsidian --yes
+```
+
+On Windows, run `.\pieces-export.exe` with the same options.
+
+### Open it
+
+1. In Obsidian, choose **Open folder as vault** and pick the `vault` folder inside the export. Don't pick the export folder itself, or Obsidian will index the whole archive.
+2. Open **Start Here**. It links to your timeline, personas, single-click summaries, people, topics, sources and websites.
+3. To see one note's neighborhood instead of the whole graph, run **Graph view: Open local graph** from the command palette.
+
+### Query it from the terminal or with an agent
+
+Obsidian's [command line interface](https://help.obsidian.md/cli) lets scripts and AI agents search and read your vault while Obsidian is running. It needs Obsidian 1.12 or newer. Turn it on under **Settings → General → Command line interface**, then follow the prompt. Run commands from inside the vault folder so they go to this vault. These examples use a Mac or Linux terminal:
+
+```sh
+cd ~/Documents/Pieces-Obsidian/vault   # the folder you opened in Obsidian
+
+# Count your summaries and list the most used tags
+obsidian tag name=pieces/summary total
+obsidian tags counts sort=count
+
+# Search with Obsidian's search syntax: words, "phrases", tags, folders and [properties]
+obsidian search query='"pull request" tag:#pieces/summary' limit=10
+obsidian search query='tag:#pieces/summary [created:2025-04]' total
+obsidian search:context query='kubernetes' limit=5
+
+# Read a note, then follow its links in both directions
+obsidian read file="Start Here"
+obsidian links path="<note path>"
+obsidian backlinks path="<note path>" counts format=json
+obsidian property:read name=created path="<note path>"
+```
+
+Search prints note paths, which you can pass to `read`, `links` and `backlinks`. Add `format=json` to `search`, `tags` or `backlinks` when a script or agent needs structured output. On an indexed vault of about 31,000 notes, each of these commands returned in under a second.
+
+Coding agents such as Claude Code or Codex can run these commands for you. For example, ask: "Use the obsidian command line on my Pieces vault. Find my summaries from April 2025 that mention pull requests, then list the people and topics they link to."
+
+| Tag | Marks |
+| --- | --- |
+| `pieces/summary` | Summaries |
+| `pieces/profile` | Persona and profile reports |
+| `entity/person`, `entity/tag`, `entity/source`, `entity/website` | Notes for people, topics, sources and websites |
+| `topic/<label>`, `source/<label>`, `website/<label>`, `person/<label>` | Notes tagged with that topic, source, website or person |
+
+Memory notes also have `created`, `updated` and `pieces_type` properties. The [Obsidian guide](OBSIDIAN_EXPORT.md) covers the full vault layout.
 
 ## Manual download
 
