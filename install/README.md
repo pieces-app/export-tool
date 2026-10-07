@@ -2,7 +2,7 @@
 
 Save your Pieces memories as Markdown files you keep: your summaries, your persona and profile histories, and the links between them. The tool only reads your local Pieces data. Nothing in Pieces is changed or deleted.
 
-Version **0.18.0-rc2** (early access). Pieces Export is open source under the MIT License; the source code is at [github.com/pieces-app/export-tool](https://github.com/pieces-app/export-tool).
+Version **0.18.0-rc3** (early access). Pieces Export is open source under the MIT License; the source code is at [github.com/pieces-app/export-tool](https://github.com/pieces-app/export-tool).
 
 ## Quick start
 
@@ -76,16 +76,16 @@ The resume data is private and encrypted. It stays on your computer and isn't sa
 
 ## Manual download
 
-To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1NjJ8jsOnFkSxp8Msn7PkAg0tJwgsVfZA):
+To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1lABvGdTeCue2AMRHSAS_cl4dQ9OYEiE4):
 
 | Computer | Download |
 | --- | --- |
-| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/1oMRUgO184Pt0kavuccCQVQgmqKWViSE8/view) |
-| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1opKlUbvSCjS3RO4i9qHoapoxf81pj7nf/view) |
-| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1mGaXSaDUAflRaa6cCI4zfj_nILWNTH67/view) |
-| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1dJmEB55mnG3sYITFcfVL0DAXcyQ8ySWn/view) |
-| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1zk2WVA12LxtCQsBnlPm7aDdWs2no1X3A/view) |
-| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1h44eHYqIAW6Yg7J90L1o9qqC4IAffpdV/view) |
+| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/1RGIoNvro0AuyADwL3zKTKFZi1oDal9l-/view) |
+| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1vgoUYENQRqob845TYnXJzSi7jdUQJl3f/view) |
+| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1FUpqjfpXRfumjfECHJB3IMi2mD2zZ04Z/view) |
+| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1b7I4WOu1yl6JFROX6KNMwn5Aie0cMS33/view) |
+| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1alrEphCpjI2l8A_vkQ3y3aKOkwt1a_LI/view) |
+| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1ReiyL2qQRbDYjQMht1fEX5EQ8baCFTHY/view) |
 
 Not sure which one you need? On a Mac, open the Apple menu and choose About This Mac. "Chip: Apple M..." means Apple silicon. On Windows, open Settings, then System, then About, and check System type. On Linux, run `uname -m`. `x86_64` means x86-64, and `aarch64` means ARM64.
 
@@ -95,7 +95,7 @@ Mac, in Terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc2_darwin_arm64_notarized.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc3_darwin_arm64_notarized.zip -d pieces-export-tool
 cd pieces-export-tool
 ./pieces-export version
 ./pieces-export export --dry-run --format markdown --launch-os=false
@@ -106,7 +106,7 @@ Windows, in PowerShell:
 
 ```powershell
 cd $HOME\Downloads
-Expand-Archive .\pieces-export_0.18.0-rc2_windows_amd64.zip -DestinationPath .\pieces-export-tool
+Expand-Archive .\pieces-export_0.18.0-rc3_windows_amd64.zip -DestinationPath .\pieces-export-tool
 cd .\pieces-export-tool
 .\pieces-export.exe version
 .\pieces-export.exe export --dry-run --format markdown --launch-os=false
@@ -117,7 +117,7 @@ Linux, in a terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc2_linux_amd64.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc3_linux_amd64.zip -d pieces-export-tool
 cd pieces-export-tool
 chmod u+x ./pieces-export
 ./pieces-export version
@@ -149,4 +149,4 @@ To report a problem, send the tool version, your operating system and chip, and 
 - The scripts download only the Google Drive files pinned in them. Each file must match the SHA-256 written in the script, and the ZIP must contain exactly the tool, its README, and its license files. Anything else is rejected before it runs.
 - The Mac tool is signed with our Apple Developer ID (Mesh Intelligent Technologies, Inc.) and notarized by Apple. The Windows and Linux tools aren't code-signed yet.
 - No administrator rights, PATH changes, or background services are involved. You can read both scripts in this Gist before running them.
-- Pieces Export is open source under the [MIT License](https://github.com/pieces-app/export-tool/blob/main/LICENSE.txt). The 0.18.0-rc2 ZIPs were packaged before the move to MIT, so the LICENSE.txt inside them still has the earlier text. Third-party notices come with the download.
+- Pieces Export is open source under the [MIT License](https://github.com/pieces-app/export-tool/blob/main/LICENSE.txt). The license and third-party notices come with every download.
