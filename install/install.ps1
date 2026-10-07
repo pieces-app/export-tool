@@ -28,8 +28,8 @@ function Get-PiecesBuiltInRelease {
         Folder       = 'https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca'
         InstallerUrl = 'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1'
         Files        = @{
-            windows_amd64 = @{ Id = '1FUpqjfpXRfumjfECHJB3IMi2mD2zZ04Z'; Sha256 = 'fd8331e0730a8248df2c6a34abb6b06ff7342500bcfacc3dfd26b99c116ef7e6'; Name = 'pieces-export_0.18.0-rc4_windows_amd64.zip' }
-            windows_arm64 = @{ Id = '1b7I4WOu1yl6JFROX6KNMwn5Aie0cMS33'; Sha256 = '538a4c1c475bfe46c6b2eb53de979c7d920982d1848267a1db6cdf690bd0cebf'; Name = 'pieces-export_0.18.0-rc4_windows_arm64.zip' }
+            windows_amd64 = @{ Id = '1P9YAIn5eL67zkXVj4nADPmRB23sxCGkn'; Sha256 = '8be86ce5d0fb1913fcc24619cd8d51fe96327adbdac385847e0d5fb2a01dc5b8'; Name = 'pieces-export_0.18.0-rc4_windows_amd64.zip' }
+            windows_arm64 = @{ Id = '1DTV4qRZow1WIWJXhNrvNnw5e48CKDcOc'; Sha256 = 'e07fd22236942b6d8c136ef6fb548f9fbdf443dea2fac57d55fa6241a39f41ef'; Name = 'pieces-export_0.18.0-rc4_windows_arm64.zip' }
             darwin_arm64  = @{ Id = '154vjYfVlimh6-LPtrnZa9JoXNLjI13lQ'; Sha256 = '1e1aeb0c1237f15ab43f2f3b45c00cb75ab24f5d6aeb83a187f145592f1de071'; Name = 'pieces-export_0.18.0-rc4_darwin_arm64_notarized.zip' }
             darwin_amd64  = @{ Id = '1vpT_S8O26AXpyaRJzEC1Vqfj9bD7JjHW'; Sha256 = 'ba283e82f58981d30ab21c3c87a482bc30db5084b02e9891700e1c3c6079016e'; Name = 'pieces-export_0.18.0-rc4_darwin_amd64_notarized.zip' }
             linux_amd64   = @{ Id = '1iDbKB8BmopqpwWxW3JvTQPXLEXr5anIv'; Sha256 = '212b6861854e623c9b05f338c645033671fd2dd269ac18e182a3f19517ab8c0d'; Name = 'pieces-export_0.18.0-rc4_linux_amd64.zip' }
