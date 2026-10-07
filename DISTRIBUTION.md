@@ -1,6 +1,21 @@
 # Binary distribution and installation
 
-Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc4 and 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Release candidate 0.18.0-rc4 — 2026-10-07
+
+Built with `go run ./cmd/release --version 0.18.0-rc4` from the tree of `main` at `6b54749` (PR #4), which adds the shared URL reader for sanitizing and the final audit, rescans of flattened or shortened display text and derived file names, actionable audit errors that name the output file and finding kind, and dependency updates for golang.org/x/crypto, github.com/nwaples/rardecode/v2, github.com/yuin/goldmark and github.com/klauspost/compress. The binaries embed only the version string, so the build from the merged tree is byte-identical to one from the merge commit. Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` (hardened runtime, secure timestamp, identifier `app.pieces.export-tool`) from the `pieces-codesign` keychain and notarized with the `global-cloud-runtime/apple-codesigning-config-pieces-app-json` credentials. Apple accepted arm64 submission `a509f04f-088c-43b9-ad8b-b7111e43455e` and amd64 submission `51de80fa-e7d1-4805-875e-4a622863744b` as Ready for distribution with no issues. Each ticket's cdhash matches its executable, and extracted copies of both final ZIPs pass `codesign --verify --strict --check-notarization -R=notarized`. The amd64 build was run under Rosetta. Windows and Linux ZIPs are unsigned, as before. `go test ./...` passed on the merged tree, and `govulncheck ./...` reports no vulnerability reachable from the module. After the pins below were written, `go test ./install` passed, and both installers (`install.sh` under Bash and `install.ps1` under PowerShell 7.5) downloaded the published Apple-silicon ZIP from Drive, verified its SHA-256 and installed a notarized `pieces-export 0.18.0-rc4` into an isolated `PIECES_EXPORT_HOME`. Native Windows and Linux runtime checks were not repeated for this candidate.
+
+All six ZIPs, per-file `.sha256` files, `SHA256SUMS.txt` and a copy of `install/README.md` are in the public [0.18.0-rc4 Drive folder](https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca) (anyone with the link can view). Anonymous downloads of every ZIP matched its SHA-256. Local artifacts are in ignored `dist/0.18.0-rc4/` and `dist/macos-notarized-0.18.0-rc4/` (with Apple receipts under `receipts/`).
+
+| File | Drive ID | SHA-256 |
+| --- | --- | --- |
+| `pieces-export_0.18.0-rc4_darwin_arm64_notarized.zip` | `154vjYfVlimh6-LPtrnZa9JoXNLjI13lQ` | `1e1aeb0c1237f15ab43f2f3b45c00cb75ab24f5d6aeb83a187f145592f1de071` |
+| `pieces-export_0.18.0-rc4_darwin_amd64_notarized.zip` | `1vpT_S8O26AXpyaRJzEC1Vqfj9bD7JjHW` | `ba283e82f58981d30ab21c3c87a482bc30db5084b02e9891700e1c3c6079016e` |
+| `pieces-export_0.18.0-rc4_linux_amd64.zip` | `1iDbKB8BmopqpwWxW3JvTQPXLEXr5anIv` | `212b6861854e623c9b05f338c645033671fd2dd269ac18e182a3f19517ab8c0d` |
+| `pieces-export_0.18.0-rc4_linux_arm64.zip` | `1f4XL0Omd-22Jkh8wtXPXnt9-dnw1r95u` | `bcd70663141da91f5edb61ca3f5531a7fc0c48c56eaf2e7d6672e57ac726c842` |
+| `pieces-export_0.18.0-rc4_windows_amd64.zip` | `1P9YAIn5eL67zkXVj4nADPmRB23sxCGkn` | `8be86ce5d0fb1913fcc24619cd8d51fe96327adbdac385847e0d5fb2a01dc5b8` |
+| `pieces-export_0.18.0-rc4_windows_arm64.zip` | `1DTV4qRZow1WIWJXhNrvNnw5e48CKDcOc` | `e07fd22236942b6d8c136ef6fb548f9fbdf443dea2fac57d55fa6241a39f41ef` |
 
 ## Release candidate 0.18.0-rc3 — 2026-10-07
 
@@ -65,7 +80,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-1. With no options, both scripts install the built-in `0.18.0-rc3` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+1. With no options, both scripts install the built-in `0.18.0-rc4` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
 3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
 4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`.
