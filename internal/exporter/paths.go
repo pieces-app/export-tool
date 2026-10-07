@@ -15,6 +15,30 @@ import (
 
 var uuidName = regexp.MustCompile(`(?i)^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
+func asciiDigit(c byte) bool { return c >= '0' && c <= '9' }
+
+// safeName is safeTitle for names that a filtered export audits as text.
+// Sanitizing can create word boundaries the record scan never saw: a title's
+// own underscores joined a run of digits to other text, and the file name
+// drops them. A changed name is scanned again and any finding is sanitized
+// back into the name. A scanner failure yields "untitled"; the run reports the
+// underlying cancellation or timeout on its next check.
+func (r *run) safeName(value string, maxBytes int) string {
+	name := safeTitle(value, maxBytes)
+	if r.opts.Mode != "filtered" || name == value {
+		return name
+	}
+	stats := ScanResult{}
+	clean, err := r.opts.Scanner.cleanString(r.ctx, "", name, &stats)
+	if err != nil {
+		return "untitled"
+	}
+	if stats.Redactions == 0 && !stats.Denied {
+		return name
+	}
+	return safeTitle(clean, maxBytes)
+}
+
 func safeTitle(value string, maxBytes int) string {
 	value = norm.NFC.String(value)
 	var b strings.Builder
@@ -28,11 +52,24 @@ func safeTitle(value string, maxBytes int) string {
 			separator = true
 		}
 	}
-	result := strings.Trim(b.String(), "_. ")
+	full := strings.Trim(b.String(), "_. ")
+	result := full
 	if len(result) > maxBytes {
 		result = result[:maxBytes]
 		for !utf8.ValidString(result) {
 			result = result[:len(result)-1]
+		}
+		// File names are audited. A cut inside a run of digits can leave a 13
+		// to 19 digit run that the record scan never saw, so drop the partial
+		// run when other text remains or when the cut run is card-shaped.
+		if asciiDigit(full[len(result)]) {
+			start := len(result)
+			for start > 0 && asciiDigit(result[start-1]) {
+				start--
+			}
+			if run := len(result) - start; start > 0 || run >= 13 && run <= 19 {
+				result = result[:start]
+			}
 		}
 		result = strings.TrimRight(result, "_ .")
 	}
@@ -97,7 +134,7 @@ func (r *run) summaryDescriptorFolder(m *Meta) string {
 		return "pipeline." + opaque("SUMMARY_DESCRIPTOR", m.SummaryDescriptor)[:16]
 	}
 	if pipeline := r.descriptorPipeline(m); pipeline != nil {
-		key = strings.ToLower(safeTitle(pipeline.Title, 64))
+		key = strings.ToLower(r.safeName(pipeline.Title, 64))
 	}
 	// Descriptors are structured client keys, but can be custom. Preserve their
 	// sanitized readability and add a stable suffix so equivalent folder labels
@@ -171,7 +208,7 @@ func (r *run) assignPaths() {
 		if !uuidName.MatchString(id) {
 			id = opaque(m.Type, id)
 		}
-		m.Path = fmt.Sprintf("%s/%0*d.%s.%s.%s.md", folder, width, i, safeTitle(m.Title, 90), date, id)
+		m.Path = fmt.Sprintf("%s/%0*d.%s.%s.%s.md", folder, width, i, r.safeName(m.Title, 90), date, id)
 	}
 	r.assignPersonaHistoryPaths()
 }

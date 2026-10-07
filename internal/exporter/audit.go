@@ -240,12 +240,15 @@ func (a *outputAuditor) hashFile(f *os.File) (digest [32]byte, bytes int64, resu
 }
 
 // auditMarkdown scans generated Markdown as a reader sees it. Generated titles
-// escape "_" as "\_". The underscore is the only word character that Markdown
-// escaping changes, and the added backslash would create word boundaries the
-// record scan never saw, such as one that ends a 16-digit run in "4111…_final"
-// for the payment card pattern.
+// escape "_" as "\_" and write "<" and ">" as "&lt;" and "&gt;". Those are the
+// escapes that change how the scanner reads the text: the backslash would
+// create word boundaries the record scan never saw, such as one that ends a
+// 16-digit run in "4111…_final" for the payment card pattern, and "&lt;" no
+// longer ends a URL where "<" did.
+var markdownAuditUnescape = strings.NewReplacer(`\_`, "_", "&lt;", "<", "&gt;", ">")
+
 func (r *run) auditMarkdown(text string) error {
-	return r.auditText(strings.ReplaceAll(text, `\_`, "_"))
+	return r.auditText(markdownAuditUnescape.Replace(text))
 }
 
 func (r *run) auditText(text string) error {

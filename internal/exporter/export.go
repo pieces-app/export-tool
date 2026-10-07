@@ -217,13 +217,26 @@ func timestamp(v map[string]any, key string) string {
 	m, _ := v[key].(map[string]any)
 	return fieldString(m, "value")
 }
+
+// title is the record's display title: the first line of its first populated
+// title field, shortened to 120 runes.
 func title(v map[string]any, m Material) string {
+	s := titleLine(v, m)
+	if prefix, truncated := displayPrefix(s, 120); truncated {
+		return prefix + "…"
+	}
+	return s
+}
+
+// titleLine ends at any line break. Escaping writes "\r" as a space, so a
+// carriage return left in a title could join two digit groups into a
+// card-shaped number that the record scan never saw.
+func titleLine(v map[string]any, m Material) string {
 	for _, k := range []string{"name", "title", "windowTitle", "readable", "text", "description", "url"} {
 		s := fieldString(v, k)
 		if s != "" {
-			s = strings.Split(s, "\n")[0]
-			if prefix, truncated := displayPrefix(s, 120); truncated {
-				s = prefix + "…"
+			if i := strings.IndexAny(s, "\r\n"); i >= 0 {
+				s = s[:i]
 			}
 			return s
 		}
@@ -239,20 +252,28 @@ func title(v map[string]any, m Material) string {
 }
 
 // displayTitle returns the title that generated documents show for a record.
-// In filtered mode a shortened title is scanned again: cutting text can leave
-// a value the record scan never saw, such as a 13 to 19 digit run or the
-// prefix of a longer token.
-func (r *run) displayTitle(v map[string]any, m Material) string {
-	s := title(v, m)
-	if r.opts.Mode != "filtered" || !strings.HasSuffix(s, "…") {
-		return s
+// A shortened title is scanned again; see rescanDisplay.
+func (r *run) displayTitle(v map[string]any, m Material) (string, error) {
+	return r.rescanDisplay(titleLine(v, m), title(v, m))
+}
+
+// displayLine returns multi-line text as generated Markdown shows it, on one
+// line, with the spacing that md escaping would write.
+func (r *run) displayLine(s string) (string, error) {
+	return r.rescanDisplay(s, strings.NewReplacer("\r", " ", "\n", " ").Replace(s))
+}
+
+// rescanDisplay returns the text that generated documents show for a value
+// after flattening or shortening. In filtered mode changed text is scanned
+// again: a line break that became a space can join two digit groups into a
+// card-shaped number, and a cut can leave the prefix of a longer token,
+// neither of which the record scan saw.
+func (r *run) rescanDisplay(original, shown string) (string, error) {
+	if shown == original || r.opts.Mode != "filtered" {
+		return shown, nil
 	}
 	stats := ScanResult{}
-	clean, err := r.opts.Scanner.cleanString(r.ctx, "", s, &stats)
-	if err != nil {
-		return strings.ReplaceAll(m.Type, "_", " ")
-	}
-	return clean
+	return r.opts.Scanner.cleanString(r.ctx, "", shown, &stats)
 }
 
 func Export(ctx context.Context, client *Client, o Options) (result Manifest, resultErr error) {
@@ -902,7 +923,11 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 			v = clean
 		}
 	}
-	meta.Title = r.displayTitle(v, m)
+	shown, err := r.displayTitle(v, m)
+	if err != nil {
+		return err
+	}
+	meta.Title = shown
 	if family, ok := associationFamilyByType(m.Type); ok && meta.State == "included" {
 		if !reflect.DeepEqual(associationEndpoints(family, v), meta.AssociationEndpoints) {
 			meta.State = "withheld"
@@ -1174,7 +1199,9 @@ func (r *run) rescanKnownCredentials() error {
 		}
 		m.Redactions += stats.Redactions
 		material, _ := materialByType(m.Type)
-		m.Title = r.displayTitle(clean, material)
+		if m.Title, err = r.displayTitle(clean, material); err != nil {
+			return err
+		}
 		m.SummaryKind = fieldString(clean, "parentHierarchicalType")
 		m.SummaryDescriptor = fieldString(clean, "parentHierarchicalTypeDescriptor")
 		m.Created = timestamp(clean, "created")

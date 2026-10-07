@@ -151,7 +151,7 @@ func TestDisplayTruncationKeepsURLQueriesWhole(t *testing.T) {
 	defer root.Close()
 	path = strings.Repeat("p", 325)
 	summary := &compactRecord{entry: TimelineEntry{Type: "WORKSTREAM_SUMMARIES", ID: "s1", Path: "vault/s1.md"}}
-	if err := compactSummaryDescription(root, summary, map[string]any{"description": "Preview https://example.com/" + path + "?token=REDACTED"}); err != nil {
+	if err := compactSummaryDescription(root, summary, map[string]any{"description": "Preview https://example.com/" + path + "?token=REDACTED"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if want := "Preview https://example.com/" + path + "…"; summary.description != want {
@@ -289,12 +289,7 @@ func FuzzGeneratedTitlesPassFinalAudit(f *testing.F) {
 	}
 	website, _ := materialByType("WEBSITES")
 	f.Fuzz(func(t *testing.T, name string) {
-		// Out of scope: titles write "<" and ">" as "&lt;" and "&gt;", which the
-		// audit reads literally, so a URL directly followed by "<" and
-		// credential-like query text reads differently. Escaping also writes a
-		// carriage return as a space, which can join two digit groups into a
-		// card-shaped number.
-		if !utf8.ValidString(name) || len(name) > 4096 || strings.ContainsAny(name, "<>\r") {
+		if !utf8.ValidString(name) || len(name) > 4096 {
 			t.Skip()
 		}
 		stats := ScanResult{}
@@ -303,15 +298,27 @@ func FuzzGeneratedTitlesPassFinalAudit(f *testing.F) {
 			t.Skip()
 		}
 		r := &run{ctx: context.Background(), opts: Options{Mode: "filtered", Scanner: s}}
-		label := r.displayTitle(map[string]any{"name": clean}, website)
+		label, err := r.displayTitle(map[string]any{"name": clean}, website)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The same text can also be a multi-line summary description.
+		metadata, err := r.metadataMarkdown(&DocumentMetadata{Description: clean, Sources: []string{label, "Other source"}})
+		if err != nil {
+			t.Fatal(err)
+		}
 		for _, rendered := range []string{
 			"# " + md(label) + "\n",
 			navigationEntry{label: label, path: "markdown/websites/w1.md", detail: "12:00:00 +00:00 · WEBSITES"}.markdown("markdown/days/2026-09-29.md"),
-			metadataMarkdown(&DocumentMetadata{Sources: []string{label, "Other source"}}),
+			metadata,
 		} {
 			if err := r.auditMarkdown(rendered); err != nil {
 				t.Fatalf("title from %q rendered as %q failed the final audit: %v", name, rendered, err)
 			}
+		}
+		// File names derived from the title are audited as text.
+		if path := "markdown/websites/000001." + r.safeName(label, 90) + ".2026-09-29.w1.md"; r.auditText(path) != nil {
+			t.Fatalf("title from %q produced file name %q that failed the final audit", name, path)
 		}
 	})
 }
