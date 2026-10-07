@@ -2,7 +2,7 @@
 
 Save your Pieces memories as Markdown files you keep: your summaries, your persona and profile histories, and the links between them. The tool only reads your local Pieces data. Nothing in Pieces is changed or deleted.
 
-Version **0.18.0-rc2** (early access).
+Version **0.18.0-rc2** (early access). Pieces Export is open source under the MIT License; the source code is at [github.com/pieces-app/export-tool](https://github.com/pieces-app/export-tool).
 
 ## Quick start
 
@@ -149,4 +149,4 @@ To report a problem, send the tool version, your operating system and chip, and 
 - The scripts download only the Google Drive files pinned in them. Each file must match the SHA-256 written in the script, and the ZIP must contain exactly the tool, its README, and its license files. Anything else is rejected before it runs.
 - The Mac tool is signed with our Apple Developer ID (Mesh Intelligent Technologies, Inc.) and notarized by Apple. The Windows and Linux tools aren't code-signed yet.
 - No administrator rights, PATH changes, or background services are involved. You can read both scripts in this Gist before running them.
-- The tool is open source under the Apache 2.0 license. Its license and third-party notices come with the download.
+- Pieces Export is open source under the [MIT License](https://github.com/pieces-app/export-tool/blob/main/LICENSE.txt). The 0.18.0-rc2 ZIPs were packaged before the move to MIT, so the LICENSE.txt inside them still has the earlier text. Third-party notices come with the download.

@@ -14,7 +14,7 @@ At the recorded server revision, `lib/utils/associations_read_server_base.dart` 
 
 The forward fix includes missing owners in the usual closure traversal. Successful empty/positive counts must reconcile just as for present or excluded owners. Available targets remain exportable, the unavailable owner remains missing with no invented path/body, and indexed evidence survives completed-source replay and rebuild. Only that verified annotation evidence permits referenced-only retrieval; actual count/list failures remain failures. Tests include missing persons with no annotations, retained profile annotations attached to missing persons, missing summaries, invalid counts, compiled CLI export and offline replay.
 
-The internal facade also exposes batch-count methods, but the inspected HTTP association server does not expose a bulk-count route. Internal methods are not callable API contracts for this closed-source download.
+The internal facade also exposes batch-count methods, but the inspected HTTP association server does not expose a bulk-count route. Internal methods are not callable API contracts for this tool.
 
 ## Source evidence
 

@@ -172,4 +172,4 @@ To report a problem, start with the tool's `version`, OS version/CPU, process ex
 
 Use `--environment production` or `--environment staging` when both are installed. `--base-url http://127.0.0.1:39300` selects a particular running instance. `--os-path` can specify an installed OS executable or macOS application bundle.
 
-The application is open source. The current Mac packages are Developer ID signed and notarized as described above. Its use is covered by `LICENSE.txt`; keep `THIRD_PARTY_NOTICES.txt` with it. Only the finalized export folder should be shared—never the private recovery workspace or keys.
+The application is open source under the MIT License. The current Mac packages are Developer ID signed and notarized as described above. Its use is covered by `LICENSE.txt`; keep `THIRD_PARTY_NOTICES.txt` with it. Only the finalized export folder should be shared—never the private recovery workspace or keys.
