@@ -5,9 +5,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -80,6 +82,12 @@ func (a *outputAuditor) file(path string) (result error) {
 		return err
 	}
 	relative, _ := filepath.Rel(r.stage, path)
+	defer func() {
+		var review *outputReviewError
+		if errors.As(result, &review) && review.path == "" {
+			review.path = r.reviewPath(relative)
+		}
+	}()
 	if err := r.auditText(relative); err != nil {
 		return err
 	}
@@ -181,6 +189,10 @@ func (a *outputAuditor) file(path string) (result error) {
 	if a.buffer == nil {
 		a.buffer = make([]byte, auditReadBytes)
 	}
+	scan := r.auditText
+	if filepath.Ext(path) == ".md" {
+		scan = r.auditMarkdown
+	}
 	tail := ""
 	for {
 		n, readErr := counter.Read(a.buffer)
@@ -188,7 +200,7 @@ func (a *outputAuditor) file(path string) (result error) {
 			// Only the newly read bytes belong to this file. The rest of the
 			// buffer can retain arbitrary bytes from a prior, longer document.
 			chunk := tail + string(a.buffer[:n])
-			if err := r.auditText(chunk); err != nil {
+			if err := scan(chunk); err != nil {
 				return err
 			}
 			start := max(0, len(chunk)-auditOverlapBytes)
@@ -227,9 +239,18 @@ func (a *outputAuditor) hashFile(f *os.File) (digest [32]byte, bytes int64, resu
 	}
 }
 
+// auditMarkdown scans generated Markdown as a reader sees it. Generated titles
+// escape "_" as "\_". The underscore is the only word character that Markdown
+// escaping changes, and the added backslash would create word boundaries the
+// record scan never saw, such as one that ends a 16-digit run in "4111…_final"
+// for the payment card pattern.
+func (r *run) auditMarkdown(text string) error {
+	return r.auditText(strings.ReplaceAll(text, `\_`, "_"))
+}
+
 func (r *run) auditText(text string) error {
 	stats := ScanResult{}
-	err := r.opts.Scanner.auditRendered(r.ctx, text, &stats)
+	_, err := r.opts.Scanner.cleanString(r.ctx, "", text, &stats)
 	for i := 0; i < stats.TimeoutRetries; i++ {
 		r.local.record("secret_scan_timeout_retry", 0, 0, err)
 	}
@@ -237,7 +258,42 @@ func (r *run) auditText(text string) error {
 		return err
 	}
 	if stats.Redactions > 0 || stats.Denied {
-		return errConfig("final output scan found content requiring review; partial directory was not finalized")
+		return &outputReviewError{kinds: stats.Findings}
 	}
 	return nil
+}
+
+// outputReviewError reports a final-audit finding by output file and finding
+// kind so that a failed export can be diagnosed from its error alone. It never
+// carries the matched value.
+type outputReviewError struct {
+	path  string
+	kinds []string
+}
+
+func (e *outputReviewError) Error() string {
+	var b strings.Builder
+	b.WriteString("final output scan found content requiring review")
+	if e.path != "" {
+		b.WriteString(" in ")
+		b.WriteString(e.path)
+	}
+	if len(e.kinds) > 0 {
+		b.WriteString(" (")
+		b.WriteString(strings.Join(e.kinds, ", "))
+		b.WriteString(")")
+	}
+	b.WriteString("; partial directory was not finalized")
+	return b.String()
+}
+
+// reviewPath names an output file in an audit error. The name itself can be
+// the finding, so report the scanner's cleaned form, never the raw name.
+func (r *run) reviewPath(relative string) string {
+	stats := ScanResult{}
+	clean, err := r.opts.Scanner.cleanString(r.ctx, "", filepath.ToSlash(relative), &stats)
+	if err != nil {
+		return ""
+	}
+	return clean
 }

@@ -24,9 +24,8 @@ func compactSummaryDescription(root *os.Root, r *compactRecord, canonical map[st
 		return err
 	}
 	description = compactDisplayTitle(description)
-	chars := []rune(description)
-	if len(chars) > 360 {
-		description = string(chars[:360])
+	if prefix, truncated := displayPrefix(description, 360); truncated {
+		description = prefix
 		if at := strings.LastIndex(description, " "); at > len(description)*2/3 {
 			description = description[:at]
 		}

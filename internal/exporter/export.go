@@ -222,9 +222,8 @@ func title(v map[string]any, m Material) string {
 		s := fieldString(v, k)
 		if s != "" {
 			s = strings.Split(s, "\n")[0]
-			r := []rune(s)
-			if len(r) > 120 {
-				s = string(r[:120]) + "…"
+			if prefix, truncated := displayPrefix(s, 120); truncated {
+				s = prefix + "…"
 			}
 			return s
 		}
@@ -237,6 +236,23 @@ func title(v map[string]any, m Material) string {
 		}
 	}
 	return strings.ReplaceAll(m.Type, "_", " ")
+}
+
+// displayTitle returns the title that generated documents show for a record.
+// In filtered mode a shortened title is scanned again: cutting text can leave
+// a value the record scan never saw, such as a 13 to 19 digit run or the
+// prefix of a longer token.
+func (r *run) displayTitle(v map[string]any, m Material) string {
+	s := title(v, m)
+	if r.opts.Mode != "filtered" || !strings.HasSuffix(s, "…") {
+		return s
+	}
+	stats := ScanResult{}
+	clean, err := r.opts.Scanner.cleanString(r.ctx, "", s, &stats)
+	if err != nil {
+		return strings.ReplaceAll(m.Type, "_", " ")
+	}
+	return clean
 }
 
 func Export(ctx context.Context, client *Client, o Options) (result Manifest, resultErr error) {
@@ -886,7 +902,7 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 			v = clean
 		}
 	}
-	meta.Title = title(v, m)
+	meta.Title = r.displayTitle(v, m)
 	if family, ok := associationFamilyByType(m.Type); ok && meta.State == "included" {
 		if !reflect.DeepEqual(associationEndpoints(family, v), meta.AssociationEndpoints) {
 			meta.State = "withheld"
@@ -1158,7 +1174,7 @@ func (r *run) rescanKnownCredentials() error {
 		}
 		m.Redactions += stats.Redactions
 		material, _ := materialByType(m.Type)
-		m.Title = title(clean, material)
+		m.Title = r.displayTitle(clean, material)
 		m.SummaryKind = fieldString(clean, "parentHierarchicalType")
 		m.SummaryDescriptor = fieldString(clean, "parentHierarchicalTypeDescriptor")
 		m.Created = timestamp(clean, "created")

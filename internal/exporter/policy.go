@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -269,6 +270,25 @@ type ScanResult struct {
 	Redactions, WithheldRepresentations int
 	Denied                              bool
 	TimeoutRetries                      int
+	// Findings names the detector or rule behind each redaction or denial, in
+	// first-seen order. It never contains a matched value.
+	Findings []string
+}
+
+func (s *ScanResult) redact(kind string) {
+	s.Redactions++
+	s.note(kind)
+}
+
+func (s *ScanResult) deny() {
+	s.Denied = true
+	s.note("denied domain")
+}
+
+func (s *ScanResult) note(kind string) {
+	if !slices.Contains(s.Findings, kind) {
+		s.Findings = append(s.Findings, kind)
+	}
 }
 
 func (s *Scanner) Sanitize(ctx context.Context, record map[string]any) (map[string]any, ScanResult, error) {
@@ -288,7 +308,7 @@ func (s *Scanner) walk(ctx context.Context, key string, v any, stats *ScanResult
 		return nil, errConfig("record nesting exceeds scanner limit")
 	}
 	if credentialField(key) {
-		stats.Redactions++
+		stats.redact("credential field")
 		return "[REDACTED:CREDENTIAL]", nil
 	}
 	if strings.EqualFold(key, "bytes") {
@@ -387,7 +407,7 @@ func (s *Scanner) walk(ctx context.Context, key string, v any, stats *ScanResult
 		return s.cleanString(ctx, key, value, stats)
 	case json.Number:
 		if s.Policy.Financial && validCard(string(value)) {
-			stats.Redactions++
+			stats.redact("payment card number")
 			return "[REDACTED:PAYMENT_CARD]", nil
 		}
 		return value, nil
@@ -397,26 +417,15 @@ func (s *Scanner) walk(ctx context.Context, key string, v any, stats *ScanResult
 }
 
 func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *ScanResult) (string, error) {
-	return s.scan(ctx, key, value, false, stats)
-}
-
-// auditRendered counts what record sanitizing would still change in generated
-// output. URLs are read as renderers write them; see renderedURLRedactions.
-func (s *Scanner) auditRendered(ctx context.Context, text string, stats *ScanResult) error {
-	_, err := s.scan(ctx, "", text, true, stats)
-	return err
-}
-
-func (s *Scanner) scan(ctx context.Context, key, value string, rendered bool, stats *ScanResult) (string, error) {
 	if len(value) > 2<<20 {
 		return "", errConfig("text field exceeds 2 MiB scanning limit")
 	}
-	for _, raw := range urlPattern.FindAllString(value, -1) {
-		u, err := url.Parse(strings.TrimRight(raw, ".,;)]}"))
-		if err == nil && u.Hostname() != "" && s.HostDenied(u.Hostname()) {
-			stats.Denied = true
+	scanURLs(value, func(link string, _ bool) (string, bool) {
+		if u, err := url.Parse(markdownUnescape(link)); err == nil && u.Hostname() != "" && s.HostDenied(u.Hostname()) {
+			stats.deny()
 		}
-	}
+		return link, false
+	})
 	// Canonical URL fields may store a hostname without a scheme.
 	if strings.Contains(strings.ToLower(key), "url") || strings.EqualFold(key, "hostname") || strings.EqualFold(key, "domain") {
 		candidate := value
@@ -424,7 +433,7 @@ func (s *Scanner) scan(ctx context.Context, key, value string, rendered bool, st
 			candidate = "https://" + candidate
 		}
 		if u, err := url.Parse(candidate); err == nil && u.Hostname() != "" && s.HostDenied(u.Hostname()) {
-			stats.Denied = true
+			stats.deny()
 		}
 	}
 	fragment := detect.Fragment{Raw: key + "=" + value}
@@ -442,20 +451,24 @@ func (s *Scanner) scan(ctx context.Context, key, value string, rendered bool, st
 	if err != nil {
 		return "", err
 	}
-	secrets := map[string]bool{}
+	// Each secret maps to the finding kind reported for it: the first detector
+	// rule that matched it, otherwise the late-discovered credential list.
+	secrets := map[string]string{}
 	for _, f := range findings {
 		if f.Secret == "" {
 			continue
 		}
 		if !strings.Contains(value, f.Secret) {
-			stats.Redactions++
+			stats.redact("encoded secret pattern " + f.RuleID)
 			return "[WITHHELD:ENCODED_SECRET]", nil
 		}
-		secrets[f.Secret] = true
+		if _, seen := secrets[f.Secret]; !seen {
+			secrets[f.Secret] = "secret pattern " + f.RuleID
+		}
 	}
 	for secret := range s.known {
-		if strings.Contains(value, secret) {
-			secrets[secret] = true
+		if _, seen := secrets[secret]; !seen && strings.Contains(value, secret) {
+			secrets[secret] = "known credential value"
 		}
 	}
 	ordered := []string{}
@@ -470,118 +483,216 @@ func (s *Scanner) scan(ctx context.Context, key, value string, rendered bool, st
 	})
 	for _, secret := range ordered {
 		if strings.Contains(value, secret) {
-			stats.Redactions++
+			stats.redact(secrets[secret])
 			value = strings.ReplaceAll(value, secret, "[REDACTED:SECRET]")
 		}
 	}
-	if rendered {
-		stats.Redactions += renderedURLRedactions(value)
-	} else {
-		value = urlPattern.ReplaceAllStringFunc(value, func(raw string) string {
-			clean, changed := redactURL(raw, false)
-			if changed {
-				stats.Redactions++
-			}
-			return clean
-		})
-	}
+	value, _ = scanURLs(value, func(link string, cut bool) (string, bool) {
+		clean, kinds := redactURL(link, cut)
+		if len(kinds) == 0 {
+			return link, false
+		}
+		stats.Redactions++
+		for _, kind := range kinds {
+			stats.note(kind)
+		}
+		return clean, true
+	})
 	if s.Policy.Financial {
 		value = redactPaymentCards(value, stats)
 		value = ibanPattern.ReplaceAllStringFunc(value, func(v string) string {
 			if validIBAN(v) {
-				stats.Redactions++
+				stats.redact("IBAN")
 				return "[REDACTED:IBAN]"
 			}
 			return v
 		})
 		value = ssnPattern.ReplaceAllStringFunc(value, func(v string) string {
 			if v[:3] != "000" && v[:3] != "666" && v[0] < '9' && v[4:6] != "00" && v[7:] != "0000" {
-				stats.Redactions++
+				stats.redact("US Social Security number")
 				return "[REDACTED:SSN]"
 			}
 			return v
 		})
 	}
 	if s.Policy.Emails {
-		value = emailPattern.ReplaceAllStringFunc(value, func(string) string { stats.Redactions++; return "[REDACTED:EMAIL]" })
+		value = emailPattern.ReplaceAllStringFunc(value, func(string) string { stats.redact("email address"); return "[REDACTED:EMAIL]" })
 	}
 	return value, nil
+}
+
+// urlTrailingPunctuation lists characters that end prose or Markdown around a
+// URL more often than they end the URL itself.
+const urlTrailingPunctuation = `.,:;!?'*\…`
+
+// urlFromMatch returns the URL at the start of a urlPattern match. The pattern
+// stops only at whitespace and a few delimiters, so a match can absorb sentence
+// punctuation, Markdown emphasis and escapes, an ellipsis, unmatched closing
+// brackets, or a link label's "](" followed by its destination. The URL ends at
+// the first "](" whose remainder hides none of this URL's credential query
+// parameters, or else at the end of the match; trailing punctuation is then
+// left out. Record scanning and the final output audit read URLs the same way,
+// so a sanitized URL placed next to generated Markdown is parsed exactly as it
+// was approved. Generated titles escape "]", so a "](" that ended a URL in the
+// record reaches the audit as "\](", and the backslash is trimmed as well.
+func urlFromMatch(raw string) string {
+	floor := strings.Index(raw, "://") + len("://")
+	for from := floor; ; {
+		i := strings.Index(raw[from:], "](")
+		if i < 0 {
+			break
+		}
+		if link := trimURLEnd(raw[:from+i], floor); !hidesCredentialKey(raw, link) {
+			return link
+		}
+		from += i + len("](")
+	}
+	if link := trimURLEnd(raw, floor); !hidesCredentialKey(raw, link) {
+		return link
+	}
+	return raw
+}
+
+func trimURLEnd(s string, floor int) string {
+	end := len(s)
+	for end > floor {
+		last, size := utf8.DecodeLastRuneInString(s[:end])
+		if !strings.ContainsRune(urlTrailingPunctuation, last) && !unmatchedCloser(s[:end], last) {
+			break
+		}
+		end -= size
+	}
+	return s[:end]
+}
+
+// unmatchedCloser reports whether s ends with a closing bracket that has no
+// opening partner inside s, as when a URL is wrapped in parentheses.
+func unmatchedCloser(s string, last rune) bool {
+	switch last {
+	case ')':
+		return strings.Count(s, ")") > strings.Count(s, "(")
+	case ']':
+		return strings.Count(s, "]") > strings.Count(s, "[")
+	case '}':
+		return strings.Count(s, "}") > strings.Count(s, "{")
+	}
+	return false
+}
+
+// hidesCredentialKey reports whether the whole match parses with a credential
+// query parameter that the shorter link lacks, meaning the cut text belongs to
+// the URL's query rather than to Markdown.
+func hidesCredentialKey(raw, link string) bool {
+	if link == raw {
+		return false
+	}
+	full, err := url.Parse(markdownUnescape(raw))
+	if err != nil {
+		return false
+	}
+	var kept url.Values
+	if short, err := url.Parse(markdownUnescape(link)); err == nil {
+		kept = short.Query()
+	}
+	for k := range full.Query() {
+		if credentialQueryKey(k) && !kept.Has(k) {
+			return true
+		}
+	}
+	return false
+}
+
+// scanURLs calls visit for each URL in text, in order, and replaces a URL with
+// visit's result when visit reports a change. Scanning resumes right after each
+// URL, so a URL that the pattern ran into (such as the destination of a
+// Markdown link whose label is also a URL) is visited separately. cut reports
+// that an ellipsis follows the URL, as when a long title was shortened.
+func scanURLs(text string, visit func(link string, cut bool) (string, bool)) (string, bool) {
+	var b strings.Builder
+	copied, changed := 0, false
+	for at := 0; at < len(text); {
+		loc := urlPattern.FindStringIndex(text[at:])
+		if loc == nil {
+			break
+		}
+		start := at + loc[0]
+		link := urlFromMatch(text[start : at+loc[1]])
+		if clean, ok := visit(link, strings.HasPrefix(text[start+len(link):], "…")); ok {
+			b.WriteString(text[copied:start])
+			b.WriteString(clean)
+			copied, changed = start+len(link), true
+		}
+		at = start + len(link)
+	}
+	if !changed {
+		return text, false
+	}
+	b.WriteString(text[copied:])
+	return b.String(), true
 }
 
 func credentialQueryKey(k string) bool {
 	return credentialField(k) || strings.EqualFold(k, "key") || strings.Contains(strings.ToLower(k), "signature")
 }
 
-// redactURL removes user information and credential query values. When cut is
-// set, the text ended right after this URL, so its final value may be a
-// truncated redaction marker.
-func redactURL(raw string, cut bool) (string, bool) {
-	u, err := url.Parse(raw)
+// redactURL removes user information and credential query values from one URL
+// and returns the finding kinds it applied. Values already set to REDACTED are
+// left alone, so redacting an approved URL again changes nothing. When cut is
+// set, an ellipsis ended the text right after the URL, so the final query value
+// may be a REDACTED marker shortened along with its title.
+func redactURL(link string, cut bool) (string, []string) {
+	plain := markdownUnescape(link)
+	u, err := url.Parse(plain)
 	if err != nil {
-		return raw, false
+		return link, nil
 	}
-	changed := false
+	var kinds []string
 	if u.User != nil {
 		u.User = nil
-		changed = true
+		kinds = append(kinds, "URL user information")
 	}
 	final := ""
-	if cut && !strings.Contains(raw, "#") {
+	if cut && !strings.Contains(plain, "#") {
 		pair := u.RawQuery[strings.LastIndexByte(u.RawQuery, '&')+1:]
 		key, _, _ := strings.Cut(pair, "=")
 		final, _ = url.QueryUnescape(key)
 	}
 	q := u.Query()
 	for k := range q {
-		if !credentialQueryKey(k) {
-			continue
-		}
-		if len(q[k]) == 1 && (q[k][0] == "REDACTED" || k == final && strings.HasPrefix("REDACTED", q[k][0])) {
+		if !credentialQueryKey(k) || len(q[k]) == 1 && (q[k][0] == "REDACTED" || k == final && strings.HasPrefix("REDACTED", q[k][0])) {
 			continue
 		}
 		q.Set(k, "REDACTED")
-		changed = true
+		if !slices.Contains(kinds, "URL credential parameter") {
+			kinds = append(kinds, "URL credential parameter")
+		}
 	}
-	if !changed {
-		return raw, false
+	if len(kinds) == 0 {
+		return link, nil
 	}
 	u.RawQuery = q.Encode()
-	return u.String(), true
+	return u.String(), kinds
 }
 
-// Generated documents put sanitized URLs inside Markdown syntax: link labels
-// end in "](", link destinations in ")", escapes add "\" and long titles end
-// in "…". A rendered URL stops at an unescaped "]" or the ellipsis, keeps a
-// bracketed IPv6 host, and includes escaped punctuation.
-var renderedURLPattern = regexp.MustCompile(`(?i)https?://(?:\[[^\]\s]*\])?(?:\\[!-/:-@\[-` + "`" + `{-~]|[^\s<>"` + "`" + `\]…])*`)
-
-// renderedURLRedactions counts URLs in generated output that still carry user
-// information or a credential value. Reading the renderer's syntax as part of
-// a value would reject an already-redacted URL and could hide the next URL.
-// Keys and values stay literal, as record sanitizing read them; only the
-// fragment delimiter that title escaping writes as "\#" is restored.
-func renderedURLRedactions(text string) int {
-	count := 0
-	for _, at := range renderedURLPattern.FindAllStringIndex(text, -1) {
-		raw := strings.ReplaceAll(trimURLSyntax(text[at[0]:at[1]]), `\#`, "#")
-		if _, changed := redactURL(raw, strings.HasPrefix(text[at[1]:], "…")); changed {
-			count++
-		}
+// markdownUnescape removes the backslash from Markdown escapes of ASCII
+// punctuation, such as the "\#" and "\_" in generated titles, so a URL is
+// parsed the way a reader sees it.
+func markdownUnescape(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
 	}
-	return count
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; c == '\\' && i+1 < len(s) && asciiPunctuation(s[i+1]) {
+			i++
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
-// trimURLSyntax drops trailing prose punctuation, a hard-break backslash and an
-// unmatched ")" such as the end of a Markdown link destination.
-func trimURLSyntax(raw string) string {
-	for raw != "" {
-		last := raw[len(raw)-1]
-		if strings.IndexByte(`.,:;!?*_~'\`, last) < 0 && (last != ')' || strings.Count(raw, ")") <= strings.Count(raw, "(")) {
-			break
-		}
-		raw = raw[:len(raw)-1]
-	}
-	return raw
+func asciiPunctuation(c byte) bool {
+	return c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~'
 }
 
 func (s *Scanner) remember(value string) {
@@ -636,7 +747,7 @@ func redactPaymentCards(value string, stats *ScanResult) string {
 		b.WriteString(value[last:match[0]])
 		b.WriteString("[REDACTED:PAYMENT_CARD]")
 		last = match[1]
-		stats.Redactions++
+		stats.redact("payment card number")
 	}
 	if last == 0 {
 		return value

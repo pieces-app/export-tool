@@ -20,9 +20,8 @@ type navigationEntry struct {
 }
 
 func navigationLabel(label string) string {
-	runes := []rune(label)
-	if len(runes) > 160 {
-		return string(runes[:160]) + "…"
+	if prefix, truncated := displayPrefix(label, 160); truncated {
+		return prefix + "…"
 	}
 	return label
 }
