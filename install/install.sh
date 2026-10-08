@@ -4,7 +4,8 @@
 #   curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh | bash
 #
 # Downloads the pieces-export tool, checks its SHA-256 before running it, and
-# exports your Pieces memories to Markdown in Documents/Pieces-Exports. The tool
+# exports your Pieces memories to Markdown in Documents/Pieces-Exports (or
+# ~/Pieces-Exports on a Mac whose Documents folder syncs with iCloud). The tool
 # is kept so an interrupted export can be resumed. Pieces Export is open source
 # under the MIT License: https://github.com/pieces-app/export-tool
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
@@ -32,10 +33,11 @@ usage() {
 Usage: install.sh [options] [-- pieces-export flags]
 
 Downloads the Pieces Export tool, checks its SHA-256, and exports your Pieces
-memories to Markdown in Documents/Pieces-Exports. The tool is kept afterward.
+memories to Markdown in Documents/Pieces-Exports, or in ~/Pieces-Exports on a
+Mac whose Documents folder syncs with iCloud. The tool is kept afterward.
 
 Options:
-  --output DIR     Export into DIR instead of Documents/Pieces-Exports/<date_time>
+  --output DIR     Export into DIR instead of Pieces-Exports/<date_time>
   --resume         Continue the most recent export that did not finish
   --dry-run        Scan and estimate the export time without writing anything
   --no-open        Don't open the export folder when it finishes
@@ -73,12 +75,25 @@ latest_session() {
   printf '%s\n' "$found"
 }
 
+# Succeeds when iCloud Drive syncs this Mac's Documents folder (System Settings,
+# iCloud Drive, Desktop & Documents Folders). Finder records the setting; iCloud
+# Drive links to the synced folder; uploads hard-link new files into
+# Documents/.tmp.driveupload. Any one of these is enough.
+icloud_documents() {
+  local drive="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+  case "$(plutil -extract FXICloudDriveDocuments raw -o - "$HOME/Library/Preferences/com.apple.finder.plist" 2>/dev/null || true)" in
+    true | 1) return 0 ;;
+  esac
+  [ -e "$drive/Documents" ] && [ "$drive/Documents" -ef "$1" ] && return 0
+  [ -d "$1/.tmp.driveupload" ]
+}
+
 # Keep EXIT handling in this function's subshell so its local state is still
 # available when an unchecked command (such as curl) fails under errexit.
 main() (
   local base_url='' version='' output='' cleanup='keep' install_only=false resume=false dry_run=false no_open=false
   local data_root='' tool_dir='' staging='' session='' owns_session=false verified=false started=false code=0
-  local os_name='' arch='' label='' archive='' expected='' actual='' entries='' executable='' docs='' dir='' entry=''
+  local os_name='' arch='' label='' archive='' expected='' actual='' entries='' executable='' docs='' exports='' dir='' entry=''
   local format_given=false format_value='' recovery_given=false sdk_cache=false dry_flag=false prev='' arg=''
   local -a cli_args=() run_args=()
   while [ "$#" -gt 0 ]; do
@@ -174,7 +189,14 @@ main() (
       dir="$(xdg-user-dir DOCUMENTS 2>/dev/null || true)"
       if [ -n "$dir" ] && [ "$dir" != "$HOME" ]; then docs="$dir"; fi
     fi
-    [ -n "$output" ] || output="$docs/Pieces-Exports/$(date '+%Y-%m-%d_%H-%M-%S')"
+    if [ -z "$output" ]; then
+      exports="$docs/Pieces-Exports"
+      if [ "$os_name" = darwin ] && icloud_documents "$docs"; then
+        exports="$HOME/Pieces-Exports"
+        printf 'Your Documents folder syncs with iCloud, so the export will be saved in your home folder instead.\nUse --output to choose another folder.\n\n'
+      fi
+      output="$exports/$(date '+%Y-%m-%d_%H-%M-%S')"
+    fi
     case "$output" in /*) ;; *) output="$PWD/$output" ;; esac
     if [ -e "$output" ] || [ -e "$output.partial" ]; then
       printf 'The export folder already exists: %s\nChoose a new --output folder.\n' "$output" >&2

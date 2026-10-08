@@ -1006,3 +1006,83 @@ exit [lindex $status 3]
 		}
 	})
 }
+
+// iCloudDocumentsSignals marks a fake home folder the way a Mac whose iCloud
+// Drive syncs Desktop & Documents looks to the installer.
+var iCloudDocumentsSignals = map[string]func(t *testing.T, home string){
+	"Finder setting": func(t *testing.T, home string) {
+		prefs := filepath.Join(home, "Library", "Preferences")
+		if err := os.MkdirAll(prefs, 0700); err != nil {
+			t.Fatal(err)
+		}
+		plist := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>FXICloudDriveDocuments</key><true/></dict></plist>
+`
+		if err := os.WriteFile(filepath.Join(prefs, "com.apple.finder.plist"), []byte(plist), 0600); err != nil {
+			t.Fatal(err)
+		}
+	},
+	"iCloud Drive link": func(t *testing.T, home string) {
+		drive := filepath.Join(home, "Library", "Mobile Documents", "com~apple~CloudDocs")
+		if err := os.MkdirAll(drive, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(home, "Documents"), filepath.Join(drive, "Documents")); err != nil {
+			t.Fatal(err)
+		}
+	},
+	"upload folder": func(t *testing.T, home string) {
+		if err := os.Mkdir(filepath.Join(home, "Documents", ".tmp.driveupload"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	},
+}
+
+// When iCloud Drive syncs Documents, the default export goes to the home
+// folder instead, so a large private export isn't uploaded while it's written.
+func TestICloudSyncedDocumentsMoveTheDefaultExportHome(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("iCloud Drive Desktop & Documents sync exists only on macOS")
+	}
+	for name, signal := range iCloudDocumentsSignals {
+		t.Run(name, func(t *testing.T) {
+			inst := bashInstaller(t)
+			h := newHarness(t, inst, fixtureBinary(t), "complete")
+			if err := os.MkdirAll(filepath.Join(h.home, "Documents"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			signal(t, h.home)
+			r := h.run(options{baseURL: true, defaultData: true})
+			if r.code != 0 {
+				t.Fatalf("exit %d\n%s", r.code, r.out)
+			}
+			exports, _ := filepath.Glob(filepath.Join(h.home, "Pieces-Exports", "*", "manifest.json"))
+			if len(exports) != 1 {
+				t.Fatalf("export not under ~/Pieces-Exports: %v\n%s", exports, r.out)
+			}
+			if synced, _ := filepath.Glob(filepath.Join(h.home, "Documents", "Pieces-Exports", "*")); len(synced) != 0 {
+				t.Fatalf("export was written to iCloud-synced Documents: %v", synced)
+			}
+			if !strings.Contains(r.out, "Your Documents folder syncs with iCloud") {
+				t.Fatalf("the installer did not explain the new location\n%s", r.out)
+			}
+		})
+	}
+	t.Run("explicit output", func(t *testing.T) {
+		inst := bashInstaller(t)
+		h := newHarness(t, inst, fixtureBinary(t), "complete")
+		if err := os.MkdirAll(filepath.Join(h.home, "Documents"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		iCloudDocumentsSignals["upload folder"](t, h.home)
+		chosen := filepath.Join(h.home, "Documents", "chosen export")
+		r := h.run(options{baseURL: true, defaultData: true, output: chosen})
+		if r.code != 0 {
+			t.Fatalf("exit %d\n%s", r.code, r.out)
+		}
+		if _, err := os.Stat(filepath.Join(chosen, "manifest.json")); err != nil {
+			t.Fatalf("an explicit --output was not respected\n%s", r.out)
+		}
+	})
+}
