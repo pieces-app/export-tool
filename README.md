@@ -2,7 +2,7 @@
 
 Save your Pieces memories as Markdown files you keep: your summaries, your persona and profile histories, and the links between them. The tool only reads your local Pieces data. Nothing in Pieces is changed or deleted.
 
-Pieces Export is open source under the [MIT License](LICENSE.txt). The current release is **0.18.0-rc4** (early access).
+Pieces Export is open source under the [MIT License](LICENSE.txt). The current release is **0.18.0-rc5** (early access).
 
 ## Quick start
 
@@ -149,16 +149,16 @@ Memory notes also have `created`, `updated` and `pieces_type` properties. The [O
 
 ## Manual download
 
-To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca):
+To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1PfF3hFLJKx_1RfBrjrI5YiLYN0S1KeP_):
 
 | Computer | Download |
 | --- | --- |
-| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/154vjYfVlimh6-LPtrnZa9JoXNLjI13lQ/view) |
-| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1vpT_S8O26AXpyaRJzEC1Vqfj9bD7JjHW/view) |
+| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/11TVkLyn-aMMpSa8Ifz_NVPn_WhMab6PF/view) |
+| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1XDCW3BY53E3I7FiMsVXbMZ_Dy7dUg1GF/view) |
 | Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1FUpqjfpXRfumjfECHJB3IMi2mD2zZ04Z/view) |
 | Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1b7I4WOu1yl6JFROX6KNMwn5Aie0cMS33/view) |
-| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1iDbKB8BmopqpwWxW3JvTQPXLEXr5anIv/view) |
-| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1f4XL0Omd-22Jkh8wtXPXnt9-dnw1r95u/view) |
+| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1fi-X3GE-2H1FF4WAkVtHM4G9yQBsYJZf/view) |
+| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1vcaR2nACGHPTZ4O7GliWraS8rEKUieBM/view) |
 
 Not sure which one you need? On a Mac, open the Apple menu and choose About This Mac. "Chip: Apple M..." means Apple silicon. On Windows, open Settings, then System, then About, and check System type. On Linux, run `uname -m`. `x86_64` means x86-64, and `aarch64` means ARM64.
 
@@ -168,7 +168,7 @@ Mac, in Terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc4_darwin_arm64_notarized.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc5_darwin_arm64_notarized.zip -d pieces-export-tool
 cd pieces-export-tool
 ./pieces-export version
 ./pieces-export export --dry-run --format markdown --launch-os=false
@@ -179,7 +179,7 @@ Windows, in PowerShell:
 
 ```powershell
 cd $HOME\Downloads
-Expand-Archive .\pieces-export_0.18.0-rc4_windows_amd64.zip -DestinationPath .\pieces-export-tool
+Expand-Archive .\pieces-export_0.18.0-rc5_windows_amd64.zip -DestinationPath .\pieces-export-tool
 cd .\pieces-export-tool
 .\pieces-export.exe version
 .\pieces-export.exe export --dry-run --format markdown --launch-os=false
@@ -190,7 +190,7 @@ Linux, in a terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc4_linux_amd64.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc5_linux_amd64.zip -d pieces-export-tool
 cd pieces-export-tool
 chmod u+x ./pieces-export
 ./pieces-export version
@@ -230,14 +230,15 @@ To report a problem, send the tool version, your operating system and chip, and 
 - **macOS:** export and recovery are tested on Apple silicon. The Intel build is tested under Rosetta.
 - **Linux:** the ARM64 build is tested natively and the x86-64 build under emulation.
 - **Windows:** builds are available, and native Windows testing is in progress.
-- **New in 0.18.0-rc4:** the final privacy scan no longer rejects correct exports over redacted links in titles, numbers next to underscores, shortened titles or vault note names, and when it does stop an export it names the file and the kind of finding. Dependencies with published vulnerability fixes are updated. All files are in the [rc4 Google Drive folder](https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca).
+- **New in 0.18.0-rc5:** fixes for two export failures. The final privacy scan's time limit now grows with the size of each file, so large notes no longer stop an export with "secret scan did not finish after one full retry", and when the scan does run out of time, the error names the file. A temporary database no longer sits beside the export, so exports saved in an iCloud-synced Documents folder no longer fail, and on a Mac where iCloud Drive syncs Documents the installer saves to `~/Pieces-Exports` instead. All files are in the [rc5 Google Drive folder](https://drive.google.com/drive/folders/1PfF3hFLJKx_1RfBrjrI5YiLYN0S1KeP_).
+- **New in 0.18.0-rc4:** the final privacy scan no longer rejects correct exports over redacted links in titles, numbers next to underscores, shortened titles or vault note names, and when it does stop an export it names the file and the kind of finding. Dependencies with published vulnerability fixes are updated. Its files remain in the [rc4 Google Drive folder](https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca).
 - **New in 0.18.0-rc3:** an Obsidian vault option (`--format obsidian`), a fix for the final privacy scan wrongly flagging redacted links as "content requiring review", and the MIT License in every download. Its files remain in the [rc3 Google Drive folder](https://drive.google.com/drive/folders/1lABvGdTeCue2AMRHSAS_cl4dQ9OYEiE4).
 
 ## For developers
 
 ### Obsidian vaults — working build 0.20.0-dev
 
-`export --format obsidian`, `rebuild --format obsidian`, and `pieces-export obsidian --source ./finished-export --output ./Pieces-Obsidian --yes` create a compact **`vault/` subfolder** alongside the complete archive. Open that child folder in Obsidian. It keeps summaries/profile histories, existing Pieces tags and named connections, with automatic backlinks, readable graph labels and four nearby-summary shortcuts. Bulk evidence stays in the parent. The first compact trial reduced indexing from 86,051 notes/1.8 million links to 30,455 notes/187,294 links and completed Obsidian's index. See [the guide and current acceptance](OBSIDIAN_EXPORT.md). Signals appear only when selected in the source. The signed and notarized 0.18.0-rc4 packages include it.
+`export --format obsidian`, `rebuild --format obsidian`, and `pieces-export obsidian --source ./finished-export --output ./Pieces-Obsidian --yes` create a compact **`vault/` subfolder** alongside the complete archive. Open that child folder in Obsidian. It keeps summaries/profile histories, existing Pieces tags and named connections, with automatic backlinks, readable graph labels and four nearby-summary shortcuts. Bulk evidence stays in the parent. The first compact trial reduced indexing from 86,051 notes/1.8 million links to 30,455 notes/187,294 links and completed Obsidian's index. See [the guide and current acceptance](OBSIDIAN_EXPORT.md). Signals appear only when selected in the source. The signed and notarized 0.18.0-rc5 packages include it.
 
 ### Run from this repository
 

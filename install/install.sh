@@ -11,8 +11,8 @@
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 
-PIECES_RELEASE_VERSION='0.18.0-rc4'
-PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1lc9PqI4HWdR9dfvs8OzRUM9y-eQW8gca'
+PIECES_RELEASE_VERSION='0.18.0-rc5'
+PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1PfF3hFLJKx_1RfBrjrI5YiLYN0S1KeP_'
 PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh'
 
 # The built-in release lives in a public Google Drive folder. Each file is
@@ -20,10 +20,10 @@ PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3
 # Prints "<drive id> <sha256> <file name>".
 pieces_release_file() {
   case "$1" in
-    darwin_arm64) echo '154vjYfVlimh6-LPtrnZa9JoXNLjI13lQ 1e1aeb0c1237f15ab43f2f3b45c00cb75ab24f5d6aeb83a187f145592f1de071 pieces-export_0.18.0-rc4_darwin_arm64_notarized.zip' ;;
-    darwin_amd64) echo '1vpT_S8O26AXpyaRJzEC1Vqfj9bD7JjHW ba283e82f58981d30ab21c3c87a482bc30db5084b02e9891700e1c3c6079016e pieces-export_0.18.0-rc4_darwin_amd64_notarized.zip' ;;
-    linux_amd64) echo '1iDbKB8BmopqpwWxW3JvTQPXLEXr5anIv 212b6861854e623c9b05f338c645033671fd2dd269ac18e182a3f19517ab8c0d pieces-export_0.18.0-rc4_linux_amd64.zip' ;;
-    linux_arm64) echo '1f4XL0Omd-22Jkh8wtXPXnt9-dnw1r95u bcd70663141da91f5edb61ca3f5531a7fc0c48c56eaf2e7d6672e57ac726c842 pieces-export_0.18.0-rc4_linux_arm64.zip' ;;
+    darwin_arm64) echo '11TVkLyn-aMMpSa8Ifz_NVPn_WhMab6PF d7c9cb0c85768551b35b9dd98a2e9ee86ccb1b74cc34bc26be53675082d84d21 pieces-export_0.18.0-rc5_darwin_arm64_notarized.zip' ;;
+    darwin_amd64) echo '1XDCW3BY53E3I7FiMsVXbMZ_Dy7dUg1GF 991de63b226a4b2cf16961db976bbeec943777bd2e22f295e325705513507e1c pieces-export_0.18.0-rc5_darwin_amd64_notarized.zip' ;;
+    linux_amd64) echo '1fi-X3GE-2H1FF4WAkVtHM4G9yQBsYJZf fd8de023e52a3bfa30b32d0c96a8a659103b0a23b75fbf7d9362f9b06bc7a339 pieces-export_0.18.0-rc5_linux_amd64.zip' ;;
+    linux_arm64) echo '1vcaR2nACGHPTZ4O7GliWraS8rEKUieBM 3b597c636ace51c8165c8be5061ab5dbbee611d9ed9269ade974eb9c860ec1e3 pieces-export_0.18.0-rc5_linux_arm64.zip' ;;
     *) return 1 ;;
   esac
 }
