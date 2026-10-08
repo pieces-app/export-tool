@@ -14,7 +14,10 @@ import (
 )
 
 const auditReadBytes = 1 << 20
-const auditOverlapBytes = 4096
+
+// Consecutive reads overlap like the scanner's own windows, so a secret up to
+// secretScanOverlapBytes long lies whole in one read.
+const auditOverlapBytes = secretScanOverlapBytes
 const auditJSONReadBytes = 32 << 10
 
 // One auditor belongs to one worker. Allocate I/O buffers lazily and reuse them
@@ -82,15 +85,25 @@ func (a *outputAuditor) file(path string) (result error) {
 		return err
 	}
 	relative, _ := filepath.Rel(r.stage, path)
+	nameScanned := false
 	defer func() {
 		var review *outputReviewError
 		if errors.As(result, &review) && review.path == "" {
 			review.path = r.reviewPath(relative)
 		}
+		if errors.Is(result, errSecretScanIncomplete) {
+			// A name that already passed the scan is safe to show as it is.
+			name := ""
+			if nameScanned {
+				name = filepath.ToSlash(relative)
+			}
+			result = &outputScanTimeoutError{path: name}
+		}
 	}()
 	if err := r.auditText(relative); err != nil {
 		return err
 	}
+	nameScanned = true
 	if filepath.Ext(path) == ".pdf" {
 		return r.auditPDF(path)
 	}
@@ -289,6 +302,19 @@ func (e *outputReviewError) Error() string {
 	b.WriteString("; partial directory was not finalized")
 	return b.String()
 }
+
+// outputScanTimeoutError names the output file whose scan did not finish.
+type outputScanTimeoutError struct{ path string }
+
+func (e *outputScanTimeoutError) Error() string {
+	message := errSecretScanIncomplete.Error()
+	if e.path != "" {
+		message += " in " + e.path
+	}
+	return message + "; partial directory was not finalized"
+}
+
+func (e *outputScanTimeoutError) Unwrap() error { return errSecretScanIncomplete }
 
 // reviewPath names an output file in an audit error. The name itself can be
 // the finding, so report the scanner's cleaned form, never the raw name.

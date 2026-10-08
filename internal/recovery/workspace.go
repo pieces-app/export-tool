@@ -25,7 +25,7 @@ import (
 var (
 	ErrBusy          = errors.New("recovery workspace is owned by another operation")
 	ErrInvalid       = errors.New("recovery workspace is invalid or incomplete")
-	ErrPermissions   = errors.New("recovery storage permissions or ownership are unsafe")
+	ErrPermissions   = errors.New("recovery storage permissions, ownership or hard links are unsafe; keep recovery folders out of synced folders such as iCloud Drive")
 	ErrKey           = errors.New("recovery key is missing, invalid, or does not match")
 	ErrCompatibility = errors.New("recovery configuration does not match this workspace")
 	ErrStorage       = errors.New("recovery storage operation failed")

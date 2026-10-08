@@ -76,6 +76,7 @@ func requireNoTransientAssociationStorage(t *testing.T, parent string) {
 
 func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
 	parent := t.TempDir()
+	t.Setenv("TMPDIR", parent)
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial")}
 	s := r.canonicalRecords().(*associationCanonicalRecords)
 	if err := s.ensure(r.ctx); err != nil {
@@ -108,6 +109,8 @@ func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
 }
 
 func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testing.T) {
+	transient := t.TempDir()
+	t.Setenv("TMPDIR", transient)
 	f := groupedJunctionFixture(123)
 	srv := junctionServer(t, f, nil)
 	client, _ := NewClient(srv.URL, time.Second, 8<<20)
@@ -120,7 +123,7 @@ func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testi
 	if err != nil || m.FormatVersion != 6 || m.ArchiveState.Version != 3 {
 		t.Fatal("grouped export failed", err)
 	}
-	requireNoTransientAssociationStorage(t, filepath.Dir(o.Output))
+	requireNoTransientAssociationStorage(t, transient)
 	family, _ := junctionFamilyByName("workstream_summary_to_annotation_associations")
 	files, err := os.ReadDir(filepath.Join(o.Output, "data", family.material().Folder))
 	if err != nil || len(files) != 3 {
@@ -171,7 +174,7 @@ func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testi
 		if err != nil || !reflect.DeepEqual(before, after) {
 			t.Fatal("grouped reconstruction changed counts, graph, bodies or decisions", err)
 		}
-		requireNoTransientAssociationStorage(t, filepath.Dir(out))
+		requireNoTransientAssociationStorage(t, transient)
 		moved := out + "-moved"
 		if err := os.Rename(out, moved); err != nil {
 			t.Fatal(err)
@@ -186,6 +189,7 @@ func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testi
 
 func TestGroupedAssociationBoundsAndEncryptedStagingCleanup(t *testing.T) {
 	parent := t.TempDir()
+	t.Setenv("TMPDIR", parent)
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial"), opts: Options{Mode: "preserve"}, meta: map[string]*Meta{}, local: newLocalMeasurements()}
 	if err := os.Mkdir(r.stage, 0700); err != nil {
 		t.Fatal(err)
@@ -275,6 +279,8 @@ func TestGroupedAssociationLegacyArchiveUpgrade(t *testing.T) {
 func TestGroupedAssociationArchiveRejectsConflictingEvidence(t *testing.T) {
 	for _, scenario := range []string{"missing-record-ref", "wrong-ref-shared-path", "wrong-row-offset", "duplicate-row", "truncated-row", "extra-empty-chunk", "symlink", "old-reader-version"} {
 		t.Run(scenario, func(t *testing.T) {
+			transient := t.TempDir()
+			t.Setenv("TMPDIR", transient)
 			f := groupedJunctionFixture(2)
 			srv := junctionServer(t, f, nil)
 			client, _ := NewClient(srv.URL, time.Second, 8<<20)
@@ -379,7 +385,7 @@ func TestGroupedAssociationArchiveRejectsConflictingEvidence(t *testing.T) {
 			if _, err := os.Stat(out); !os.IsNotExist(err) {
 				t.Fatal("invalid archive has final output")
 			}
-			requireNoTransientAssociationStorage(t, filepath.Dir(out))
+			requireNoTransientAssociationStorage(t, transient)
 		})
 	}
 }
@@ -387,6 +393,8 @@ func TestGroupedAssociationArchiveRejectsConflictingEvidence(t *testing.T) {
 func TestGroupedAssociationFailureNeverFinalizesOrRetainsPrivateStage(t *testing.T) {
 	for _, scenario := range []string{"canceled", "store-closed", "public-file-exists"} {
 		t.Run(scenario, func(t *testing.T) {
+			transient := t.TempDir()
+			t.Setenv("TMPDIR", transient)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			f := junctionFixture()
@@ -415,7 +423,7 @@ func TestGroupedAssociationFailureNeverFinalizesOrRetainsPrivateStage(t *testing
 			if _, err := os.Stat(o.Output); !errors.Is(err, fs.ErrNotExist) {
 				t.Fatal("failed export has a finalized destination")
 			}
-			requireNoTransientAssociationStorage(t, filepath.Dir(o.Output))
+			requireNoTransientAssociationStorage(t, transient)
 		})
 	}
 }

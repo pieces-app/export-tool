@@ -35,7 +35,11 @@ func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 	if s.transactions != nil {
 		return nil
 	}
-	parent, err := os.MkdirTemp(filepath.Dir(s.run.stage), ".pieces-export-stage-")
+	// The store's private files must keep a single link. Sync services such as
+	// iCloud Drive's Desktop & Documents hard-link the files in a synced folder
+	// while uploading them, so keep the store out of the output's folder. The
+	// system temporary folder isn't synced, and MkdirTemp makes this one private.
+	parent, err := os.MkdirTemp(os.TempDir(), ".pieces-export-stage-")
 	if err != nil {
 		return err
 	}

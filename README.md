@@ -42,7 +42,7 @@ curl -fsSL https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8c
 & ([scriptblock]::Create((irm https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1))) -Resume
 ```
 
-The finished export goes into a new folder in Documents/Pieces-Exports.
+The finished export goes into a new folder in Documents/Pieces-Exports. On a Mac whose Documents folder syncs with iCloud, it goes in Pieces-Exports in your home folder instead.
 
 ## Options
 
@@ -72,6 +72,8 @@ PDF and Obsidian exports can't be resumed after an interruption. Markdown export
 | Your export | `~/Documents/Pieces-Exports/<date_time>` | `Documents\Pieces-Exports\<date_time>` | `~/Documents/Pieces-Exports/<date_time>` |
 | The tool | `~/Library/Application Support/Pieces Export/tool/` | `%LOCALAPPDATA%\Pieces Export\tool\` | `~/.local/share/pieces-export/tool/` |
 | Resume data | `~/Library/Application Support/Pieces Export/recovery/` | `%LOCALAPPDATA%\Pieces Export\recovery\` | `~/.local/share/pieces-export/recovery/` |
+
+On a Mac where iCloud Drive syncs Desktop & Documents, the export goes to `~/Pieces-Exports/<date_time>` instead, so it stays on your Mac and isn't uploaded to iCloud. Use `--output` to choose another folder.
 
 The resume data is private and encrypted. It stays on your computer and isn't saved in Documents, so it isn't synced. It's deleted when an export finishes. The tool is kept so you can resume or run it again. To remove everything except your exports, delete the `Pieces Export` folder (Linux: `pieces-export`) shown above.
 

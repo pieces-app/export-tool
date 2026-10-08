@@ -17,13 +17,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/logging"
-	"github.com/zricethezav/gitleaks/v8/report"
 	"golang.org/x/net/idna"
 	"golang.org/x/net/publicsuffix"
 )
@@ -436,18 +434,7 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 			stats.deny()
 		}
 	}
-	fragment := detect.Fragment{Raw: key + "=" + value}
-	findings, retried, err := completeSecretScan(ctx, 10*time.Second, func(deadline context.Context, attempt int) []report.Finding {
-		detector := s.detector
-		if attempt > 0 {
-			// Never carry partial detector state into the complete retry.
-			detector = s.forkForAudit().detector
-		}
-		return detector.DetectContext(deadline, fragment)
-	})
-	if retried {
-		stats.TimeoutRetries++
-	}
+	findings, err := s.detectSecrets(ctx, key+"="+value, stats)
 	if err != nil {
 		return "", err
 	}
