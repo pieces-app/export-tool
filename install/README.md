@@ -72,7 +72,7 @@ PDF exports can't be resumed after an interruption. Markdown exports can.
 | The tool | `~/Library/Application Support/Pieces Export/tool/` | `%LOCALAPPDATA%\Pieces Export\tool\` | `~/.local/share/pieces-export/tool/` |
 | Resume data | `~/Library/Application Support/Pieces Export/recovery/` | `%LOCALAPPDATA%\Pieces Export\recovery\` | `~/.local/share/pieces-export/recovery/` |
 
-On a Mac where iCloud Drive syncs Desktop & Documents, the export goes to `~/Pieces-Exports/<date_time>` instead, so it stays on your Mac and isn't uploaded to iCloud. Use `--output` to choose another folder.
+When the installer detects that iCloud Drive syncs your Desktop & Documents folders, the export goes to `~/Pieces-Exports/<date_time>` instead, outside the synced folder. Use `--output` to choose another folder.
 
 The resume data is private and encrypted. It stays on your computer and isn't saved in Documents, so it isn't synced. It's deleted when an export finishes. The tool is kept so you can resume or run it again. To remove everything except your exports, delete the `Pieces Export` folder (Linux: `pieces-export`) shown above.
 

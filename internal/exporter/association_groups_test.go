@@ -76,7 +76,7 @@ func requireNoTransientAssociationStorage(t *testing.T, parent string) {
 
 func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
 	parent := t.TempDir()
-	t.Setenv("TMPDIR", parent)
+	useTempDir(t, parent)
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial")}
 	s := r.canonicalRecords().(*associationCanonicalRecords)
 	if err := s.ensure(r.ctx); err != nil {
@@ -110,7 +110,7 @@ func TestGroupedAssociationCleanupPreservesReplacementDirectory(t *testing.T) {
 
 func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testing.T) {
 	transient := t.TempDir()
-	t.Setenv("TMPDIR", transient)
+	useTempDir(t, transient)
 	f := groupedJunctionFixture(123)
 	srv := junctionServer(t, f, nil)
 	client, _ := NewClient(srv.URL, time.Second, 8<<20)
@@ -189,7 +189,7 @@ func TestGroupedAssociationsPreserveIdentitiesAcrossExportReplayRebuild(t *testi
 
 func TestGroupedAssociationBoundsAndEncryptedStagingCleanup(t *testing.T) {
 	parent := t.TempDir()
-	t.Setenv("TMPDIR", parent)
+	useTempDir(t, parent)
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial"), opts: Options{Mode: "preserve"}, meta: map[string]*Meta{}, local: newLocalMeasurements()}
 	if err := os.Mkdir(r.stage, 0700); err != nil {
 		t.Fatal(err)
@@ -280,7 +280,7 @@ func TestGroupedAssociationArchiveRejectsConflictingEvidence(t *testing.T) {
 	for _, scenario := range []string{"missing-record-ref", "wrong-ref-shared-path", "wrong-row-offset", "duplicate-row", "truncated-row", "extra-empty-chunk", "symlink", "old-reader-version"} {
 		t.Run(scenario, func(t *testing.T) {
 			transient := t.TempDir()
-			t.Setenv("TMPDIR", transient)
+			useTempDir(t, transient)
 			f := groupedJunctionFixture(2)
 			srv := junctionServer(t, f, nil)
 			client, _ := NewClient(srv.URL, time.Second, 8<<20)
@@ -394,7 +394,7 @@ func TestGroupedAssociationFailureNeverFinalizesOrRetainsPrivateStage(t *testing
 	for _, scenario := range []string{"canceled", "store-closed", "public-file-exists"} {
 		t.Run(scenario, func(t *testing.T) {
 			transient := t.TempDir()
-			t.Setenv("TMPDIR", transient)
+			useTempDir(t, transient)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			f := junctionFixture()

@@ -3,88 +3,54 @@ package exporter
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/report"
 )
 
-// secretScanBudget bounds one detector call. Tests lower it.
+// secretScanBudget is the time for scanning up to secretScanBudgetBytes, and
+// for each further secretScanBudgetBytes. Tests lower it.
 var secretScanBudget = 10 * time.Second
+
+const secretScanBudgetBytes = 64 << 10
 
 // errSecretScanIncomplete marks a scan that timed out twice. The final audit
 // adds the output file's name to it.
 var errSecretScanIncomplete = errors.New("secret scan did not finish after one full retry")
 
-// Gitleaks runs every rule whose keyword appears anywhere in a fragment over
-// that whole fragment, then rescans it in decoding passes, so one call's cost
-// grows with the fragment. A 1 MiB note that mentions many services took over
-// 10 s twice, failing the export. Scanning bounded windows keeps every call far
-// below the budget, and fewer rules run in each window.
-//
-// Windows overlap by more than any single secret the rules match, including
-// PEM and PGP private key blocks, so each secret lies whole in one window.
-// Cuts fall just after a line break near the limit, else after a space, so
-// rules see the same neighboring text as in the whole value.
-const secretScanWindowBytes = 64 << 10
-const secretScanOverlapBytes = 16 << 10
-const secretScanCutSearchBytes = 8 << 10
-
-func secretScanWindows(text string) [][2]int {
-	windows := [][2]int{}
-	for start := 0; ; {
-		end := start + secretScanWindowBytes
-		if end >= len(text) {
-			return append(windows, [2]int{start, len(text)})
-		}
-		end = cutAfter(text, end-secretScanCutSearchBytes, end)
-		windows = append(windows, [2]int{start, end})
-		// The next window starts between 24 and 16 KiB before this one ends.
-		start = cutAfter(text, end-secretScanOverlapBytes-secretScanCutSearchBytes, end-secretScanOverlapBytes)
-	}
+// detectFragment runs one detector call. Tests replace it to observe or stall
+// individual calls.
+var detectFragment = func(ctx context.Context, d *detect.Detector, f detect.Fragment) []report.Finding {
+	return d.DetectContext(ctx, f)
 }
 
-// cutAfter returns a cut in (lo, hi]: just after the last line break in
-// text[lo:hi], else after its last space or tab, else hi moved back to the
-// start of a UTF-8 character.
-func cutAfter(text string, lo, hi int) int {
-	if i := strings.LastIndexByte(text[lo:hi], '\n'); i >= 0 {
-		return lo + i + 1
-	}
-	if i := strings.LastIndexAny(text[lo:hi], " \t"); i >= 0 {
-		return lo + i + 1
-	}
-	for hi > lo && !utf8.RuneStart(text[hi]) {
-		hi--
-	}
-	return hi
+// scanBudget is the time allowed to scan n bytes. Gitleaks runs every rule
+// whose keyword appears anywhere in a fragment over that whole fragment, then
+// rescans it in decoding passes, so one call's time grows with its size. Real
+// 1 MiB notes took 3.6 to 19 s, and a fixed 10 s limit failed exports with
+// errSecretScanIncomplete. Scaling keeps a stalled scan bounded without
+// splitting the text, so detection is the same as one whole scan.
+func scanBudget(n int) time.Duration {
+	return secretScanBudget * time.Duration(1+n/secretScanBudgetBytes)
 }
 
-// detectSecrets runs the detector over each window of text. Every window gets
-// the full budget and one fresh retry, and any incomplete window fails closed.
+// detectSecrets scans text whole, with a budget that grows with its size and
+// one fresh retry.
 func (s *Scanner) detectSecrets(ctx context.Context, text string, stats *ScanResult) ([]report.Finding, error) {
-	var all []report.Finding
-	for _, w := range secretScanWindows(text) {
-		fragment := detect.Fragment{Raw: text[w[0]:w[1]]}
-		findings, retried, err := completeSecretScan(ctx, secretScanBudget, func(deadline context.Context, attempt int) []report.Finding {
-			detector := s.detector
-			if attempt > 0 {
-				// Never carry partial detector state into the complete retry.
-				detector = s.forkForAudit().detector
-			}
-			return detector.DetectContext(deadline, fragment)
-		})
-		if retried {
-			stats.TimeoutRetries++
+	fragment := detect.Fragment{Raw: text}
+	findings, retried, err := completeSecretScan(ctx, scanBudget(len(text)), func(deadline context.Context, attempt int) []report.Finding {
+		detector := s.detector
+		if attempt > 0 {
+			// Never carry partial detector state into the complete retry.
+			detector = s.forkForAudit().detector
 		}
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, findings...)
+		return detectFragment(deadline, detector, fragment)
+	})
+	if retried {
+		stats.TimeoutRetries++
 	}
-	return all, nil
+	return findings, err
 }
 
 // A suspend/resume or transient scheduling stall can expire a local scan's

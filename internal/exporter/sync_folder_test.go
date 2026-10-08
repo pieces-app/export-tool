@@ -11,19 +11,36 @@ import (
 	"time"
 )
 
+// useTempDir points os.TempDir at dir for one test: TMPDIR on Unix, and TMP
+// and TEMP, which Windows reads instead.
+func useTempDir(t *testing.T, dir string) {
+	t.Helper()
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, dir)
+	}
+	if os.TempDir() != dir {
+		t.Fatalf("temporary folder is %s, want %s", os.TempDir(), dir)
+	}
+}
+
 // simulateUploadHardLinks behaves like iCloud Drive uploading a synced folder
 // such as Desktop & Documents: it hard-links every new file under dir into
 // dir/.tmp.driveupload, giving each file a second link while the export runs.
-// The returned stop function reports how many files it linked.
-func simulateUploadHardLinks(t *testing.T, dir string) func() int {
+// The returned stop function reports how many files it linked and whether it
+// ever saw the temporary association store there.
+func simulateUploadHardLinks(t *testing.T, dir string) func() (int, bool) {
 	t.Helper()
 	upload := filepath.Join(dir, ".tmp.driveupload")
 	if err := os.Mkdir(upload, 0700); err != nil {
 		t.Fatal(err)
 	}
-	done, finished := make(chan struct{}), make(chan int)
+	type result struct {
+		linked   int
+		sawStore bool
+	}
+	done, finished := make(chan struct{}), make(chan result)
 	go func() {
-		seen, linked := map[string]bool{}, 0
+		seen, linked, sawStore := map[string]bool{}, 0, false
 		for {
 			_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
@@ -32,6 +49,7 @@ func simulateUploadHardLinks(t *testing.T, dir string) func() int {
 				if d.IsDir() && path == upload {
 					return filepath.SkipDir
 				}
+				sawStore = sawStore || strings.Contains(path, ".pieces-export-stage-")
 				if d.Type().IsRegular() && !seen[path] {
 					seen[path] = true
 					if os.Link(path, filepath.Join(upload, strconv.Itoa(linked))) == nil {
@@ -42,20 +60,24 @@ func simulateUploadHardLinks(t *testing.T, dir string) func() int {
 			})
 			select {
 			case <-done:
-				finished <- linked
+				finished <- result{linked, sawStore}
 				return
 			case <-time.After(time.Millisecond):
 			}
 		}
 	}()
-	return func() int { close(done); return <-finished }
+	return func() (int, bool) {
+		close(done)
+		r := <-finished
+		return r.linked, r.sawStore
+	}
 }
 
 // The temporary association store holds private files that must keep a single
 // link. It must not live beside the output, where a sync service links them.
 func TestTransientAssociationStorageIsOutsideTheOutputFolder(t *testing.T) {
-	parent := t.TempDir()
-	t.Setenv("TMPDIR", t.TempDir())
+	parent, transient := t.TempDir(), t.TempDir()
+	useTempDir(t, transient)
 	r := &run{ctx: context.Background(), stage: filepath.Join(parent, "archive.partial")}
 	s := r.canonicalRecords().(*associationCanonicalRecords)
 	if err := s.ensure(r.ctx); err != nil {
@@ -64,6 +86,9 @@ func TestTransientAssociationStorageIsOutsideTheOutputFolder(t *testing.T) {
 	defer r.cleanupCanonicalStage()
 	if rel, err := filepath.Rel(parent, s.parent); err == nil && !strings.HasPrefix(rel, "..") {
 		t.Fatalf("temporary association storage %s is inside the output's folder %s", s.parent, parent)
+	}
+	if rel, err := filepath.Rel(transient, s.parent); err != nil || strings.HasPrefix(rel, "..") {
+		t.Fatalf("temporary association storage %s is not in the temporary folder %s", s.parent, transient)
 	}
 }
 
@@ -76,15 +101,18 @@ func TestExportSurvivesSyncServiceHardLinksBesideTheOutput(t *testing.T) {
 	client, _ := NewClient(srv.URL, time.Second, 8<<20)
 	o := junctionExportOptions(t)
 	transient := t.TempDir()
-	t.Setenv("TMPDIR", transient)
+	useTempDir(t, transient)
 	stop := simulateUploadHardLinks(t, filepath.Dir(o.Output))
 	_, err := Export(context.Background(), client, o)
-	linked := stop()
+	linked, sawStore := stop()
 	if err != nil {
 		t.Fatalf("export failed while a sync service hard-linked files beside it: %v", err)
 	}
 	if linked == 0 {
 		t.Fatal("the simulated sync service linked no files")
+	}
+	if sawStore {
+		t.Fatal("the temporary association store appeared in the synced folder")
 	}
 	requireNoTransientAssociationStorage(t, transient)
 }

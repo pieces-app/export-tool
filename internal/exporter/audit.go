@@ -15,9 +15,9 @@ import (
 
 const auditReadBytes = 1 << 20
 
-// Consecutive reads overlap like the scanner's own windows, so a secret up to
-// secretScanOverlapBytes long lies whole in one read.
-const auditOverlapBytes = secretScanOverlapBytes
+// Consecutive reads overlap by 16 KiB, so a secret up to that long, such as
+// most PEM or PGP private key blocks, lies whole in one read.
+const auditOverlapBytes = 16 << 10
 const auditJSONReadBytes = 32 << 10
 
 // One auditor belongs to one worker. Allocate I/O buffers lazily and reuse them
@@ -92,10 +92,10 @@ func (a *outputAuditor) file(path string) (result error) {
 			review.path = r.reviewPath(relative)
 		}
 		if errors.Is(result, errSecretScanIncomplete) {
-			// A name that already passed the scan is safe to show as it is.
+			// A name that already passed the scan is safe to show exactly as scanned.
 			name := ""
 			if nameScanned {
-				name = filepath.ToSlash(relative)
+				name = relative
 			}
 			result = &outputScanTimeoutError{path: name}
 		}
