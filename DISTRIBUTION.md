@@ -1,6 +1,21 @@
 # Binary distribution and installation
 
-Updated 2026-10-07. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc4 and 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+Updated 2026-10-08. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc5, 0.18.0-rc4 and 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
+
+## Release candidate 0.18.0-rc5 — 2026-10-08
+
+Built with `go run ./cmd/release --version 0.18.0-rc5` from `main` at `c9f0d12` (PR #8), which fixes issues #6 and #7: the secret scan's deadline now grows with the scanned text (10 seconds plus 10 seconds per 64 KiB) instead of a flat 10 seconds, the final audit's reads overlap by 16 KiB and a timeout names the output file, the temporary association store lives in the system temporary folder instead of beside the output, and the Bash installer saves to `~/Pieces-Exports` when iCloud Drive syncs the Documents folder. Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` and notarized; receipts are in `dist/macos-notarized-0.18.0-rc5/receipts/`. Windows and Linux ZIPs are unsigned, as before. `go test ./...` and `go vet ./...` passed on the merged tree, all six targets were built by the release tool, and an offline rebuild of a real 197,790-record archive completed its final audit with this code. Native Windows and Linux runtime checks were not repeated.
+
+All six ZIPs, per-file `.sha256` files, `SHA256SUMS.txt` and a copy of `install/README.md` are in the public [0.18.0-rc5 Drive folder](https://drive.google.com/drive/folders/1PfF3hFLJKx_1RfBrjrI5YiLYN0S1KeP_) (anyone with the link can view).
+
+| File | Drive ID | SHA-256 |
+| --- | --- | --- |
+| `pieces-export_0.18.0-rc5_darwin_arm64_notarized.zip` | `11TVkLyn-aMMpSa8Ifz_NVPn_WhMab6PF` | `d7c9cb0c85768551b35b9dd98a2e9ee86ccb1b74cc34bc26be53675082d84d21` |
+| `pieces-export_0.18.0-rc5_darwin_amd64_notarized.zip` | `1XDCW3BY53E3I7FiMsVXbMZ_Dy7dUg1GF` | `991de63b226a4b2cf16961db976bbeec943777bd2e22f295e325705513507e1c` |
+| `pieces-export_0.18.0-rc5_linux_amd64.zip` | `1fi-X3GE-2H1FF4WAkVtHM4G9yQBsYJZf` | `fd8de023e52a3bfa30b32d0c96a8a659103b0a23b75fbf7d9362f9b06bc7a339` |
+| `pieces-export_0.18.0-rc5_linux_arm64.zip` | `1vcaR2nACGHPTZ4O7GliWraS8rEKUieBM` | `3b597c636ace51c8165c8be5061ab5dbbee611d9ed9269ade974eb9c860ec1e3` |
+| `pieces-export_0.18.0-rc5_windows_amd64.zip` | `1cFM1capTxtmk5fR4AFQrsZwYnfVNjgA3` | `a873a1e7190baf4ecf81ffff926f91e6469019a9849a1e0fd7ce228254067b2b` |
+| `pieces-export_0.18.0-rc5_windows_arm64.zip` | `1cSJ3LCk4ILrvc4lKxC83w_SmMhnu_mR-` | `857bff24c18b5fc7f52003e441563cc977997ed69d2ef402082d13796482e6f1` |
 
 ## Release candidate 0.18.0-rc4 — 2026-10-07
 
@@ -80,7 +95,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-1. With no options, both scripts install the built-in `0.18.0-rc4` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+1. With no options, both scripts install the built-in `0.18.0-rc5` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
 3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
 4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`. On a Mac whose iCloud Drive syncs Desktop & Documents, the default is `~/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>` instead, and the installer says so.
