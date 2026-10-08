@@ -155,8 +155,8 @@ To skip the script, download the ZIP for your computer from the [Google Drive fo
 | --- | --- |
 | Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/11TVkLyn-aMMpSa8Ifz_NVPn_WhMab6PF/view) |
 | Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1XDCW3BY53E3I7FiMsVXbMZ_Dy7dUg1GF/view) |
-| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1FUpqjfpXRfumjfECHJB3IMi2mD2zZ04Z/view) |
-| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1b7I4WOu1yl6JFROX6KNMwn5Aie0cMS33/view) |
+| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1cFM1capTxtmk5fR4AFQrsZwYnfVNjgA3/view) |
+| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1cSJ3LCk4ILrvc4lKxC83w_SmMhnu_mR-/view) |
 | Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1fi-X3GE-2H1FF4WAkVtHM4G9yQBsYJZf/view) |
 | Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1vcaR2nACGHPTZ4O7GliWraS8rEKUieBM/view) |
 
