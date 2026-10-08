@@ -20,7 +20,7 @@ const secretScanBudgetBytes = 64 << 10
 var errSecretScanIncomplete = errors.New("secret scan did not finish after one full retry")
 
 // detectFragment runs one detector call. Tests replace it to observe or stall
-// individual calls.
+// individual calls; tests that replace it must not run in parallel.
 var detectFragment = func(ctx context.Context, d *detect.Detector, f detect.Fragment) []report.Finding {
 	return d.DetectContext(ctx, f)
 }

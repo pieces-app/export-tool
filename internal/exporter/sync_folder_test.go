@@ -26,21 +26,23 @@ func useTempDir(t *testing.T, dir string) {
 // simulateUploadHardLinks behaves like iCloud Drive uploading a synced folder
 // such as Desktop & Documents: it hard-links every new file under dir into
 // dir/.tmp.driveupload, giving each file a second link while the export runs.
-// The returned stop function reports how many files it linked and whether it
-// ever saw the temporary association store there.
-func simulateUploadHardLinks(t *testing.T, dir string) func() (int, bool) {
+// It also watches temp, so a test can tell that it ran while the temporary
+// association store existed. The returned stop function reports how many
+// files it linked and whether it saw the store in dir and in temp.
+func simulateUploadHardLinks(t *testing.T, dir, temp string) func() (int, bool, bool) {
 	t.Helper()
 	upload := filepath.Join(dir, ".tmp.driveupload")
 	if err := os.Mkdir(upload, 0700); err != nil {
 		t.Fatal(err)
 	}
 	type result struct {
-		linked   int
-		sawStore bool
+		linked       int
+		sawStore     bool
+		sawStoreTemp bool
 	}
 	done, finished := make(chan struct{}), make(chan result)
 	go func() {
-		seen, linked, sawStore := map[string]bool{}, 0, false
+		seen, linked, sawStore, sawStoreTemp := map[string]bool{}, 0, false, false
 		for {
 			_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
@@ -58,18 +60,23 @@ func simulateUploadHardLinks(t *testing.T, dir string) func() (int, bool) {
 				}
 				return nil
 			})
+			if entries, err := os.ReadDir(temp); err == nil {
+				for _, entry := range entries {
+					sawStoreTemp = sawStoreTemp || strings.HasPrefix(entry.Name(), ".pieces-export-stage-")
+				}
+			}
 			select {
 			case <-done:
-				finished <- result{linked, sawStore}
+				finished <- result{linked, sawStore, sawStoreTemp}
 				return
 			case <-time.After(time.Millisecond):
 			}
 		}
 	}()
-	return func() (int, bool) {
+	return func() (int, bool, bool) {
 		close(done)
 		r := <-finished
-		return r.linked, r.sawStore
+		return r.linked, r.sawStore, r.sawStoreTemp
 	}
 }
 
@@ -102,14 +109,19 @@ func TestExportSurvivesSyncServiceHardLinksBesideTheOutput(t *testing.T) {
 	o := junctionExportOptions(t)
 	transient := t.TempDir()
 	useTempDir(t, transient)
-	stop := simulateUploadHardLinks(t, filepath.Dir(o.Output))
+	stop := simulateUploadHardLinks(t, filepath.Dir(o.Output), transient)
 	_, err := Export(context.Background(), client, o)
-	linked, sawStore := stop()
+	linked, sawStore, sawStoreTemp := stop()
 	if err != nil {
 		t.Fatalf("export failed while a sync service hard-linked files beside it: %v", err)
 	}
 	if linked == 0 {
 		t.Fatal("the simulated sync service linked no files")
+	}
+	// The watcher saw the store while it existed, so it would have seen it in the
+	// synced folder too had it been created there.
+	if !sawStoreTemp {
+		t.Fatal("the watcher never saw the temporary association store; the check proved nothing")
 	}
 	if sawStore {
 		t.Fatal("the temporary association store appeared in the synced folder")
