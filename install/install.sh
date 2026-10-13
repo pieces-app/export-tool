@@ -11,8 +11,8 @@
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 
-PIECES_RELEASE_VERSION='0.18.0-rc6'
-PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg'
+PIECES_RELEASE_VERSION='0.18.0-rc7'
+PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1dUTJ8MLg0F-ZwN8bOOQTbn_z7YSX5Ko-'
 PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh'
 
 # The built-in release lives in a public Google Drive folder. Each file is
@@ -20,10 +20,10 @@ PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3
 # Prints "<drive id> <sha256> <file name>".
 pieces_release_file() {
   case "$1" in
-    darwin_arm64) echo '1L4nPG40NuW75nSZ0Vac8MzsXjNu5esPN fe7d8a87320c52deaead3e17e06c75fd1230b72721d02294873e6f6902c83f7e pieces-export_0.18.0-rc6_darwin_arm64_notarized.zip' ;;
-    darwin_amd64) echo '1l0pscYFtcdpGnbO6BYi-hwF2Y2udmpAI 5507ab9444e0a9704e7401b4f6445b5f3db5c2ae11f5da1f2bf1376f6033a02c pieces-export_0.18.0-rc6_darwin_amd64_notarized.zip' ;;
-    linux_amd64) echo '1xqAI4gqBR39j6dOIaEYMy6r8Rzk4h8HL 37b4ad80573c88f8a39f45544175e38d4b57ec38ba3a184805c31e30e109b819 pieces-export_0.18.0-rc6_linux_amd64.zip' ;;
-    linux_arm64) echo '1dans8QR1VKw-p-rdhWM1_BsEBnexvOs0 78ff2e2843946b39bbd1b4eee1ac9ee3766c687f1030999641114238de5eaab6 pieces-export_0.18.0-rc6_linux_arm64.zip' ;;
+    darwin_arm64) echo '18y6AaDAYjCy97BObBg9ecVOeML_k3hyI 2c9370150cc13b9c0fd6da588456d8a0d623a29e2d93847acf9d2d121e6e8479 pieces-export_0.18.0-rc7_darwin_arm64_notarized.zip' ;;
+    darwin_amd64) echo '1qNwO5Mcgl-Iys1xwfyhB8QycBPJMrzZb c10de02c9eaa6b3e0aaded51d8ae8a357a502a445753386bf27492ccd07ef250 pieces-export_0.18.0-rc7_darwin_amd64_notarized.zip' ;;
+    linux_amd64) echo '1NRf2Opa48qOopvEza1ORVmHa_DoCvdZf 8ed44fa0edb4323176f8096e1567c1398a3912c7f20776199e1afd7db57bb2de pieces-export_0.18.0-rc7_linux_amd64.zip' ;;
+    linux_arm64) echo '1b2erlQoI-jZ6FxpY-5YgPmlO1rjrqmwx b583c8f5e701f7e57d0f1400769ea26241d5d79ffbc79e5324a7bab9b7991702 pieces-export_0.18.0-rc7_linux_arm64.zip' ;;
     *) return 1 ;;
   esac
 }

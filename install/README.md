@@ -2,7 +2,7 @@
 
 Save your Pieces memories as Markdown files you keep: your summaries, your persona and profile histories, and the links between them. The tool only reads your local Pieces data. Nothing in Pieces is changed or deleted.
 
-Version **0.18.0-rc6** (early access). Pieces Export is open source under the MIT License; the source code is at [github.com/pieces-app/export-tool](https://github.com/pieces-app/export-tool).
+Version **0.18.0-rc7** (early access). Pieces Export is open source under the MIT License; the source code is at [github.com/pieces-app/export-tool](https://github.com/pieces-app/export-tool).
 
 ## Quick start
 
@@ -81,9 +81,9 @@ The resume data is private and encrypted. It stays on your computer and isn't sa
 
 The export is plain Markdown, so you can open the folder in Obsidian as it is. For a large library, a compact vault browses better. The tool you installed can build one from a finished export:
 
-- **Mac:** `"$HOME/Library/Application Support/Pieces Export/tool/0.18.0-rc6/pieces-export" obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
-- **Windows:** `& "$env:LOCALAPPDATA\Pieces Export\tool\0.18.0-rc6\pieces-export.exe" obsidian --source <your export folder> --output "$HOME\Pieces-Obsidian" --yes`
-- **Linux:** `~/.local/share/pieces-export/tool/0.18.0-rc6/pieces-export obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
+- **Mac:** `"$HOME/Library/Application Support/Pieces Export/tool/0.18.0-rc7/pieces-export" obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
+- **Windows:** `& "$env:LOCALAPPDATA\Pieces Export\tool\0.18.0-rc7\pieces-export.exe" obsidian --source <your export folder> --output "$HOME\Pieces-Obsidian" --yes`
+- **Linux:** `~/.local/share/pieces-export/tool/0.18.0-rc7/pieces-export obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
 
 Replace `<your export folder>` with the folder the installer opened when it finished. Then, in Obsidian, choose **Open folder as vault** and pick the `vault` folder inside `Pieces-Obsidian`. Start with `Start Here.md`. Keep the original export as your complete archive; the vault links back to it.
 
@@ -91,16 +91,16 @@ To get a vault straight from the export, add `-- --format obsidian` on Mac or Li
 
 ## Manual download
 
-To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg):
+To skip the script, download the ZIP for your computer from the [Google Drive folder](https://drive.google.com/drive/folders/1dUTJ8MLg0F-ZwN8bOOQTbn_z7YSX5Ko-):
 
 | Computer | Download |
 | --- | --- |
-| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/1L4nPG40NuW75nSZ0Vac8MzsXjNu5esPN/view) |
-| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1l0pscYFtcdpGnbO6BYi-hwF2Y2udmpAI/view) |
-| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1kyPy47nU1aX7M63QPBtGiKG0BX4Sbyfd/view) |
-| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1H8KwPyzbdU4GVNdV30_BUfdurGy8hYdE/view) |
-| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1xqAI4gqBR39j6dOIaEYMy6r8Rzk4h8HL/view) |
-| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1dans8QR1VKw-p-rdhWM1_BsEBnexvOs0/view) |
+| Mac with Apple silicon (M1 or newer) | [macOS ARM64](https://drive.google.com/file/d/18y6AaDAYjCy97BObBg9ecVOeML_k3hyI/view) |
+| Mac with an Intel processor | [macOS x86-64](https://drive.google.com/file/d/1qNwO5Mcgl-Iys1xwfyhB8QycBPJMrzZb/view) |
+| Windows, Intel or AMD | [Windows x86-64](https://drive.google.com/file/d/1DT_-CVnALXiysOwjeOrThdRXaWx2Z8f7/view) |
+| Windows on ARM | [Windows ARM64](https://drive.google.com/file/d/1wNxKa0pk25OlebiobqYdWZB3DqTTQ-Qd/view) |
+| Linux, Intel or AMD | [Linux x86-64](https://drive.google.com/file/d/1NRf2Opa48qOopvEza1ORVmHa_DoCvdZf/view) |
+| Linux on ARM | [Linux ARM64](https://drive.google.com/file/d/1b2erlQoI-jZ6FxpY-5YgPmlO1rjrqmwx/view) |
 
 Not sure which one you need? On a Mac, open the Apple menu and choose About This Mac. "Chip: Apple M..." means Apple silicon. On Windows, open Settings, then System, then About, and check System type. On Linux, run `uname -m`. `x86_64` means x86-64, and `aarch64` means ARM64.
 
@@ -110,7 +110,7 @@ Mac, in Terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc6_darwin_arm64_notarized.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc7_darwin_arm64_notarized.zip -d pieces-export-tool
 cd pieces-export-tool
 ./pieces-export version
 ./pieces-export export --dry-run --format markdown --launch-os=false
@@ -121,7 +121,7 @@ Windows, in PowerShell:
 
 ```powershell
 cd $HOME\Downloads
-Expand-Archive .\pieces-export_0.18.0-rc6_windows_amd64.zip -DestinationPath .\pieces-export-tool
+Expand-Archive .\pieces-export_0.18.0-rc7_windows_amd64.zip -DestinationPath .\pieces-export-tool
 cd .\pieces-export-tool
 .\pieces-export.exe version
 .\pieces-export.exe export --dry-run --format markdown --launch-os=false
@@ -132,7 +132,7 @@ Linux, in a terminal:
 
 ```sh
 cd ~/Downloads
-unzip pieces-export_0.18.0-rc6_linux_amd64.zip -d pieces-export-tool
+unzip pieces-export_0.18.0-rc7_linux_amd64.zip -d pieces-export-tool
 cd pieces-export-tool
 chmod u+x ./pieces-export
 ./pieces-export version

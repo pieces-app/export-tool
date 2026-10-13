@@ -2,6 +2,25 @@
 
 Updated 2026-10-08. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc5, 0.18.0-rc4 and 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
 
+## Release candidate 0.18.0-rc7 — 2026-10-13
+
+Built with `go run ./cmd/release --version 0.18.0-rc7` from `main` at `e416676` (PRs #15, #16 and #17). Changes beyond rc6: `export --scope all --exclude TYPE,TYPE` skips named collections so a long-running install can leave out ACTIVITIES (issue #12); the overload stop says when a smaller `--batch-size` cannot help and suggests restarting Pieces OS and excluding the slow collection; the installers report a failed dry run instead of "finished"; the user guides explain how to build an Obsidian vault from a finished export (issue #11); the new recovery tests are Windows-portable.
+
+Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` (hardened runtime, secure timestamp, identifier `app.pieces.export-tool`) and notarized. Apple accepted arm64 submission `e14f1d7f-7ba4-4f22-aa6a-c3c045bd649e` and amd64 submission `adac0b14-c7de-4329-a6c4-79220763db14` as Ready for distribution with no issues; each ticket's cdhash matches its executable, and extracted copies of both final ZIPs pass `codesign --verify --strict --check-notarization -R=notarized`. Windows and Linux ZIPs are unsigned, as before.
+
+Verification: the full `go test ./...` suite, `go vet`, and Windows amd64/arm64 cross-compiles passed on macOS at e416676; packaged installer and CLI acceptance passed with the rc7 Mac binary. Native Windows: rc6, which shares the recovery-store fix, completed a volunteer's export on Windows 11 x64; rc7 itself was not run on Windows at publication time.
+
+All six ZIPs, per-file `.sha256` files and `SHA256SUMS.txt` are in the public [0.18.0-rc7 Drive folder](https://drive.google.com/drive/folders/1dUTJ8MLg0F-ZwN8bOOQTbn_z7YSX5Ko-) (anyone with the link can view).
+
+| File | Drive ID | SHA-256 |
+| --- | --- | --- |
+| `pieces-export_0.18.0-rc7_darwin_arm64_notarized.zip` | `18y6AaDAYjCy97BObBg9ecVOeML_k3hyI` | `2c9370150cc13b9c0fd6da588456d8a0d623a29e2d93847acf9d2d121e6e8479` |
+| `pieces-export_0.18.0-rc7_darwin_amd64_notarized.zip` | `1qNwO5Mcgl-Iys1xwfyhB8QycBPJMrzZb` | `c10de02c9eaa6b3e0aaded51d8ae8a357a502a445753386bf27492ccd07ef250` |
+| `pieces-export_0.18.0-rc7_linux_amd64.zip` | `1NRf2Opa48qOopvEza1ORVmHa_DoCvdZf` | `8ed44fa0edb4323176f8096e1567c1398a3912c7f20776199e1afd7db57bb2de` |
+| `pieces-export_0.18.0-rc7_linux_arm64.zip` | `1b2erlQoI-jZ6FxpY-5YgPmlO1rjrqmwx` | `b583c8f5e701f7e57d0f1400769ea26241d5d79ffbc79e5324a7bab9b7991702` |
+| `pieces-export_0.18.0-rc7_windows_amd64.zip` | `1DT_-CVnALXiysOwjeOrThdRXaWx2Z8f7` | `5b45ef43a94f4e5a0275b245590755bd2a1d3690cfa09dade57c1cc7c040e0c2` |
+| `pieces-export_0.18.0-rc7_windows_arm64.zip` | `1wNxKa0pk25OlebiobqYdWZB3DqTTQ-Qd` | `ba3653da35630cd8f6283fa72483adcccf1a9ae8464e6f9c0b20f67b448289f7` |
+
 ## Release candidate 0.18.0-rc6 — 2026-10-13
 
 Built with `go run ./cmd/release --version 0.18.0-rc6` from `main` at `f484446` (PR #13, fix for issue #10). Changes beyond rc5: the recovery store's SQLite URI puts the drive letter in the path (`file:///C:/...`), which makes the recovery workspace, the transient association store and `resume` work on Windows for the first time; recovery failures now name the failing operation and operating-system error without paths; a failed association store is reported as such with a pointer to `--associations off`; the bundled README gained a troubleshooting row for those messages.
@@ -114,7 +133,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-1. With no options, both scripts install the built-in `0.18.0-rc6` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+1. With no options, both scripts install the built-in `0.18.0-rc7` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
 3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
 4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`. On a Mac whose iCloud Drive syncs Desktop & Documents, the default is `~/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>` instead, and the installer says so.
