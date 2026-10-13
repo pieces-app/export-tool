@@ -8,7 +8,7 @@ Built with `go run ./cmd/release --version 0.18.0-rc6` from `main` at `f484446` 
 
 Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` (hardened runtime, secure timestamp, identifier `app.pieces.export-tool`) and notarized. Apple accepted arm64 submission `11ff5cbd-4e1b-4ff3-85bb-6b14d5305ee4` and amd64 submission `d1a1e333-9b0e-478a-a468-badf8dad80db` as Ready for distribution with no issues; each ticket's cdhash matches its executable, and extracted copies of both final ZIPs pass `codesign --verify --strict --check-notarization -R=notarized`. Windows and Linux ZIPs are unsigned, as before.
 
-Verification: the full `go test ./...` suite, `go vet`, and Windows amd64/arm64 cross-compiles passed on macOS; the SQLite URI fix is proven by SQLite's own parser on macOS (the old form fails with "invalid uri authority: C:"); native Windows execution of rc6 was pending a volunteer tester at publication time (see issue #10).
+Verification: the full `go test ./...` suite, `go vet`, and Windows amd64/arm64 cross-compiles passed on macOS; the SQLite URI fix is proven by SQLite's own parser on macOS (the old form fails with "invalid uri authority: C:"); a volunteer's rc6 export on Windows 11 x64 (normal PowerShell window, installer defaults: recovery workspace and association metadata on) completed on 2026-10-13 in 1m35s with partial status, 7,676 fetched and 15,868 file writes, which is the first native Windows run to finalize an archive (issue #10, closed).
 
 All six ZIPs, per-file `.sha256` files and `SHA256SUMS.txt` are in the public [0.18.0-rc6 Drive folder](https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg) (anyone with the link can view).
 
