@@ -2,11 +2,14 @@ package recovery
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
 )
+
+func errnoText(e syscall.Errno) string { return fmt.Sprintf("(errno %d)", uintptr(e)) }
 
 // A hidden cause cost a week on Windows (issue #10). Failures must name the
 // underlying operating-system error while never leaking a filesystem path.
@@ -18,10 +21,12 @@ func TestFailureMessagesNameTheCauseWithoutPaths(t *testing.T) {
 		want  []string
 		avoid []string
 	}{
-		{"path error", &os.PathError{Op: "open", Path: secret + "/state.sqlite", Err: syscall.EACCES}, []string{"open", "permission denied"}, []string{secret, "state.sqlite"}},
-		{"link error", &os.LinkError{Op: "rename", Old: secret + "/a", New: secret + "/b", Err: syscall.EEXIST}, []string{"rename", "file exists"}, []string{secret}},
-		{"syscall error", os.NewSyscallError("LockFileEx", syscall.Errno(33)), []string{"LockFileEx", "33"}, nil},
-		{"errno", syscall.ENOSPC, []string{"no space left on device"}, nil},
+		// Errno text comes from the operating system, so expect the OS's own
+		// wording plus the number rather than Unix strings.
+		{"path error", &os.PathError{Op: "open", Path: secret + "/state.sqlite", Err: syscall.EACCES}, []string{"open", syscall.EACCES.Error(), errnoText(syscall.EACCES)}, []string{secret, "state.sqlite"}},
+		{"link error", &os.LinkError{Op: "rename", Old: secret + "/a", New: secret + "/b", Err: syscall.EEXIST}, []string{"rename", syscall.EEXIST.Error(), errnoText(syscall.EEXIST)}, []string{secret}},
+		{"syscall error", os.NewSyscallError("LockFileEx", syscall.Errno(33)), []string{"LockFileEx", errnoText(syscall.Errno(33))}, nil},
+		{"errno", syscall.ENOSPC, []string{syscall.ENOSPC.Error(), errnoText(syscall.ENOSPC)}, nil},
 		{"driver message without a path", errors.New("SQL logic error: invalid uri authority: C: (1)"), []string{"invalid uri authority: C:"}, nil},
 		{"message containing a path", errors.New("cannot read " + secret + "/keys"), []string{"*errors.errorString"}, []string{secret, "keys"}},
 		{"message containing a drive path", errors.New(`stat C:\Users\someone\AppData: denied`), []string{"*errors.errorString"}, []string{"someone", `C:\`}},

@@ -511,7 +511,10 @@ func TestAssociationStageFailureIsReported(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("TMPDIR", blocker)
+	// os.TempDir reads TMPDIR on Unix and TMP/TEMP on Windows.
+	for _, name := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(name, blocker)
+	}
 	srv, _, policy, _ := associationFixture(t)
 	defer srv.Close()
 	client, _ := NewClient(srv.URL, time.Second, 8<<20)
