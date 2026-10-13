@@ -156,6 +156,7 @@ Website allow/deny rules can be configured in that policy. Adult/banking categor
 | Desktop closure fails | Close Pieces Desktop manually and retry with `--close-desktop=false`. Leave Pieces OS running. |
 | Output/workspace already exists | Use new paths for a new export; use `resume` with the existing workspace and keys to recover. Do not repeatedly restart into the same paths. |
 | Permission, locking or disk-space error | Keep the partial folder and keys. Use a writable private local disk with sufficient free space; do not run as root to work around it. |
+| `Pieces OS is too slow or unavailable; stopped requesting data` | The tool backs off and stops so Pieces OS can recover. If the message says the batch size was already at its minimum, a smaller `--batch-size` will not help: quit and reopen Pieces OS, let it settle, then skip the slow collection with `--scope all --exclude ACTIVITIES` (the largest collection on long-running installs). Otherwise retry later with a smaller `--batch-size`. |
 | `recovery storage operation failed: ...` or `the temporary association store could not be prepared: ...` | The text after the colon names the operation and the operating-system error, without any path. Include it in a report. Releases before 0.18.0-rc6 failed this way on every Windows machine because of a database-path bug; update to the current release. |
 | Exit 2 or missing body/person | Read `coverage.md` and `manifest.json`. Some OS versions omit fields or records; the tool cannot recreate unavailable source data. |
 | Markdown links do not open | Keep the whole folder together and use a Markdown viewer that supports relative local links. Finder/Explorer alone may display Markdown as plain text. |
@@ -169,6 +170,8 @@ To report a problem, start with the tool's `version`, OS version/CPU, process ex
 ./pieces-export doctor
 ./pieces-export export --dry-run --format markdown --launch-os=false
 ./pieces-export export --help
+# Everything except one collection that overwhelms a large library:
+./pieces-export export --scope all --exclude ACTIVITIES --format markdown --output ./everything
 ```
 
 Use `--environment production` or `--environment staging` when both are installed. `--base-url http://127.0.0.1:39300` selects a particular running instance. `--os-path` can specify an installed OS executable or macOS application bundle.

@@ -163,3 +163,53 @@ func TestBenchmarkIsBoundedAndDoesNotLogRecordBodies(t *testing.T) {
 		t.Fatal("sample body was logged")
 	}
 }
+
+// When the circuit opens, the advice must match the state: if the batch size
+// is already at its minimum, "retry with a smaller batch ceiling" is useless
+// and the user should exclude the slow collection instead (issue #12).
+func TestOverloadStopAdviceMatchesBatchState(t *testing.T) {
+	setup := func(t *testing.T) *Client {
+		t.Helper()
+		c := &Client{}
+		if err := c.ConfigurePerformance("adaptive", 50, 500*time.Millisecond, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	observe := func(c *Client, d time.Duration, status, n int) {
+		c.pacer.flight <- struct{}{}
+		c.pacer.after("k", d, 100, status, false, n)
+	}
+	t.Run("minimum batch", func(t *testing.T) {
+		c := setup(t)
+		for i := 0; i < 3; i++ { // 5 -> 2 -> 1 -> 1, then the circuit opens
+			observe(c, time.Millisecond, 429, 1)
+		}
+		err := c.pacer.before(context.Background())
+		if !errors.Is(err, ErrOSBusy) {
+			t.Fatal("open circuit accepted work")
+		}
+		if msg := err.Error(); !strings.Contains(msg, "already at its minimum") || strings.Contains(msg, "smaller batch ceiling") || !strings.Contains(msg, "--exclude") {
+			t.Fatalf("advice does not match a minimum batch: %s", msg)
+		}
+		if msg := c.stopBusy().Error(); !strings.Contains(msg, "already at its minimum") {
+			t.Fatalf("stopBusy gives different advice: %s", msg)
+		}
+	})
+	t.Run("batch still large", func(t *testing.T) {
+		c := setup(t)
+		for i := 0; i < 6; i++ { // healthy pairs grow 5 -> 10 -> 20 -> 40
+			observe(c, 20*time.Millisecond, 200, 50)
+		}
+		for i := 0; i < 3; i++ { // 40 -> 20 -> 10 -> 5, then the circuit opens
+			observe(c, time.Millisecond, 429, 1)
+		}
+		err := c.pacer.before(context.Background())
+		if !errors.Is(err, ErrOSBusy) {
+			t.Fatal("open circuit accepted work")
+		}
+		if msg := err.Error(); !strings.Contains(msg, "smaller batch ceiling") || strings.Contains(msg, "already at its minimum") {
+			t.Fatalf("advice does not match a large batch: %s", msg)
+		}
+	})
+}

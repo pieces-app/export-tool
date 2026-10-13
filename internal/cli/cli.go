@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -110,6 +111,7 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		scope := fs.String("scope", "", "summaries (default) or all; summaries skips events and reads supporting labels only when referenced")
 		associations := fs.String("associations", "linked", "linked (default) reads observed-pair metadata and selected person/event pages; off skips these extra reads")
 		materials := fs.String("materials", "", "custom comma-separated material types or all; cannot combine with --scope")
+		exclude := fs.String("exclude", "", "comma-separated collections to skip with --scope all, for example ACTIVITIES")
 		batch := fs.Int("batch-size", 50, "maximum IDs per batch (1–50); pacing starts smaller")
 		window := fs.Int("window-ids", 5000, "target ID count per adaptive time window")
 		zone := fs.String("timezone", "Local", "Local uses this computer's timezone; or choose an IANA name such as America/New_York")
@@ -260,6 +262,35 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 		if err != nil {
 			return fail(err)
 		}
+		var excludedTypes []string
+		if *exclude != "" {
+			if selection.Name != "all" {
+				return fail(fmt.Errorf("--exclude applies only to --scope all"))
+			}
+			if strings.EqualFold(strings.TrimSpace(*exclude), "all") {
+				return fail(fmt.Errorf("--exclude cannot exclude every collection"))
+			}
+			drop, err := exporter.SelectMaterials(*exclude)
+			if err != nil {
+				return fail(err)
+			}
+			dropped := map[string]bool{}
+			for _, m := range drop {
+				dropped[m.Type] = true
+				excludedTypes = append(excludedTypes, m.Type)
+			}
+			kept := selection.Materials[:0:0]
+			for _, m := range selection.Materials {
+				if !dropped[m.Type] {
+					kept = append(kept, m)
+				}
+			}
+			if len(kept) == 0 {
+				return fail(fmt.Errorf("--exclude cannot exclude every collection"))
+			}
+			selection.Materials = kept
+			sort.Strings(excludedTypes)
+		}
 		if *people == "" {
 			*people = "all"
 			if selection.Name == "summaries" {
@@ -295,6 +326,9 @@ func RunWithInput(ctx context.Context, args []string, stdin io.Reader, stdout, s
 			return 0
 		}
 		selection.Print(stdout)
+		if len(excludedTypes) > 0 {
+			fmt.Fprintf(stdout, "Excluded: %s\n", strings.Join(excludedTypes, ", "))
+		}
 		if args[0] == "benchmark" || *dryRun {
 			if *dryRun {
 				fmt.Fprintln(stdout, "Dry run: inventory and bounded reads only; no export directory or Desktop closure.")
@@ -443,6 +477,7 @@ Usage:
   pieces-export export --dry-run [--people connected --people-report]
   pieces-export export --output ./my-summaries [--yes]
   pieces-export export --scope all --output ./my-export [--format markdown|obsidian|pdf|both] [--yes]
+  pieces-export export --scope all --exclude ACTIVITIES --output ./my-export
   pieces-export export --format obsidian --output ./my-vault [--yes]
   pieces-export obsidian --source ./finished-export --output ./my-vault [--yes]
   pieces-export export --output ./private-originals --mode preserve

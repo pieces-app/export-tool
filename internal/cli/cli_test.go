@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -219,5 +220,72 @@ func TestAssociationValidationBeforeConnection(t *testing.T) {
 	var out, errs bytes.Buffer
 	if code := Run(context.Background(), []string{"export", "--associations", "invalid", "--launch-os=false", "--base-url", "http://127.0.0.1:1"}, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), "associations must") {
 		t.Fatalf("association validation did not precede source access: %d %s", code, errs.String())
+	}
+}
+
+// --exclude drops collections from --scope all, for libraries where one
+// collection (ACTIVITIES on long-running installs) overwhelms Pieces OS
+// (issue #12). It is validated before any connection is attempted.
+func TestExcludeValidationBeforeConnection(t *testing.T) {
+	for _, test := range []struct {
+		flags []string
+		want  string
+	}{
+		{[]string{"--exclude", "ACTIVITIES"}, "applies only to --scope all"},                         // default scope is summaries
+		{[]string{"--scope", "summaries", "--exclude", "ACTIVITIES"}, "applies only to --scope all"}, // only --scope all
+		{[]string{"--materials", "TAGS", "--exclude", "TAGS"}, "applies only to --scope all"},        // not with --materials
+		{[]string{"--scope", "all", "--exclude", "NOPE"}, "unknown material"},                        // unknown type
+		{[]string{"--scope", "all", "--exclude", "all"}, "cannot exclude every"},                     // cannot exclude everything
+	} {
+		var out, errs bytes.Buffer
+		args := append([]string{"scan", "--launch-os=false", "--base-url", "http://127.0.0.1:1"}, test.flags...)
+		if code := Run(context.Background(), args, &out, &errs, "test"); code != 1 || !strings.Contains(errs.String(), test.want) {
+			t.Fatalf("%v: exclude validation did not precede OS discovery: %d %s", test.flags, code, errs.String())
+		}
+	}
+}
+
+func TestExcludeRemovesCollectionsFromScopeAll(t *testing.T) {
+	var seen sync.Map // material types the scan asked Pieces OS about
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var body struct {
+				Type string `json:"material_type"`
+			}
+			if json.NewDecoder(r.Body).Decode(&body) == nil && body.Type != "" {
+				seen.Store(body.Type, true)
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		var value any
+		switch r.URL.Path {
+		case "/.well-known/health":
+			value = "ok:macos"
+		case "/.well-known/version":
+			value = "12.3.108"
+		case "/materials/metrics":
+			value = map[string]any{"total_count": 0}
+		default:
+			value = map[string]any{"iterable": []any{}}
+		}
+		_ = json.NewEncoder(w).Encode(value)
+	}))
+	defer srv.Close()
+	path := filepath.Join(t.TempDir(), "archive")
+	args := []string{"export", "--base-url", srv.URL, "--launch-os=false", "--close-desktop=false", "--format", "markdown", "--output", path, "--scope", "all", "--exclude", "activities, HINTS"}
+	var out, errs bytes.Buffer
+	if code := RunWithInput(context.Background(), args, strings.NewReader("n\n"), &out, &errs, "test"); code != 0 {
+		t.Fatalf("preflight failed: %d %s", code, errs.String())
+	}
+	if !strings.Contains(out.String(), "Excluded: ACTIVITIES, HINTS") {
+		t.Fatalf("preflight did not confirm the exclusions:\n%s", out.String())
+	}
+	for _, typ := range []string{"ACTIVITIES", "HINTS"} {
+		if _, ok := seen.Load(typ); ok {
+			t.Fatalf("excluded collection %s was still inventoried", typ)
+		}
+	}
+	if _, ok := seen.Load("WORKSTREAM_EVENTS"); !ok {
+		t.Fatal("a non-excluded collection was not inventoried")
 	}
 }
