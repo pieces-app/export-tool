@@ -501,3 +501,35 @@ func TestAssociationLateCredentialsAndConflictingIdentity(t *testing.T) {
 		})
 	}
 }
+
+// On Windows the transient association store failed for every user (issue
+// #10), and the export blamed "destination space and permissions". A store
+// failure must be named as such, point at --associations off, and never print
+// the temporary directory.
+func TestAssociationStageFailureIsReported(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", blocker)
+	srv, _, policy, _ := associationFixture(t)
+	defer srv.Close()
+	client, _ := NewClient(srv.URL, time.Second, 8<<20)
+	opts := associationFixtureOptions(t, filepath.Join(t.TempDir(), "export"), policy)
+	opts.Format = "markdown"
+	_, err := Export(context.Background(), client, opts)
+	if err == nil {
+		t.Fatal("export succeeded without a usable association store")
+	}
+	msg := err.Error()
+	for _, want := range []string{"temporary association store", "--associations off"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q lacks %q", msg, want)
+		}
+	}
+	for _, avoid := range []string{"destination space", blocker} {
+		if strings.Contains(msg, avoid) {
+			t.Errorf("message %q contains %q", msg, avoid)
+		}
+	}
+}

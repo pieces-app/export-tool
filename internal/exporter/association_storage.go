@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,6 +26,20 @@ type associationCanonicalRecords struct {
 	closed       bool
 }
 
+// errAssociationStage marks a failure to prepare the transient association
+// store, so the export can name it instead of blaming the destination.
+var errAssociationStage = errors.New("the temporary association store could not be prepared")
+
+// stageFailure wraps err with errAssociationStage without revealing the
+// temporary directory: a path error keeps only its operation and OS error.
+func stageFailure(err error) error {
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		return fmt.Errorf("%w: %s: %v", errAssociationStage, pathErr.Op, pathErr.Err)
+	}
+	return fmt.Errorf("%w: %v", errAssociationStage, err)
+}
+
 func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -41,16 +56,16 @@ func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 	// system temporary folder isn't synced, and MkdirTemp makes this one private.
 	parent, err := os.MkdirTemp(os.TempDir(), ".pieces-export-stage-")
 	if err != nil {
-		return err
+		return stageFailure(err)
 	}
 	s.parent = parent
 	s.parentInfo, err = os.Lstat(parent)
 	if err != nil {
-		return err
+		return stageFailure(err)
 	}
 	s.parentRoot, err = os.OpenRoot(parent)
 	if err != nil {
-		return err
+		return stageFailure(err)
 	}
 	held, err := s.parentRoot.Stat(".")
 	if err != nil || !os.SameFile(held, s.parentInfo) {
@@ -65,10 +80,13 @@ func (s *associationCanonicalRecords) ensure(ctx context.Context) error {
 		Binding: sha256.Sum256([]byte("pieces-export transient association storage v1")),
 	}, []byte(canonicalTransactionState))
 	if err != nil {
-		return err
+		return stageFailure(err)
 	}
 	s.transactions, err = newTransactionalCanonicalRecords(ctx, s.store, s.run.local)
-	return err
+	if err != nil {
+		return stageFailure(err)
+	}
+	return nil
 }
 
 func (s *associationCanonicalRecords) Open(ctx context.Context, m *Meta) (io.ReadCloser, error) {

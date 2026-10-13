@@ -14,12 +14,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 var (
@@ -35,10 +37,40 @@ var (
 // Preserve underlying filesystem causes for errors.Is without printing paths.
 type failure struct{ kind, cause error }
 
-func (e *failure) Error() string        { return e.kind.Error() }
+func (e *failure) Error() string {
+	if cause := describeCause(e.cause); cause != "" {
+		return e.kind.Error() + ": " + cause
+	}
+	return e.kind.Error()
+}
 func (e *failure) Unwrap() error        { return e.cause }
 func (e *failure) Is(target error) bool { return target == e.kind }
 func fail(kind, cause error) error      { return &failure{kind, cause} }
+
+// describeCause names the operating-system or driver error behind a failure
+// without revealing any filesystem path. Paths are private; the operation and
+// error code are what a bug report needs.
+func describeCause(err error) string {
+	switch e := err.(type) {
+	case nil:
+		return ""
+	case *os.PathError:
+		return e.Op + ": " + describeCause(e.Err)
+	case *os.LinkError:
+		return e.Op + ": " + describeCause(e.Err)
+	case *os.SyscallError:
+		return e.Syscall + ": " + describeCause(e.Err)
+	case syscall.Errno:
+		return fmt.Sprintf("%s (errno %d)", e.Error(), uintptr(e))
+	}
+	msg := err.Error()
+	if strings.ContainsAny(msg, `/\`) || driveLetterPattern.MatchString(msg) {
+		return fmt.Sprintf("%T", err)
+	}
+	return msg
+}
+
+var driveLetterPattern = regexp.MustCompile(`(?i)\b[a-z]:[\\/]`)
 
 const maxPayloadBytes = 128 << 20
 const envelopeOverhead = 32 + 12 + 16 // HKDF salt, GCM nonce, authentication tag
