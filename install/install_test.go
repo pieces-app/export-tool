@@ -756,6 +756,24 @@ func TestDryRunScansWithoutRecoveryOrOutput(t *testing.T) {
 	})
 }
 
+// A dry run that fails (for example, Pieces OS not running) must not be
+// reported as finished.
+func TestDryRunFailureIsReported(t *testing.T) {
+	eachInstaller(t, func(t *testing.T, inst installer, binary []byte) {
+		h := newHarness(t, inst, binary, "complete")
+		r := h.run(options{baseURL: true, dryRun: true, exportArgs: []string{"--test-exit=1"}})
+		if r.code != 1 {
+			t.Fatalf("exit %d, want the CLI's 1\n%s", r.code, r.out)
+		}
+		if strings.Contains(r.out, "Dry run finished") {
+			t.Fatalf("failed dry run reported as finished:\n%s", r.out)
+		}
+		if !strings.Contains(r.out, "dry run did not finish") {
+			t.Fatalf("failed dry run not explained:\n%s", r.out)
+		}
+	})
+}
+
 func TestCleanupChoices(t *testing.T) {
 	eachInstaller(t, func(t *testing.T, inst installer, binary []byte) {
 		for _, tc := range []struct {
