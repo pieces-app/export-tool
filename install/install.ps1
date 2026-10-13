@@ -324,7 +324,8 @@ function Invoke-PiecesBootstrap {
         if ($run.Staging -and (Test-Path -LiteralPath $run.Staging)) { Remove-Item -LiteralPath $run.Staging -Recurse -Force }
         if ($run.Started) {
             if ($DryRun) {
-                Write-Host "`nDry run finished. Nothing was exported."
+                if ($run.Code -eq 0) { Write-Host "`nDry run finished. Nothing was exported." }
+                else { Write-Host "`nThe dry run did not finish. Nothing was exported. Fix the problem above, then run the same command again." }
             } elseif (Test-Path -LiteralPath (Join-Path $Output 'manifest.json') -PathType Leaf) {
                 if ($run.Session) { Remove-Item -LiteralPath $run.Session -Recurse -Force }
                 Write-Host "`nYour export is ready:`n  $Output"

@@ -62,6 +62,7 @@ Add options to the end of the command:
 | Delete the tool afterward | `--remove` | `-Cleanup Remove` |
 | Only download and check the tool | `--install-only` | `-InstallOnly` |
 | Skip the Export now? question | `-- --yes` | `-ExportArgs '--yes'` |
+| Make an Obsidian vault instead | `-- --format obsidian` | `-ExportArgs '--format','obsidian'` |
 
 PDF and Obsidian exports can't be resumed after an interruption. Markdown exports can.
 
@@ -146,6 +147,18 @@ Coding agents such as Claude Code or Codex can run these commands for you. For e
 | `topic/<label>`, `source/<label>`, `website/<label>`, `person/<label>` | Notes tagged with that topic, source, website or person |
 
 Memory notes also have `created`, `updated` and `pieces_type` properties. The [Obsidian guide](OBSIDIAN_EXPORT.md) covers the full vault layout.
+
+## Open it in Obsidian
+
+The export is plain Markdown, so you can open the folder in Obsidian as it is. For a large library, a compact vault browses better. The tool you installed can build one from a finished export:
+
+- **Mac:** `"$HOME/Library/Application Support/Pieces Export/tool/0.18.0-rc6/pieces-export" obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
+- **Windows:** `& "$env:LOCALAPPDATA\Pieces Export\tool\0.18.0-rc6\pieces-export.exe" obsidian --source <your export folder> --output "$HOME\Pieces-Obsidian" --yes`
+- **Linux:** `~/.local/share/pieces-export/tool/0.18.0-rc6/pieces-export obsidian --source <your export folder> --output ~/Pieces-Obsidian --yes`
+
+Replace `<your export folder>` with the folder the installer opened when it finished. Then, in Obsidian, choose **Open folder as vault** and pick the `vault` folder inside `Pieces-Obsidian`. Start with `Start Here.md`. Keep the original export as your complete archive; the vault links back to it.
+
+To get a vault straight from the export, add `-- --format obsidian` on Mac or Linux, or `-ExportArgs '--format','obsidian'` on Windows. That export can't be resumed if it's interrupted.
 
 ## Manual download
 

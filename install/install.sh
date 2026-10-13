@@ -211,7 +211,11 @@ main() (
   # shellcheck disable=SC2329 # Invoked by the EXIT trap.
   report() {
     if [ "$dry_run" = true ]; then
-      printf '\nDry run finished. Nothing was exported.\n'
+      if [ "$1" = 0 ]; then
+        printf '\nDry run finished. Nothing was exported.\n'
+      else
+        printf '\nThe dry run did not finish. Nothing was exported. Fix the problem above, then run the same command again.\n'
+      fi
       return 0
     fi
     if [ -f "$output/manifest.json" ]; then
