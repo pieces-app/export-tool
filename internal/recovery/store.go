@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"modernc.org/sqlite"
@@ -89,6 +90,21 @@ func OpenStore(ctx context.Context, o Options) (*Store, error) {
 	return acquireStore(ctx, o, nil, false)
 }
 
+// storeURI is the SQLite URI for the database at the given slash-separated
+// absolute path. mode=rw never silently creates an absent/replaced database.
+// A Windows path starts with a drive letter; without a leading slash it would
+// render as file://C:/..., which SQLite rejects as a URI authority.
+func storeURI(slashPath string) string {
+	if !strings.HasPrefix(slashPath, "/") {
+		slashPath = "/" + slashPath
+	}
+	u := url.URL{Scheme: "file", Path: slashPath}
+	q := u.Query()
+	q.Set("mode", "rw")
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 func acquireStore(ctx context.Context, o Options, initial []byte, create bool) (_ *Store, result error) {
 	var err error
 	if o, err = normalize(o); err != nil {
@@ -122,11 +138,7 @@ func acquireStore(ctx context.Context, o Options, initial []byte, create bool) (
 	if err := s.checkFiles(ctx); err != nil {
 		return nil, err
 	}
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Join(s.w.root.Name(), storeFile))}
-	q := u.Query()
-	q.Set("mode", "rw") // Never silently create an absent/replaced database.
-	u.RawQuery = q.Encode()
-	s.db, err = sql.Open("sqlite", u.String())
+	s.db, err = sql.Open("sqlite", storeURI(filepath.ToSlash(filepath.Join(s.w.root.Name(), storeFile))))
 	if err != nil {
 		return nil, fail(ErrStorage, err)
 	}

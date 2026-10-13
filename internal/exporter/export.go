@@ -947,6 +947,9 @@ func (r *run) store(m Material, v map[string]any, replace bool) error {
 			if !replace {
 				r.coverage[m.Type].Fetched++
 			}
+			if errors.Is(err, errAssociationStage) {
+				return errConfig(err.Error() + "; run the export again with --associations off, or report this message; partial directory was not finalized")
+			}
 			// A destination failure is unlikely to be record-specific. Stop before
 			// fetching more source data into an unwritable/full filesystem.
 			return errConfig("could not write an export record; check destination space and permissions; partial directory was not finalized")
