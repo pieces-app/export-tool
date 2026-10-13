@@ -2,6 +2,25 @@
 
 Updated 2026-10-08. The application is open source under the MIT License ([LICENSE.txt](LICENSE.txt)). The 0.18.0-rc5, 0.18.0-rc4 and 0.18.0-rc3 ZIPs include it; the older 0.18.0-rc2 ZIPs still bundle the earlier license text. macOS packages are Developer ID signed and notarized by Apple. This document describes the release procedure, not a claim that all-platform production acceptance has passed.
 
+## Release candidate 0.18.0-rc6 — 2026-10-13
+
+Built with `go run ./cmd/release --version 0.18.0-rc6` from `main` at `f484446` (PR #13, fix for issue #10). Changes beyond rc5: the recovery store's SQLite URI puts the drive letter in the path (`file:///C:/...`), which makes the recovery workspace, the transient association store and `resume` work on Windows for the first time; recovery failures now name the failing operation and operating-system error without paths; a failed association store is reported as such with a pointer to `--associations off`; the bundled README gained a troubleshooting row for those messages.
+
+Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` (hardened runtime, secure timestamp, identifier `app.pieces.export-tool`) and notarized. Apple accepted arm64 submission `11ff5cbd-4e1b-4ff3-85bb-6b14d5305ee4` and amd64 submission `d1a1e333-9b0e-478a-a468-badf8dad80db` as Ready for distribution with no issues; each ticket's cdhash matches its executable, and extracted copies of both final ZIPs pass `codesign --verify --strict --check-notarization -R=notarized`. Windows and Linux ZIPs are unsigned, as before.
+
+Verification: the full `go test ./...` suite, `go vet`, and Windows amd64/arm64 cross-compiles passed on macOS; the SQLite URI fix is proven by SQLite's own parser on macOS (the old form fails with "invalid uri authority: C:"); native Windows execution of rc6 was pending a volunteer tester at publication time (see issue #10).
+
+All six ZIPs, per-file `.sha256` files and `SHA256SUMS.txt` are in the public [0.18.0-rc6 Drive folder](https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg) (anyone with the link can view).
+
+| File | Drive ID | SHA-256 |
+| --- | --- | --- |
+| `pieces-export_0.18.0-rc6_darwin_arm64_notarized.zip` | `1L4nPG40NuW75nSZ0Vac8MzsXjNu5esPN` | `fe7d8a87320c52deaead3e17e06c75fd1230b72721d02294873e6f6902c83f7e` |
+| `pieces-export_0.18.0-rc6_darwin_amd64_notarized.zip` | `1l0pscYFtcdpGnbO6BYi-hwF2Y2udmpAI` | `5507ab9444e0a9704e7401b4f6445b5f3db5c2ae11f5da1f2bf1376f6033a02c` |
+| `pieces-export_0.18.0-rc6_linux_amd64.zip` | `1xqAI4gqBR39j6dOIaEYMy6r8Rzk4h8HL` | `37b4ad80573c88f8a39f45544175e38d4b57ec38ba3a184805c31e30e109b819` |
+| `pieces-export_0.18.0-rc6_linux_arm64.zip` | `1dans8QR1VKw-p-rdhWM1_BsEBnexvOs0` | `78ff2e2843946b39bbd1b4eee1ac9ee3766c687f1030999641114238de5eaab6` |
+| `pieces-export_0.18.0-rc6_windows_amd64.zip` | `1kyPy47nU1aX7M63QPBtGiKG0BX4Sbyfd` | `87fe3332815a4536e86c38dae04ba85a684f56d5111f7e333805c1cc230a4658` |
+| `pieces-export_0.18.0-rc6_windows_arm64.zip` | `1H8KwPyzbdU4GVNdV30_BUfdurGy8hYdE` | `b006befcef7e6716e694ef137f3633b3da7f6b72aa16f903047bc9c63522b87a` |
+
 ## Release candidate 0.18.0-rc5 — 2026-10-08
 
 Built with `go run ./cmd/release --version 0.18.0-rc5` from `main` at `c9f0d12` (PR #8), which fixes issues #6 and #7: the secret scan's deadline now grows with the scanned text (10 seconds plus 10 seconds per 64 KiB) instead of a flat 10 seconds, the final audit's reads overlap by 16 KiB and a timeout names the output file, the temporary association store lives in the system temporary folder instead of beside the output, and the Bash installer saves to `~/Pieces-Exports` when iCloud Drive syncs the Documents folder. Both Mac executables were signed with the Developer ID identity `471B68A3F2560F67EE4C4C215B1ECCE5B55861A0` and notarized; receipts are in `dist/macos-notarized-0.18.0-rc5/receipts/`. Windows and Linux ZIPs are unsigned, as before. `go test ./...` and `go vet ./...` passed on the merged tree, all six targets were built by the release tool, and an offline rebuild of a real 197,790-record archive completed its final audit with this code. Native Windows and Linux runtime checks were not repeated.
@@ -95,7 +114,7 @@ Release gates: interrupted-fetch recovery; one real-data acceptance of the chose
 
 Updated 2026-10-07. The [installer Gist](https://gist.github.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1) (unlisted) holds `README.md`, `install.sh` and `install.ps1`, published from `install/`. Revision `12613a13cbb370e94020fc6eb13b28e201050e3d` introduced this installer, and `1fe8f0c0d326e7962ee81d88705324571fac1591` updated its license wording to MIT. The previous development revision is `fc60b9d6a5712ab655407ff1798093afa7260d7e`.
 
-1. With no options, both scripts install the built-in `0.18.0-rc5` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
+1. With no options, both scripts install the built-in `0.18.0-rc6` release from its public Drive folder. Each platform's Drive file ID and SHA-256 are pinned in the script, so the expected checksum no longer comes from the download origin. `--base-url`/`-BaseUrl` still selects an HTTPS `<base>/<version>/` release with `SHA256SUMS.txt`, for tests and later GitHub Releases hosting.
 2. Detect OS and CPU. Apple silicon under Rosetta and ARM64 Windows running emulated PowerShell get native builds. Verify the SHA-256 and the exact four-member ZIP before anything runs, copy only those entries into a staging folder beside the install location, then move it into place.
 3. Keep the tool by default in a per-user folder: macOS `~/Library/Application Support/Pieces Export/tool/<version>/`, Windows `%LOCALAPPDATA%\Pieces Export\tool\<version>\`, Linux `${XDG_DATA_HOME:-~/.local/share}/pieces-export/tool/<version>/`. `PIECES_EXPORT_HOME` overrides the root. `--remove` / `-Cleanup Remove` deletes the tool after the run, and `--ask` / `-Cleanup Ask` prompts `[y/N]`.
 4. Export to `Documents/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>`. Windows uses the shell Documents folder, so OneDrive redirection works. Linux honors `xdg-user-dir DOCUMENTS`. On a Mac whose iCloud Drive syncs Desktop & Documents, the default is `~/Pieces-Exports/<YYYY-MM-DD_HH-MM-SS>` instead, and the installer says so.
