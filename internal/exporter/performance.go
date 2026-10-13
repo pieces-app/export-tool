@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-var ErrOSBusy = errors.New("Pieces OS is too slow or unavailable; stopped requesting data to let it recover; retry later with a smaller batch ceiling")
+var ErrOSBusy = errors.New("Pieces OS is too slow or unavailable; stopped requesting data to let it recover")
 
 type PerformanceStats struct {
 	Requests    int     `json:"requests"`
@@ -88,10 +88,14 @@ func (p *Pacer) before(ctx context.Context) error {
 	}
 	p.mu.Lock()
 	stop, delay := p.stats.Stopped, time.Until(p.next)
+	var busy error
+	if stop {
+		busy = p.busyError()
+	}
 	p.mu.Unlock()
 	if stop {
 		<-p.flight
-		return ErrOSBusy
+		return busy
 	}
 	if delay > 0 {
 		start := time.Now()
@@ -182,12 +186,29 @@ func (c *Client) Performance() PerformanceStats {
 	return stats
 }
 func (c *Client) stopBusy() error {
-	if c.pacer != nil {
-		c.pacer.mu.Lock()
-		c.pacer.stats.Stopped = true
-		c.pacer.mu.Unlock()
+	if c.pacer == nil {
+		return ErrOSBusy
 	}
-	return ErrOSBusy
+	c.pacer.mu.Lock()
+	defer c.pacer.mu.Unlock()
+	c.pacer.stats.Stopped = true
+	return c.pacer.busyError()
+}
+
+// busyError adds advice that matches the pacer's state. The caller holds p.mu.
+// Once every route is already down to single-record batches, a smaller ceiling
+// cannot help; the slow collection has to be excluded instead.
+func (p *Pacer) busyError() error {
+	atMinimum := len(p.routes) > 0
+	for _, q := range p.routes {
+		if q.batch > 1 {
+			atMinimum = false
+		}
+	}
+	if atMinimum {
+		return fmt.Errorf("%w. The batch size was already at its minimum, so a smaller --batch-size will not help. Quit and reopen Pieces OS, let it settle, then exclude the slow collection, for example --scope all --exclude ACTIVITIES", ErrOSBusy)
+	}
+	return fmt.Errorf("%w; retry later with a smaller batch ceiling (--batch-size)", ErrOSBusy)
 }
 func batchItemCount(body any) int {
 	m, ok := body.(map[string]any)

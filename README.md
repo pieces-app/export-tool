@@ -310,7 +310,7 @@ Events are useful for raw activity history, event-derived source/website/person 
 
 Secret detection and domain rules still scan the exported content. If a website origin exists only in skipped activity, its domain cannot be used to exclude that summary. `withhold_unproven_generated_content: true` remains the conservative policy option when domain filtering is configured. Related-summary suggestions include only available evidence; missing destinations stay unlinked. `coverage.md` and the manifest distinguish intentional scope omissions from read failures. A successful summaries export is not an all-data migration.
 
-Advanced `--materials TYPE,TYPE` still selects full inventories of those types; it cannot be combined with `--scope`. `--materials WORKSTREAM_SUMMARIES` alone does **not** select annotation bodies or profile context.
+Advanced `--materials TYPE,TYPE` still selects full inventories of those types; it cannot be combined with `--scope`. `--materials WORKSTREAM_SUMMARIES` alone does **not** select annotation bodies or profile context. `--scope all --exclude TYPE,TYPE` keeps the all-data scope while skipping named collections, for example `--exclude ACTIVITIES` on a long-running install whose activity history overwhelms Pieces OS (issue #12); excluded collections are listed in the manifest's omitted materials.
 
 ### Rebuild without fetching from OS again
 
