@@ -24,16 +24,16 @@ param(
 # pinned by Drive ID and SHA-256, so a changed or substituted file never runs.
 function Get-PiecesBuiltInRelease {
     @{
-        Version      = '0.18.0-rc6'
-        Folder       = 'https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg'
+        Version      = '0.18.0-rc7'
+        Folder       = 'https://drive.google.com/drive/folders/1dUTJ8MLg0F-ZwN8bOOQTbn_z7YSX5Ko-'
         InstallerUrl = 'https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.ps1'
         Files        = @{
-            windows_amd64 = @{ Id = '1kyPy47nU1aX7M63QPBtGiKG0BX4Sbyfd'; Sha256 = '87fe3332815a4536e86c38dae04ba85a684f56d5111f7e333805c1cc230a4658'; Name = 'pieces-export_0.18.0-rc6_windows_amd64.zip' }
-            windows_arm64 = @{ Id = '1H8KwPyzbdU4GVNdV30_BUfdurGy8hYdE'; Sha256 = 'b006befcef7e6716e694ef137f3633b3da7f6b72aa16f903047bc9c63522b87a'; Name = 'pieces-export_0.18.0-rc6_windows_arm64.zip' }
-            darwin_arm64  = @{ Id = '1L4nPG40NuW75nSZ0Vac8MzsXjNu5esPN'; Sha256 = 'fe7d8a87320c52deaead3e17e06c75fd1230b72721d02294873e6f6902c83f7e'; Name = 'pieces-export_0.18.0-rc6_darwin_arm64_notarized.zip' }
-            darwin_amd64  = @{ Id = '1l0pscYFtcdpGnbO6BYi-hwF2Y2udmpAI'; Sha256 = '5507ab9444e0a9704e7401b4f6445b5f3db5c2ae11f5da1f2bf1376f6033a02c'; Name = 'pieces-export_0.18.0-rc6_darwin_amd64_notarized.zip' }
-            linux_amd64   = @{ Id = '1xqAI4gqBR39j6dOIaEYMy6r8Rzk4h8HL'; Sha256 = '37b4ad80573c88f8a39f45544175e38d4b57ec38ba3a184805c31e30e109b819'; Name = 'pieces-export_0.18.0-rc6_linux_amd64.zip' }
-            linux_arm64   = @{ Id = '1dans8QR1VKw-p-rdhWM1_BsEBnexvOs0'; Sha256 = '78ff2e2843946b39bbd1b4eee1ac9ee3766c687f1030999641114238de5eaab6'; Name = 'pieces-export_0.18.0-rc6_linux_arm64.zip' }
+            windows_amd64 = @{ Id = '1DT_-CVnALXiysOwjeOrThdRXaWx2Z8f7'; Sha256 = '5b45ef43a94f4e5a0275b245590755bd2a1d3690cfa09dade57c1cc7c040e0c2'; Name = 'pieces-export_0.18.0-rc7_windows_amd64.zip' }
+            windows_arm64 = @{ Id = '1wNxKa0pk25OlebiobqYdWZB3DqTTQ-Qd'; Sha256 = 'ba3653da35630cd8f6283fa72483adcccf1a9ae8464e6f9c0b20f67b448289f7'; Name = 'pieces-export_0.18.0-rc7_windows_arm64.zip' }
+            darwin_arm64  = @{ Id = '18y6AaDAYjCy97BObBg9ecVOeML_k3hyI'; Sha256 = '2c9370150cc13b9c0fd6da588456d8a0d623a29e2d93847acf9d2d121e6e8479'; Name = 'pieces-export_0.18.0-rc7_darwin_arm64_notarized.zip' }
+            darwin_amd64  = @{ Id = '1qNwO5Mcgl-Iys1xwfyhB8QycBPJMrzZb'; Sha256 = 'c10de02c9eaa6b3e0aaded51d8ae8a357a502a445753386bf27492ccd07ef250'; Name = 'pieces-export_0.18.0-rc7_darwin_amd64_notarized.zip' }
+            linux_amd64   = @{ Id = '1NRf2Opa48qOopvEza1ORVmHa_DoCvdZf'; Sha256 = '8ed44fa0edb4323176f8096e1567c1398a3912c7f20776199e1afd7db57bb2de'; Name = 'pieces-export_0.18.0-rc7_linux_amd64.zip' }
+            linux_arm64   = @{ Id = '1b2erlQoI-jZ6FxpY-5YgPmlO1rjrqmwx'; Sha256 = 'b583c8f5e701f7e57d0f1400769ea26241d5d79ffbc79e5324a7bab9b7991702'; Name = 'pieces-export_0.18.0-rc7_linux_arm64.zip' }
         }
     }
 }
