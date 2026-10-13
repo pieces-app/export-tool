@@ -11,8 +11,8 @@
 # Bash 3.2+; no administrator rights, package manager, or PATH changes.
 set -euo pipefail
 
-PIECES_RELEASE_VERSION='0.18.0-rc5'
-PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1PfF3hFLJKx_1RfBrjrI5YiLYN0S1KeP_'
+PIECES_RELEASE_VERSION='0.18.0-rc6'
+PIECES_RELEASE_FOLDER='https://drive.google.com/drive/folders/1G5GeGokdR5egJl383Uvj2KmV6x3B4fQg'
 PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3419ace84d8ca7be085fee3bb1/raw/install.sh'
 
 # The built-in release lives in a public Google Drive folder. Each file is
@@ -20,10 +20,10 @@ PIECES_INSTALLER_URL='https://gist.githubusercontent.com/tsavo-at-pieces/e6d4dd3
 # Prints "<drive id> <sha256> <file name>".
 pieces_release_file() {
   case "$1" in
-    darwin_arm64) echo '11TVkLyn-aMMpSa8Ifz_NVPn_WhMab6PF d7c9cb0c85768551b35b9dd98a2e9ee86ccb1b74cc34bc26be53675082d84d21 pieces-export_0.18.0-rc5_darwin_arm64_notarized.zip' ;;
-    darwin_amd64) echo '1XDCW3BY53E3I7FiMsVXbMZ_Dy7dUg1GF 991de63b226a4b2cf16961db976bbeec943777bd2e22f295e325705513507e1c pieces-export_0.18.0-rc5_darwin_amd64_notarized.zip' ;;
-    linux_amd64) echo '1fi-X3GE-2H1FF4WAkVtHM4G9yQBsYJZf fd8de023e52a3bfa30b32d0c96a8a659103b0a23b75fbf7d9362f9b06bc7a339 pieces-export_0.18.0-rc5_linux_amd64.zip' ;;
-    linux_arm64) echo '1vcaR2nACGHPTZ4O7GliWraS8rEKUieBM 3b597c636ace51c8165c8be5061ab5dbbee611d9ed9269ade974eb9c860ec1e3 pieces-export_0.18.0-rc5_linux_arm64.zip' ;;
+    darwin_arm64) echo '1L4nPG40NuW75nSZ0Vac8MzsXjNu5esPN fe7d8a87320c52deaead3e17e06c75fd1230b72721d02294873e6f6902c83f7e pieces-export_0.18.0-rc6_darwin_arm64_notarized.zip' ;;
+    darwin_amd64) echo '1l0pscYFtcdpGnbO6BYi-hwF2Y2udmpAI 5507ab9444e0a9704e7401b4f6445b5f3db5c2ae11f5da1f2bf1376f6033a02c pieces-export_0.18.0-rc6_darwin_amd64_notarized.zip' ;;
+    linux_amd64) echo '1xqAI4gqBR39j6dOIaEYMy6r8Rzk4h8HL 37b4ad80573c88f8a39f45544175e38d4b57ec38ba3a184805c31e30e109b819 pieces-export_0.18.0-rc6_linux_amd64.zip' ;;
+    linux_arm64) echo '1dans8QR1VKw-p-rdhWM1_BsEBnexvOs0 78ff2e2843946b39bbd1b4eee1ac9ee3766c687f1030999641114238de5eaab6 pieces-export_0.18.0-rc6_linux_arm64.zip' ;;
     *) return 1 ;;
   esac
 }
