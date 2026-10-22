@@ -460,30 +460,53 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 	}
 	// Readers and the final audit see Markdown and HTML escapes resolved. Text
 	// stored with them, such as Markdown source or HTML-escaped web text, can
-	// read as a secret only in that form (issue #21). Scan that form too and
-	// redact the match in the stored text, allowing the escapes back in.
+	// read as a secret only in that form (issue #21). Scan that form too, with
+	// learned credentials, and redact each match in the stored text, allowing
+	// the escapes back in. Longest first, so an overlapping shorter finding
+	// sees its text already redacted instead of withholding the whole value.
 	if rendered := markdownAuditUnescape.Replace(value); rendered != value {
 		extra, err := s.detectSecrets(ctx, key+"="+rendered, stats)
 		if err != nil {
 			return "", err
 		}
+		kinds := map[string]string{}
 		for _, f := range extra {
-			if f.Secret == "" {
+			if _, seen := kinds[f.Secret]; f.Secret != "" && !seen {
+				kinds[f.Secret] = "secret pattern " + f.RuleID
+			}
+		}
+		for secret := range s.known {
+			if _, seen := kinds[secret]; !seen && strings.Contains(rendered, secret) {
+				kinds[secret] = "known credential value"
+			}
+		}
+		hidden := make([]string, 0, len(kinds))
+		for secret := range kinds {
+			hidden = append(hidden, secret)
+		}
+		sort.Slice(hidden, func(i, j int) bool {
+			if len(hidden[i]) != len(hidden[j]) {
+				return len(hidden[i]) > len(hidden[j])
+			}
+			return hidden[i] < hidden[j]
+		})
+		for _, secret := range hidden {
+			if _, seen := secrets[secret]; seen {
 				continue
 			}
-			if _, seen := secrets[f.Secret]; seen {
+			if strings.Contains(value, secret) {
+				secrets[secret] = kinds[secret]
 				continue
 			}
-			if strings.Contains(value, f.Secret) {
-				secrets[f.Secret] = "secret pattern " + f.RuleID
-				continue
+			if !strings.Contains(markdownAuditUnescape.Replace(value), secret) {
+				continue // already removed by a longer match
 			}
-			pattern := escapedSecretPattern(f.Secret)
+			pattern := escapedSecretPattern(secret)
 			if !pattern.MatchString(value) {
-				stats.redact("encoded secret pattern " + f.RuleID)
+				stats.redact("encoded " + kinds[secret])
 				return "[WITHHELD:ENCODED_SECRET]", nil
 			}
-			stats.redact("secret pattern " + f.RuleID)
+			stats.redact(kinds[secret])
 			value = pattern.ReplaceAllLiteralString(value, "[REDACTED:SECRET]")
 		}
 	}

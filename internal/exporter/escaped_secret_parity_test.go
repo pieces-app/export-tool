@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zricethezav/gitleaks/v8/detect"
+	"github.com/zricethezav/gitleaks/v8/report"
 )
 
 // Readers and the final audit see Markdown and HTML escapes resolved. Stored
@@ -93,5 +96,51 @@ func TestFilteredExportFinalizesEscapedSecretText(t *testing.T) {
 	}
 	if !strings.Contains(joined.String(), "more") {
 		t.Fatal("surrounding text was lost")
+	}
+}
+
+// Two detector rules often report the same secret. After the first in-place
+// redaction the second must not withhold the whole field.
+func TestOverlappingEscapedFindingsStayRedactedInPlace(t *testing.T) {
+	s := scanner(t, DefaultPolicy())
+	token := "abcdefghij" + "1234567890"
+	previous := detectFragment
+	t.Cleanup(func() { detectFragment = previous })
+	detectFragment = func(ctx context.Context, d *detect.Detector, f detect.Fragment) []report.Finding {
+		findings := d.DetectContext(ctx, f)
+		if strings.Contains(f.Raw, "secret_value: "+token) {
+			// A second rule reporting the same value, and a third reporting part of it.
+			findings = append(findings, report.Finding{RuleID: "another-rule", Secret: token}, report.Finding{RuleID: "partial-rule", Secret: token[2:]})
+		}
+		return findings
+	}
+	body := `notes: secret\_value: ` + token + ` and my\_notes stay`
+	clean, stats, err := s.Sanitize(context.Background(), map[string]any{"id": "x", "readable": body})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fieldString(clean, "readable")
+	if got == "[WITHHELD:ENCODED_SECRET]" {
+		t.Fatalf("overlapping findings withheld the whole field (redactions %d)", stats.Redactions)
+	}
+	if strings.Contains(got, token[2:]) || !strings.Contains(got, `my\_notes stay`) {
+		t.Fatalf("unexpected result: %q", got)
+	}
+}
+
+// A credential learned from the source must be caught behind escapes too,
+// because the audit resolves them and checks learned credentials as well.
+func TestKnownCredentialHiddenByEscapesIsRedacted(t *testing.T) {
+	s := scanner(t, DefaultPolicy())
+	known := "qwertyuiop_" + "0192837465"
+	s.remember(known)
+	body := `copied: qwertyuiop\_0192837465 end`
+	clean, stats, err := s.Sanitize(context.Background(), map[string]any{"id": "x", "readable": body})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fieldString(clean, "readable")
+	if stats.Redactions == 0 || strings.Contains(got, `qwertyuiop\_0192837465`) || !strings.HasSuffix(got, " end") {
+		t.Fatalf("known credential behind an escape survived: %q (redactions %d)", got, stats.Redactions)
 	}
 }
