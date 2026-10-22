@@ -27,19 +27,46 @@ import (
 var (
 	ErrBusy          = errors.New("recovery workspace is owned by another operation")
 	ErrInvalid       = errors.New("recovery workspace is invalid or incomplete")
-	ErrPermissions   = errors.New("recovery storage permissions, ownership or hard links are unsafe; keep recovery folders out of synced folders such as iCloud Drive")
+	ErrPermissions   = errors.New("recovery storage permissions, ownership or hard links are unsafe")
 	ErrKey           = errors.New("recovery key is missing, invalid, or does not match")
 	ErrCompatibility = errors.New("recovery configuration does not match this workspace")
 	ErrStorage       = errors.New("recovery storage operation failed")
 	ErrClosed        = errors.New("recovery workspace is closed")
 )
 
+// Reasons name the private-storage condition that failed. They never contain
+// a path, so a failure can be reported and diagnosed from its message alone.
+var (
+	errOwnedByOther     = errors.New("owned by another account")
+	errLoosePermissions = errors.New("readable or writable by other users")
+	errNotRegular       = errors.New("not a regular file")
+	errNotDirectory     = errors.New("not a directory")
+	errMultiplyLinked   = errors.New("has more than one hard link; a sync service such as iCloud Drive may be linking it")
+	errHasACL           = errors.New("has an access control list")
+	errReparsePoint     = errors.New("is a reparse point")
+	errInheritsDACL     = errors.New("inherits permissions from its parent folder")
+	errOtherPrincipal   = errors.New("grants access to another account")
+	errIdentityChanged  = errors.New("file identity changed between checks")
+	errFoldersOverlap   = errors.New("the workspace and key folders contain each other")
+)
+
 // Preserve underlying filesystem causes for errors.Is without printing paths.
 type failure struct{ kind, cause error }
 
 func (e *failure) Error() string {
-	if cause := describeCause(e.cause); cause != "" {
-		return e.kind.Error() + ": " + cause
+	cause := e.cause
+	for {
+		if inner, ok := cause.(*failure); ok && inner.kind == e.kind {
+			cause = inner.cause
+			continue
+		}
+		break
+	}
+	if cause == e.kind {
+		cause = nil
+	}
+	if text := describeCause(cause); text != "" {
+		return e.kind.Error() + ": " + text
 	}
 	return e.kind.Error()
 }
@@ -153,7 +180,7 @@ func normalize(o Options) (Options, error) {
 		return o, err
 	}
 	if contained(o.Directory, o.KeyDirectory) || contained(o.KeyDirectory, o.Directory) {
-		return o, ErrPermissions
+		return o, fail(ErrPermissions, errFoldersOverlap)
 	}
 	return o, nil
 }
@@ -186,7 +213,7 @@ func openPrivateRoot(ctx context.Context, path string, create, allowExisting boo
 		var held os.FileInfo
 		held, err = f.Stat()
 		if err == nil && !os.SameFile(info, held) {
-			err = ErrPermissions
+			err = errIdentityChanged
 		}
 		if err == nil && created {
 			err = finishPrivateDirectory(ctx, f)
@@ -208,7 +235,7 @@ func openPrivateFile(ctx context.Context, root *os.Root, name string, flags int)
 	}
 	if info, err := root.Lstat(name); err == nil {
 		if !info.Mode().IsRegular() {
-			return nil, ErrPermissions
+			return nil, fail(ErrPermissions, errNotRegular)
 		}
 	} else if !os.IsNotExist(err) || flags&os.O_CREATE == 0 {
 		return nil, fail(ErrStorage, err)
@@ -227,8 +254,11 @@ func openPrivateFile(ctx context.Context, root *os.Root, name string, flags int)
 	if err == nil {
 		var current os.FileInfo
 		current, err = root.Lstat(name)
-		if err == nil && (!current.Mode().IsRegular() || !os.SameFile(held, current)) {
-			err = ErrPermissions
+		if err == nil && !current.Mode().IsRegular() {
+			err = errNotRegular
+		}
+		if err == nil && !os.SameFile(held, current) {
+			err = errIdentityChanged
 		}
 	}
 	if err == nil {
@@ -395,7 +425,7 @@ func separateRoots(a, b *os.Root) error {
 				return fail(ErrStorage, err)
 			}
 			if os.SameFile(held, info) {
-				return ErrPermissions
+				return fail(ErrPermissions, errFoldersOverlap)
 			}
 			if path == filepath.Dir(path) {
 				break

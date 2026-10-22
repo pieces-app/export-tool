@@ -166,12 +166,18 @@ func (s *Store) checkFiles(ctx context.Context) error {
 	// SQLite opens journals by pathname. A moved or replaced directory must
 	// not redirect those writes away from the root this operation owns.
 	named, err := os.Lstat(s.w.root.Name())
-	if err != nil || !named.IsDir() || named.Mode()&os.ModeSymlink != 0 {
+	if err != nil {
 		return fail(ErrPermissions, err)
 	}
+	if !named.IsDir() || named.Mode()&os.ModeSymlink != 0 {
+		return fail(ErrPermissions, errNotDirectory)
+	}
 	held, err := s.w.root.Stat(".")
-	if err != nil || !os.SameFile(named, held) {
+	if err != nil {
 		return fail(ErrPermissions, err)
+	}
+	if !os.SameFile(named, held) {
+		return fail(ErrPermissions, errIdentityChanged)
 	}
 	for _, suffix := range []string{"", "-journal", "-wal", "-shm"} {
 		name := storeFile + suffix
@@ -187,8 +193,11 @@ func (s *Store) checkFiles(ctx context.Context) error {
 		}
 		if suffix == "" {
 			held, err := s.guard.Stat()
-			if err != nil || !os.SameFile(info, held) {
+			if err != nil {
 				return fail(ErrPermissions, err)
+			}
+			if !os.SameFile(info, held) {
+				return fail(ErrPermissions, errIdentityChanged)
 			}
 			// Never open/close another descriptor for the database while
 			// SQLite owns it: POSIX close releases this process's fcntl locks

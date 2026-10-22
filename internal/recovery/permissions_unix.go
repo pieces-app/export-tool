@@ -24,8 +24,19 @@ func checkPrivate(ctx context.Context, f *os.File, directory bool) error {
 		return err
 	}
 	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || stat.Uid != uint32(os.Geteuid()) || info.Mode().Perm()&0077 != 0 || directory != info.IsDir() || !directory && (!info.Mode().IsRegular() || stat.Nlink != 1) {
+	switch {
+	case !ok:
 		return ErrPermissions
+	case stat.Uid != uint32(os.Geteuid()):
+		return errOwnedByOther
+	case info.Mode().Perm()&0077 != 0:
+		return errLoosePermissions
+	case directory && !info.IsDir():
+		return errNotDirectory
+	case !directory && !info.Mode().IsRegular():
+		return errNotRegular
+	case !directory && stat.Nlink != 1:
+		return errMultiplyLinked
 	}
 	return checkPlatformACL(ctx, f)
 }

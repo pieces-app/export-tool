@@ -133,6 +133,10 @@ This protects against exposing plaintext through a copied workspace alone. It do
 
 Hold an OS-backed exclusive lock for the entire resume/export operation. A PID, timestamp, stale file, or elapsed timeout is not sufficient evidence that another writer stopped. Verify lock release after an abrupt process exit on each platform. Resume must refuse active ownership; it must never stop the owner. Relative paths must resolve inside their intended roots, and destination creation/final rename remain exclusive.
 
+### Windows ownership
+
+Every private directory is created with an explicit security descriptor (owner: the user; protected DACL: SYSTEM and the user), and every private file the tool creates has its owner set to the user after creation, because an elevated administrator token gives new files to the Administrators group by default. Files that other code creates in the workspace, such as SQLite's rollback journal, do not pass through that step. On 0.18.0-rc5 through rc7, `checkFiles` runs while the first write transaction is still open, finds the journal owned by Administrators in an elevated window, and fails the whole store with `ErrPermissions` (issue #20); non-elevated windows were unaffected. Since 0.18.0-rc8 the process adopts the user as its token's default owner at startup (`SetTokenInformation(TokenOwner)`), so every file it creates is owned by the user regardless of elevation. The strict owner check is unchanged. `ErrPermissions` failures now end with the condition that failed (owner, permissions, hard links, reparse point, inherited or foreign access entries, or a changed file identity) and never repeat the kind text; owner mismatches in an elevated window say so.
+
 ## Transaction contract
 
 Use one controlled database connection initially. A capture transaction contains:
