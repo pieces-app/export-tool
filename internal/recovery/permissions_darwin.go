@@ -50,7 +50,7 @@ func checkPlatformACL(ctx context.Context, f *os.File) error {
 		return errno
 	}
 	if binary.NativeEndian.Uint32(buffer[0:4]) != 12 || binary.NativeEndian.Uint32(buffer[4:8]) != 8 || binary.NativeEndian.Uint32(buffer[8:12]) != 0 {
-		return ErrPermissions
+		return errHasACL
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package recovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -10,6 +11,43 @@ import (
 
 	"golang.org/x/sys/windows"
 )
+
+// Files created without an explicit security descriptor take the token's
+// default owner. For an elevated administrator that is the Administrators
+// group, so SQLite's rollback journal, which the database driver creates, was
+// owned by Administrators and failed checkPrivate's owner test while the
+// tool's own files passed, because finishPrivateFile sets their owner
+// (issue #20). Adopting the user as the default owner makes every file this
+// process creates pass the same test.
+var defaultOwnerErr = adoptUserAsDefaultOwner()
+
+func adoptUserAsDefaultOwner() error {
+	var token windows.Token
+	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY|windows.TOKEN_ADJUST_DEFAULT, &token); err != nil {
+		return err
+	}
+	defer token.Close()
+	user, err := token.GetTokenUser()
+	if err != nil {
+		return err
+	}
+	owner := struct{ Owner *windows.SID }{user.User.Sid}
+	err = windows.SetTokenInformation(token, windows.TokenOwner, (*byte)(unsafe.Pointer(&owner)), uint32(unsafe.Sizeof(owner)))
+	runtime.KeepAlive(user)
+	return err
+}
+
+// ownerReason explains an owner mismatch. The common cause is an elevated
+// window whose default owner could not be changed.
+func ownerReason() error {
+	if windows.GetCurrentProcessToken().IsElevated() {
+		if defaultOwnerErr != nil {
+			return fmt.Errorf("%w; this window is elevated and the process could not adopt the user as default owner (%v); run the export from a window that is not run as administrator", errOwnedByOther, defaultOwnerErr)
+		}
+		return fmt.Errorf("%w; this window is elevated", errOwnedByOther)
+	}
+	return errOwnedByOther
+}
 
 func extendedPath(path string) string {
 	if strings.HasPrefix(path, `\\?\`) {
@@ -66,8 +104,11 @@ func finishPrivateFile(ctx context.Context, f *os.File) error {
 		return err
 	}
 	after, err := other.Stat()
-	if err != nil || !os.SameFile(before, after) {
-		return ErrPermissions
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(before, after) {
+		return errIdentityChanged
 	}
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
@@ -85,8 +126,15 @@ func checkPrivate(ctx context.Context, f *os.File, directory bool) error {
 	if err := windows.GetFileInformationByHandle(h, &info); err != nil {
 		return err
 	}
-	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || (info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0) != directory || !directory && info.NumberOfLinks != 1 {
-		return ErrPermissions
+	switch {
+	case info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0:
+		return errReparsePoint
+	case directory && info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0:
+		return errNotDirectory
+	case !directory && info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0:
+		return errNotRegular
+	case !directory && info.NumberOfLinks != 1:
+		return errMultiplyLinked
 	}
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
@@ -99,33 +147,33 @@ func checkPrivate(ctx context.Context, f *os.File, directory bool) error {
 	defer runtime.KeepAlive(sd)
 	owner, _, err := sd.Owner()
 	if err != nil || owner == nil || !owner.Equals(user.User.Sid) {
-		return ErrPermissions
+		return ownerReason()
 	}
 	acl, _, err := sd.DACL()
 	if err != nil || acl == nil || acl.AceCount == 0 {
-		return ErrPermissions
+		return errOtherPrincipal
 	}
 	if directory {
 		control, _, err := sd.Control()
 		if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
-			return ErrPermissions
+			return errInheritsDACL
 		}
 	}
 	userAllowed := false
 	for i := uint32(0); i < uint32(acl.AceCount); i++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
 		if err := windows.GetAce(acl, i, &ace); err != nil || ace == nil || ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE || ace.Header.AceSize < uint16(unsafe.Sizeof(windows.ACCESS_ALLOWED_ACE{})) {
-			return ErrPermissions
+			return errOtherPrincipal
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 		if sid.Equals(user.User.Sid) {
 			userAllowed = true
 		} else if !sid.IsWellKnown(windows.WinLocalSystemSid) {
-			return ErrPermissions
+			return errOtherPrincipal
 		}
 	}
 	if !userAllowed {
-		return ErrPermissions
+		return errOtherPrincipal
 	}
 	return nil
 }
