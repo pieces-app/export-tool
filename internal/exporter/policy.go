@@ -458,6 +458,7 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 			secrets[secret] = "known credential value"
 		}
 	}
+	escapedSecrets := map[string]string{}
 	// Readers and the final audit see Markdown and HTML escapes resolved. Text
 	// stored with them, such as Markdown source or HTML-escaped web text, can
 	// read as a secret only in that form (issue #21). Scan that form too and
@@ -478,18 +479,55 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 				secrets[f.Secret] = "secret pattern " + f.RuleID
 				continue
 			}
+			if _, seen := escapedSecrets[f.Secret]; seen {
+				continue
+			}
 			pattern := escapedSecretPattern(f.Secret)
 			if !pattern.MatchString(value) {
 				stats.redact("encoded secret pattern " + f.RuleID)
 				return "[WITHHELD:ENCODED_SECRET]", nil
 			}
-			stats.redact("secret pattern " + f.RuleID)
-			value = pattern.ReplaceAllLiteralString(value, "[REDACTED:SECRET]")
+			escapedSecrets[f.Secret] = "secret pattern " + f.RuleID
+		}
+		for secret := range s.known {
+			if _, seen := secrets[secret]; seen || secret == "" || !strings.Contains(rendered, secret) {
+				continue
+			}
+			if strings.Contains(value, secret) {
+				secrets[secret] = "known credential value"
+				continue
+			}
+			if _, seen := escapedSecrets[secret]; seen {
+				continue
+			}
+			pattern := escapedSecretPattern(secret)
+			if !pattern.MatchString(value) {
+				stats.redact("encoded known credential value")
+				return "[WITHHELD:ENCODED_SECRET]", nil
+			}
+			escapedSecrets[secret] = "known credential value"
 		}
 	}
 	ordered := []string{}
 	for secret := range secrets {
 		ordered = append(ordered, secret)
+	}
+	escapedOrdered := []string{}
+	for secret := range escapedSecrets {
+		escapedOrdered = append(escapedOrdered, secret)
+	}
+	sort.Slice(escapedOrdered, func(i, j int) bool {
+		if len(escapedOrdered[i]) != len(escapedOrdered[j]) {
+			return len(escapedOrdered[i]) > len(escapedOrdered[j])
+		}
+		return escapedOrdered[i] < escapedOrdered[j]
+	})
+	for _, secret := range escapedOrdered {
+		pattern := escapedSecretPattern(secret)
+		if pattern.MatchString(value) {
+			stats.redact(escapedSecrets[secret])
+			value = pattern.ReplaceAllLiteralString(value, "[REDACTED:SECRET]")
+		}
 	}
 	sort.Slice(ordered, func(i, j int) bool {
 		if len(ordered[i]) != len(ordered[j]) {

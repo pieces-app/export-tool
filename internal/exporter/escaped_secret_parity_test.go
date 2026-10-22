@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/zricethezav/gitleaks/v8/detect"
+	"github.com/zricethezav/gitleaks/v8/report"
 )
 
 // Readers and the final audit see Markdown and HTML escapes resolved. Stored
@@ -53,6 +56,44 @@ func TestSanitizePreservesHarmlessEscapes(t *testing.T) {
 	clean, stats, err := s.Sanitize(context.Background(), map[string]any{"id": "x", "readable": body})
 	if err != nil || stats.Redactions != 0 || fieldString(clean, "readable") != body {
 		t.Fatalf("harmless escapes changed: %q (redactions %d, err %v)", fieldString(clean, "readable"), stats.Redactions, err)
+	}
+}
+
+func TestEscapedDuplicateFindingsRedactInPlace(t *testing.T) {
+	secret := "ghp_duplicate_secret"
+	stored := `before ghp\_duplicate\_secret after`
+	original := detectFragment
+	detectFragment = func(ctx context.Context, d *detect.Detector, f detect.Fragment) []report.Finding {
+		if strings.Contains(f.Raw, secret) {
+			return []report.Finding{
+				{RuleID: "one", Secret: secret},
+				{RuleID: "two", Secret: secret},
+			}
+		}
+		return nil
+	}
+	defer func() { detectFragment = original }()
+
+	s := scanner(t, DefaultPolicy())
+	got, err := s.cleanString(context.Background(), "text", stored, &ScanResult{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == "[WITHHELD:ENCODED_SECRET]" || strings.Contains(got, "duplicate") || !strings.Contains(got, "before ") || !strings.Contains(got, " after") {
+		t.Fatalf("duplicate escaped findings were not redacted in place: %q", got)
+	}
+}
+
+func TestKnownCredentialHiddenByEscapesRedacts(t *testing.T) {
+	s := scanner(t, DefaultPolicy())
+	secret := "my_app_secret"
+	s.known[secret] = true
+	got, err := s.cleanString(context.Background(), "text", `before my\_app\_secret after`, &ScanResult{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, secret) || strings.Contains(got, `my\_app\_secret`) || !strings.Contains(got, "before ") || !strings.Contains(got, " after") {
+		t.Fatalf("known escaped credential was not redacted in place: %q", got)
 	}
 }
 
