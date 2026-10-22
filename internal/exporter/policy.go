@@ -458,6 +458,35 @@ func (s *Scanner) cleanString(ctx context.Context, key, value string, stats *Sca
 			secrets[secret] = "known credential value"
 		}
 	}
+	// Readers and the final audit see Markdown and HTML escapes resolved. Text
+	// stored with them, such as Markdown source or HTML-escaped web text, can
+	// read as a secret only in that form (issue #21). Scan that form too and
+	// redact the match in the stored text, allowing the escapes back in.
+	if rendered := markdownAuditUnescape.Replace(value); rendered != value {
+		extra, err := s.detectSecrets(ctx, key+"="+rendered, stats)
+		if err != nil {
+			return "", err
+		}
+		for _, f := range extra {
+			if f.Secret == "" {
+				continue
+			}
+			if _, seen := secrets[f.Secret]; seen {
+				continue
+			}
+			if strings.Contains(value, f.Secret) {
+				secrets[f.Secret] = "secret pattern " + f.RuleID
+				continue
+			}
+			pattern := escapedSecretPattern(f.Secret)
+			if !pattern.MatchString(value) {
+				stats.redact("encoded secret pattern " + f.RuleID)
+				return "[WITHHELD:ENCODED_SECRET]", nil
+			}
+			stats.redact("secret pattern " + f.RuleID)
+			value = pattern.ReplaceAllLiteralString(value, "[REDACTED:SECRET]")
+		}
+	}
 	ordered := []string{}
 	for secret := range secrets {
 		ordered = append(ordered, secret)
@@ -680,6 +709,26 @@ func markdownUnescape(s string) string {
 
 func asciiPunctuation(c byte) bool {
 	return c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~'
+}
+
+// escapedSecretPattern matches a secret found in escape-resolved text against
+// the stored text, where "_" may be written "\\_" and "<" and ">" as "&lt;"
+// and "&gt;".
+func escapedSecretPattern(secret string) *regexp.Regexp {
+	var b strings.Builder
+	for _, r := range secret {
+		switch r {
+		case '_':
+			b.WriteString(`\\?_`)
+		case '<':
+			b.WriteString(`(?:<|&lt;)`)
+		case '>':
+			b.WriteString(`(?:>|&gt;)`)
+		default:
+			b.WriteString(regexp.QuoteMeta(string(r)))
+		}
+	}
+	return regexp.MustCompile(b.String())
 }
 
 func (s *Scanner) remember(value string) {
